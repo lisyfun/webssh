@@ -1,0 +1,155 @@
+package auth
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"net/http"
+	"sync"
+)
+
+type Auth struct {
+	username string
+	password string
+	tokens   map[string]bool
+	mu       sync.RWMutex
+}
+
+func New(username, password string) *Auth {
+	return &Auth{
+		username: username,
+		password: password,
+		tokens:   make(map[string]bool),
+	}
+}
+
+func (a *Auth) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" || r.URL.Path == "/logout" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		cookie, err := r.Cookie("token")
+		if err != nil {
+			redirectLogin(w, r)
+			return
+		}
+
+		a.mu.RLock()
+		valid := a.tokens[cookie.Value]
+		a.mu.RUnlock()
+		if !valid {
+			redirectLogin(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		user := r.FormValue("user")
+		pass := r.FormValue("pass")
+
+		if user == a.username && pass == a.password {
+			token := generateToken()
+			a.mu.Lock()
+			a.tokens[token] = true
+			a.mu.Unlock()
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     "token",
+				Value:    token,
+				Path:     "/",
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
+
+		w.Write([]byte(loginPage("用户名或密码错误")))
+		return
+	}
+
+	w.Write([]byte(loginPage("")))
+}
+
+func (a *Auth) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("token")
+	if err == nil {
+		a.mu.Lock()
+		delete(a.tokens, cookie.Value)
+		a.mu.Unlock()
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:   "token",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+func redirectLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Upgrade") == "websocket" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+func generateToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func loginPage(errMsg string) string {
+	errStyle := "display:none"
+	if errMsg != "" {
+		errStyle = ""
+	}
+	return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebSSH - 登录</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; align-items: center; justify-content: center; }
+.login-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 32px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.login-box h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.login-box .sub { font-size: 12px; color: #8b949e; margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #e6edf3; font-size: 14px; outline: none; }
+.form-group input:focus { border-color: #4a8cff; }
+.btn { width: 100%; padding: 8px; border: none; border-radius: 4px; background: #4a8cff; color: #fff; font-size: 14px; cursor: pointer; }
+.btn:hover { background: #3a7ae8; }
+.error { color: #ff7b72; font-size: 12px; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <h1>WebSSH</h1>
+  <div class="sub">请输入登录信息</div>
+  <form method="post" action="/login">
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" name="user" autofocus>
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" name="pass">
+    </div>
+    <button class="btn" type="submit">登录</button>
+    <div class="error" style="` + errStyle + `">` + errMsg + `</div>
+  </form>
+</div>
+</body>
+</html>`
+}
