@@ -5,25 +5,73 @@ import (
 	"encoding/hex"
 	"net/http"
 	"sync"
+	"time"
 )
 
+type tokenEntry struct {
+	created time.Time
+	ip      string
+}
+
+type rateEntry struct {
+	count    int
+	firstTry time.Time
+}
+
 type Auth struct {
-	username string
-	password string
-	tokens   map[string]bool
-	mu       sync.RWMutex
+	username  string
+	password  string
+	tokens    map[string]tokenEntry
+	rateLimit map[string]*rateEntry
+	mu        sync.RWMutex
+	tokenTTL  time.Duration
+	maxLogins int
+	banTime   time.Duration
 }
 
 func New(username, password string) *Auth {
-	return &Auth{
-		username: username,
-		password: password,
-		tokens:   make(map[string]bool),
+	a := &Auth{
+		username:  username,
+		password:  password,
+		tokens:    make(map[string]tokenEntry),
+		rateLimit: make(map[string]*rateEntry),
+		tokenTTL:  24 * time.Hour,
+		maxLogins: 5,
+		banTime:   15 * time.Minute,
+	}
+	go a.cleanupLoop()
+	return a
+}
+
+func (a *Auth) cleanupLoop() {
+	for {
+		time.Sleep(10 * time.Minute)
+		a.mu.Lock()
+		for k, v := range a.tokens {
+			if time.Since(v.created) > a.tokenTTL {
+				delete(a.tokens, k)
+			}
+		}
+		now := time.Now()
+		for k, v := range a.rateLimit {
+			if now.Sub(v.firstTry) > a.banTime {
+				delete(a.rateLimit, k)
+			}
+		}
+		a.mu.Unlock()
 	}
 }
 
 func (a *Auth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "same-origin")
+
+		if r.TLS != nil {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		}
+
 		if r.URL.Path == "/login" || r.URL.Path == "/logout" {
 			next.ServeHTTP(w, r)
 			return
@@ -36,9 +84,15 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 		}
 
 		a.mu.RLock()
-		valid := a.tokens[cookie.Value]
+		entry, ok := a.tokens[cookie.Value]
 		a.mu.RUnlock()
-		if !valid {
+
+		if !ok || time.Since(entry.created) > a.tokenTTL {
+			if ok {
+				a.mu.Lock()
+				delete(a.tokens, cookie.Value)
+				a.mu.Unlock()
+			}
 			redirectLogin(w, r)
 			return
 		}
@@ -49,6 +103,25 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 
 func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
+		ip := r.RemoteAddr
+
+		a.mu.Lock()
+		re, exists := a.rateLimit[ip]
+		if exists {
+			if time.Since(re.firstTry) > a.banTime {
+				re.count = 0
+				re.firstTry = time.Now()
+			} else if re.count >= a.maxLogins {
+				a.mu.Unlock()
+				w.Write([]byte(loginPage("登录尝试过多，请15分钟后再试")))
+				return
+			}
+		} else {
+			a.rateLimit[ip] = &rateEntry{firstTry: time.Now()}
+		}
+		a.rateLimit[ip].count++
+		a.mu.Unlock()
+
 		r.ParseForm()
 		user := r.FormValue("user")
 		pass := r.FormValue("pass")
@@ -56,7 +129,8 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		if user == a.username && pass == a.password {
 			token := generateToken()
 			a.mu.Lock()
-			a.tokens[token] = true
+			a.tokens[token] = tokenEntry{created: time.Now(), ip: ip}
+			delete(a.rateLimit, ip)
 			a.mu.Unlock()
 
 			http.SetCookie(w, &http.Cookie{
@@ -64,7 +138,8 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 				Value:    token,
 				Path:     "/",
 				HttpOnly: true,
-				SameSite: http.SameSiteLaxMode,
+				Secure:   r.TLS != nil,
+				SameSite: http.SameSiteStrictMode,
 			})
 			http.Redirect(w, r, "/", http.StatusFound)
 			return

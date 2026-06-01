@@ -16,6 +16,8 @@ var (
 	staticDir = flag.String("static", "static", "static files directory")
 	user      = flag.String("user", "admin", "login username")
 	pass      = flag.String("pass", "admin", "login password")
+	certFile  = flag.String("cert", "", "TLS certificate file (enables HTTPS)")
+	keyFile   = flag.String("key", "", "TLS private key file")
 )
 
 func main() {
@@ -40,6 +42,13 @@ func main() {
 
 	handler := a.Middleware(r)
 
-	log.Printf("WebSSH server starting on %s (user=%s)", *addr, *user)
-	log.Fatal(http.ListenAndServe(*addr, handler))
+	if *certFile != "" && *keyFile != "" {
+		log.Printf("WebSSH server starting on %s (user=%s, TLS)", *addr, *user)
+		log.Fatal(http.ListenAndServeTLS(*addr, *certFile, *keyFile, handler))
+	} else {
+		log.Printf("WebSSH server starting on %s (user=%s, plain HTTP)", *addr, *user)
+		log.Println("WARNING: plain HTTP — all traffic including passwords is visible on the network!")
+		log.Println("         use -cert and -key to enable HTTPS encryption")
+		log.Fatal(http.ListenAndServe(*addr, handler))
+	}
 }
