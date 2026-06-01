@@ -59,6 +59,9 @@ func main() {
 
 	r.HandleFunc(basePath+"/login", a.LoginHandler)
 	r.HandleFunc(basePath+"/logout", a.LogoutHandler)
+	r.HandleFunc(basePath, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, basePath+"/", http.StatusFound)
+	})
 
 	s := r.PathPrefix(basePath).Subrouter()
 	s.Use(a.Middleware)
