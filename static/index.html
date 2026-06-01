@@ -466,7 +466,7 @@ input, textarea, button { font-family: inherit; }
       <h2 style="margin:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" id="editor-title"></h2>
       <span id="editor-status" style="font-size:12px;color:var(--text-muted);margin-left:12px;white-space:nowrap"></span>
     </div>
-    <textarea id="editor-textarea"></textarea>
+    <div id="editor-cm"></div>
     <div class="modal-actions" style="margin-top:12px">
       <button class="btn-cancel" onclick="closeEditor()">取消</button>
       <button class="btn-primary" onclick="saveEditor()">保存</button>
@@ -1082,8 +1082,10 @@ function openEditor(name) {
     })
     .then(text => {
       document.getElementById('editor-status').textContent = '';
-      if (activeEditorCM) activeEditorCM.toTextArea();
-      activeEditorCM = CodeMirror.fromTextArea(document.getElementById('editor-textarea'), {
+      var container = document.getElementById('editor-cm');
+      container.innerHTML = '';
+      activeEditorCM = CodeMirror(container, {
+        value: text,
         lineNumbers: true,
         lineWrapping: true,
         indentUnit: 2,
@@ -1096,7 +1098,6 @@ function openEditor(name) {
           'Cmd-S': function() { saveEditor(); }
         }
       });
-      activeEditorCM.setValue(text);
       activeEditorCM.focus();
     })
     .catch(err => {
@@ -1105,10 +1106,6 @@ function openEditor(name) {
 }
 
 function closeEditor() {
-  if (activeEditorCM) {
-    activeEditorCM.toTextArea();
-    activeEditorCM = null;
-  }
   activeEditorFile = null;
   document.getElementById('editor-overlay').style.display = 'none';
   document.getElementById('editor-status').textContent = '';
