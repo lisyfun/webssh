@@ -77,6 +77,8 @@ func main() {
 	api.HandleFunc("/remove", sshterm.HandleFSRemove).Methods("POST")
 	api.HandleFunc("/rename", sshterm.HandleFSRename).Methods("POST")
 	api.HandleFunc("/mkdir", sshterm.HandleFSMkdir).Methods("POST")
+	api.HandleFunc("/read", sshterm.HandleFSRead).Methods("GET")
+	api.HandleFunc("/write", sshterm.HandleFSWrite).Methods("POST")
 
 	staticSub, _ := fs.Sub(staticFS, "static")
 	fileServer := http.FileServer(http.FS(staticSub))

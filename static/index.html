@@ -266,6 +266,26 @@ input, textarea, button { font-family: inherit; }
 .modal .modal-actions .btn-cancel:hover { background: var(--bg-hover); }
 .confirm-modal { width: 340px; }
 .confirm-modal p { font-size: 14px; margin: 0; line-height: 1.6; color: var(--text-primary); }
+
+.editor-modal .CodeMirror { height: 60vh; font-size: 13px; border: 1px solid var(--border-color); border-radius: 4px; }
+.editor-modal .CodeMirror-gutters { background: var(--bg-tertiary); border-right: 1px solid var(--border-color); }
+.editor-modal .CodeMirror-linenumber { color: var(--text-muted); }
+.editor-modal .CodeMirror-cursor { border-left: 1px solid var(--text-primary); }
+.editor-modal .cm-s-default .CodeMirror-activeline-background { background: var(--bg-hover); }
+.editor-modal .cm-s-default .cm-keyword { color: #ff7b72; }
+.editor-modal .cm-s-default .cm-def { color: #79c0ff; }
+.editor-modal .cm-s-default .cm-string { color: #a5d6ff; }
+.editor-modal .cm-s-default .cm-number { color: #79c0ff; }
+.editor-modal .cm-s-default .cm-comment { color: #8b949e; }
+.editor-modal .cm-s-default .cm-variable { color: #e6edf3; }
+.editor-modal .cm-s-default .cm-operator { color: #e6edf3; }
+.editor-modal .cm-s-default .cm-builtin { color: #d2a8ff; }
+.editor-modal .cm-s-default .cm-atom { color: #79c0ff; }
+.editor-modal .cm-s-default .cm-meta { color: #8b949e; }
+.editor-modal .cm-s-default .cm-tag { color: #ff7b72; }
+.editor-modal .cm-s-default .cm-attribute { color: #ffa657; }
+.editor-modal .CodeMirror-focused .CodeMirror-selected { background: #264f78; }
+.CodeMirror { background: #0d1117; color: #e6edf3; }
 </style>
 </head>
 <body>
@@ -439,12 +459,28 @@ input, textarea, button { font-family: inherit; }
   </div>
 </div>
 
+<!-- Editor Modal -->
+<div class="modal-overlay" id="editor-overlay" style="display:none">
+  <div class="modal editor-modal" style="width:800px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" id="editor-title"></h2>
+      <span id="editor-status" style="font-size:12px;color:var(--text-muted);margin-left:12px;white-space:nowrap"></span>
+    </div>
+    <textarea id="editor-textarea"></textarea>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="closeEditor()">取消</button>
+      <button class="btn-primary" onclick="saveEditor()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hidden file input -->
 <input type="file" id="file-input" style="display:none" multiple onchange="fileUploadDo(this)">
 <div class="toast" id="toast"></div>
 
 <script src="lib/xterm.min.js"></script>
 <script src="lib/xterm-addon-fit.min.js"></script>
+<script src="lib/codemirror.min.js"></script>
 <script>
 // ---- State ----
 let servers = JSON.parse(localStorage.getItem('webssh_servers') || '[]');
@@ -975,6 +1011,7 @@ function loadFileList(dir) {
           <span class="mtime">${mtime}</span>
           <span class="file-actions">
             ${f.isDir ? '' : `<button onclick="event.stopPropagation();fileDownload('${escJsStr(f.name)}')" title="下载">&#x2193;</button>`}
+            ${f.isDir ? '' : `<button onclick="event.stopPropagation();openEditor('${escJsStr(f.name)}')" title="编辑">&#x270D;</button>`}
             <button onclick="event.stopPropagation();fileRename('${escJsStr(f.name)}')" title="重命名">&#x270E;</button>
             <button class="del" onclick="event.stopPropagation();fileDelete('${escJsStr(f.name)}')" title="删除">&times;</button>
           </span>
@@ -1024,6 +1061,83 @@ function fileDownload(name) {
   if (!ses) return;
   const p = ses.fsPath + '/' + name;
   window.open(`__BASE_PATH__/api/fs/${ses.sessionId}/download?path=${encodeURIComponent(p)}`, '_blank');
+}
+
+var activeEditorFile = null;
+var activeEditorCM = null;
+
+function openEditor(name) {
+  const ses = getActiveSession();
+  if (!ses) return;
+  activeEditorFile = ses.fsPath + '/' + name;
+
+  document.getElementById('editor-title').textContent = name;
+  document.getElementById('editor-status').textContent = '加载中...';
+  document.getElementById('editor-overlay').style.display = 'flex';
+
+  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/read?path=${encodeURIComponent(activeEditorFile)}`)
+    .then(r => {
+      if (!r.ok) throw new Error(r.statusText);
+      return r.text();
+    })
+    .then(text => {
+      document.getElementById('editor-status').textContent = '';
+      const ta = document.getElementById('editor-textarea');
+      ta.value = text;
+
+      if (activeEditorCM) activeEditorCM.toTextArea();
+      activeEditorCM = CodeMirror.fromTextArea(ta, {
+        lineNumbers: true,
+        lineWrapping: true,
+        indentUnit: 2,
+        tabSize: 2,
+        indentWithTabs: false,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        extraKeys: {
+          'Ctrl-S': function() { saveEditor(); },
+          'Cmd-S': function() { saveEditor(); }
+        }
+      });
+      activeEditorCM.focus();
+    })
+    .catch(err => {
+      document.getElementById('editor-status').textContent = '加载失败: ' + err.message;
+    });
+}
+
+function closeEditor() {
+  if (activeEditorCM) {
+    activeEditorCM.toTextArea();
+    activeEditorCM = null;
+  }
+  activeEditorFile = null;
+  document.getElementById('editor-overlay').style.display = 'none';
+  document.getElementById('editor-status').textContent = '';
+}
+
+function saveEditor() {
+  if (!activeEditorCM) return;
+  const ses = getActiveSession();
+  if (!ses) return;
+  const content = activeEditorCM.getValue();
+  document.getElementById('editor-status').textContent = '保存中...';
+
+  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/write?path=${encodeURIComponent(activeEditorFile)}`, {
+    method: 'POST',
+    body: content,
+  }).then(r => r.json()).then(res => {
+    if (res.success) {
+      showToast('保存成功', 'success');
+      document.getElementById('editor-status').textContent = '';
+    } else {
+      document.getElementById('editor-status').textContent = '保存失败: ' + (res.error || '');
+      showToast(res.error || '保存失败', 'error');
+    }
+  }).catch(err => {
+    document.getElementById('editor-status').textContent = '保存失败: ' + err.message;
+    showToast('保存失败', 'error');
+  });
 }
 
 var _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };

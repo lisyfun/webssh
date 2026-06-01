@@ -258,6 +258,80 @@ func HandleFSMkdir(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ActionResponse{Success: true})
 }
 
+func HandleFSRead(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sessionID := vars["id"]
+	filePath := r.URL.Query().Get("path")
+	if filePath == "" {
+		http.Error(w, "path required", http.StatusBadRequest)
+		return
+	}
+	filePath = path.Clean(filePath)
+
+	s, err := Manager.Get(sessionID)
+	if err != nil {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	sc, err := sftp.NewClient(s.Client)
+	if err != nil {
+		http.Error(w, "sftp init failed", http.StatusInternalServerError)
+		return
+	}
+	defer sc.Close()
+
+	f, err := sc.Open(filePath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	io.Copy(w, f)
+}
+
+func HandleFSWrite(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sessionID := vars["id"]
+	filePath := r.URL.Query().Get("path")
+	if filePath == "" {
+		jsonError(w, "path required")
+		return
+	}
+	filePath = path.Clean(filePath)
+
+	s, err := Manager.Get(sessionID)
+	if err != nil {
+		jsonError(w, "session not found")
+		return
+	}
+
+	sc, err := sftp.NewClient(s.Client)
+	if err != nil {
+		jsonError(w, "sftp init failed: "+err.Error())
+		return
+	}
+	defer sc.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		jsonError(w, "read body failed: "+err.Error())
+		return
+	}
+
+	dst, err := sc.Create(filePath)
+	if err != nil {
+		jsonError(w, "create remote file failed: "+err.Error())
+		return
+	}
+	defer dst.Close()
+
+	dst.Write(body)
+	json.NewEncoder(w).Encode(ActionResponse{Success: true})
+}
+
 func removeDir(sc *sftp.Client, dirPath string) error {
 	entries, err := sc.ReadDir(dirPath)
 	if err != nil {
