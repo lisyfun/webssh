@@ -1084,21 +1084,12 @@ function openEditor(name) {
       document.getElementById('editor-status').textContent = '';
       var container = document.getElementById('editor-cm');
       container.innerHTML = '';
-      activeEditorCM = CodeMirror(container, {
-        value: text,
-        lineNumbers: true,
-        lineWrapping: true,
-        indentUnit: 2,
-        tabSize: 2,
-        indentWithTabs: false,
-        matchBrackets: true,
-        autoCloseBrackets: true,
-        extraKeys: {
-          'Ctrl-S': function() { saveEditor(); },
-          'Cmd-S': function() { saveEditor(); }
-        }
-      });
-      activeEditorCM.focus();
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'width:100%;height:60vh;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:8px;font:13px/1.5 Menlo,Monaco,monospace;resize:vertical';
+      container.appendChild(ta);
+      ta.focus();
+      activeEditorCM = ta;
     })
     .catch(err => {
       document.getElementById('editor-status').textContent = '加载失败: ' + err.message;
@@ -1107,6 +1098,7 @@ function openEditor(name) {
 
 function closeEditor() {
   activeEditorFile = null;
+  activeEditorCM = null;
   document.getElementById('editor-overlay').style.display = 'none';
   document.getElementById('editor-status').textContent = '';
 }
@@ -1115,7 +1107,7 @@ function saveEditor() {
   if (!activeEditorCM) return;
   const ses = getActiveSession();
   if (!ses) return;
-  const content = activeEditorCM.getValue();
+  const content = activeEditorCM.value || activeEditorCM.getValue();
   document.getElementById('editor-status').textContent = '保存中...';
 
   fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/write?path=${encodeURIComponent(activeEditorFile)}`, {
