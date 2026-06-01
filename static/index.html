@@ -1082,11 +1082,8 @@ function openEditor(name) {
     })
     .then(text => {
       document.getElementById('editor-status').textContent = '';
-      const ta = document.getElementById('editor-textarea');
-      ta.value = text;
-
       if (activeEditorCM) activeEditorCM.toTextArea();
-      activeEditorCM = CodeMirror.fromTextArea(ta, {
+      activeEditorCM = CodeMirror.fromTextArea(document.getElementById('editor-textarea'), {
         lineNumbers: true,
         lineWrapping: true,
         indentUnit: 2,
@@ -1099,6 +1096,7 @@ function openEditor(name) {
           'Cmd-S': function() { saveEditor(); }
         }
       });
+      activeEditorCM.setValue(text);
       activeEditorCM.focus();
     })
     .catch(err => {
