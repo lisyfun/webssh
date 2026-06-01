@@ -3,12 +3,12 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"embed"
 	"encoding/hex"
 	"flag"
+	"io/fs"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"webssh/internal/auth"
@@ -17,14 +17,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
+//go:embed all:static
+var staticFS embed.FS
+
 var (
-	addr      = flag.String("addr", ":8080", "listen address")
-	staticDir = flag.String("static", "static", "static files directory")
-	user      = flag.String("user", "admin", "login username")
-	pass      = flag.String("pass", "", "login password (empty = auto-generate random)")
-	certFile  = flag.String("cert", "", "TLS certificate file (enables HTTPS)")
-	keyFile   = flag.String("key", "", "TLS private key file")
-	urlPath   = flag.String("url", "", "access path prefix (empty = auto-generate random)")
+	addr     = flag.String("addr", ":8080", "listen address")
+	user     = flag.String("user", "admin", "login username")
+	pass     = flag.String("pass", "", "login password (empty = auto-generate random)")
+	certFile = flag.String("cert", "", "TLS certificate file (enables HTTPS)")
+	keyFile  = flag.String("key", "", "TLS private key file")
+	urlPath  = flag.String("url", "", "access path prefix (empty = auto-generate random)")
 )
 
 func main() {
@@ -48,7 +50,7 @@ func main() {
 	}
 	log.Printf("login user: %s", *user)
 
-	indexBytes, err := os.ReadFile(filepath.Join(*staticDir, "index.html"))
+	indexBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
 		log.Fatal("failed to read index.html:", err)
 	}
@@ -76,7 +78,8 @@ func main() {
 	api.HandleFunc("/rename", sshterm.HandleFSRename).Methods("POST")
 	api.HandleFunc("/mkdir", sshterm.HandleFSMkdir).Methods("POST")
 
-	fs := http.FileServer(http.Dir(*staticDir))
+	staticSub, _ := fs.Sub(staticFS, "static")
+	fileServer := http.FileServer(http.FS(staticSub))
 	s.PathPrefix("/").Handler(http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "" {
 			http.Redirect(w, r, basePath+"/", http.StatusFound)
@@ -87,7 +90,7 @@ func main() {
 			w.Write(indexContent)
 			return
 		}
-		fs.ServeHTTP(w, r)
+		fileServer.ServeHTTP(w, r)
 	})))
 
 	r.PathPrefix("/").Handler(http.NotFoundHandler())
