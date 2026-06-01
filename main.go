@@ -66,14 +66,14 @@ func main() {
 	api.HandleFunc("/mkdir", sshterm.HandleFSMkdir).Methods("POST")
 
 	fs := http.FileServer(http.Dir(*staticDir))
-	s.PathPrefix("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.PathPrefix("/").Handler(http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write(indexContent)
 			return
 		}
 		fs.ServeHTTP(w, r)
-	}))
+	})))
 
 	r.PathPrefix("/").Handler(http.NotFoundHandler())
 
