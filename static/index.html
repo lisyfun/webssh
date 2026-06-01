@@ -1127,7 +1127,7 @@ function saveEditor() {
   }).then(r => r.json()).then(res => {
     if (res.success) {
       showToast('保存成功', 'success');
-      document.getElementById('editor-status').textContent = '';
+      closeEditor();
     } else {
       document.getElementById('editor-status').textContent = '保存失败: ' + (res.error || '');
       showToast(res.error || '保存失败', 'error');

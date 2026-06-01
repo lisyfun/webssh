@@ -77,7 +77,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	Manager.Create(params.SessionID, sshClient, params.Host, params.Port, params.Username)
+	Manager.Create(params.SessionID, sshClient, params.Host, params.Port, params.Username, params.Password, params.PrivateKey)
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
@@ -155,18 +155,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				// Wait a short moment after first output for MOTD to display
 				go func() { time.Sleep(200 * time.Millisecond); writePROMPT() }()
 			}
-		}
-	}()
-
-	go func() {
-		buf := make([]byte, 4096)
-		for {
-			n, err := stderr.Read(buf)
-			if err != nil {
-				break
-			}
-			conn.WriteMessage(websocket.BinaryMessage, buf[:n])
-
 		}
 	}()
 

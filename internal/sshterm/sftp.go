@@ -46,7 +46,7 @@ func HandleFSList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
@@ -89,7 +89,7 @@ func HandleFSDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		http.Error(w, "sftp init failed", http.StatusInternalServerError)
 		return
@@ -123,7 +123,7 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
@@ -171,7 +171,7 @@ func HandleFSRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
@@ -213,7 +213,7 @@ func HandleFSRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
@@ -243,7 +243,7 @@ func HandleFSMkdir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
@@ -274,7 +274,7 @@ func HandleFSRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		http.Error(w, "sftp init failed", http.StatusInternalServerError)
 		return
@@ -308,7 +308,7 @@ func HandleFSWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := sftp.NewClient(s.Client)
+	sc, err := s.DialSFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
@@ -356,5 +356,3 @@ func jsonError(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ActionResponse{Success: false, Error: msg})
 }
-
-
