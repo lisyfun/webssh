@@ -21,6 +21,7 @@ type rateEntry struct {
 type Auth struct {
 	username  string
 	password  string
+	basePath  string
 	tokens    map[string]tokenEntry
 	rateLimit map[string]*rateEntry
 	mu        sync.RWMutex
@@ -29,10 +30,11 @@ type Auth struct {
 	banTime   time.Duration
 }
 
-func New(username, password string) *Auth {
+func New(username, password, basePath string) *Auth {
 	a := &Auth{
 		username:  username,
 		password:  password,
+		basePath:  basePath,
 		tokens:    make(map[string]tokenEntry),
 		rateLimit: make(map[string]*rateEntry),
 		tokenTTL:  24 * time.Hour,
@@ -43,43 +45,18 @@ func New(username, password string) *Auth {
 	return a
 }
 
-func (a *Auth) cleanupLoop() {
-	for {
-		time.Sleep(10 * time.Minute)
-		a.mu.Lock()
-		for k, v := range a.tokens {
-			if time.Since(v.created) > a.tokenTTL {
-				delete(a.tokens, k)
-			}
-		}
-		now := time.Now()
-		for k, v := range a.rateLimit {
-			if now.Sub(v.firstTry) > a.banTime {
-				delete(a.rateLimit, k)
-			}
-		}
-		a.mu.Unlock()
-	}
-}
-
 func (a *Auth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-
 		if r.TLS != nil {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
 
-		if r.URL.Path == "/login" || r.URL.Path == "/logout" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		cookie, err := r.Cookie("token")
 		if err != nil {
-			redirectLogin(w, r)
+			redirectLogin(w, r, a.basePath)
 			return
 		}
 
@@ -93,7 +70,7 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 				delete(a.tokens, cookie.Value)
 				a.mu.Unlock()
 			}
-			redirectLogin(w, r)
+			redirectLogin(w, r, a.basePath)
 			return
 		}
 
@@ -113,7 +90,7 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 				re.firstTry = time.Now()
 			} else if re.count >= a.maxLogins {
 				a.mu.Unlock()
-				w.Write([]byte(loginPage("登录尝试过多，请15分钟后再试")))
+				w.Write([]byte(loginPage(a.basePath, "登录尝试过多，请15分钟后再试")))
 				return
 			}
 		} else {
@@ -136,20 +113,20 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{
 				Name:     "token",
 				Value:    token,
-				Path:     "/",
+				Path:     a.basePath + "/",
 				HttpOnly: true,
 				Secure:   r.TLS != nil,
 				SameSite: http.SameSiteStrictMode,
 			})
-			http.Redirect(w, r, "/", http.StatusFound)
+			http.Redirect(w, r, a.basePath+"/", http.StatusFound)
 			return
 		}
 
-		w.Write([]byte(loginPage("用户名或密码错误")))
+		w.Write([]byte(loginPage(a.basePath, "用户名或密码错误")))
 		return
 	}
 
-	w.Write([]byte(loginPage("")))
+	w.Write([]byte(loginPage(a.basePath, "")))
 }
 
 func (a *Auth) LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -162,18 +139,18 @@ func (a *Auth) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:   "token",
 		Value:  "",
-		Path:   "/",
+		Path:   a.basePath + "/",
 		MaxAge: -1,
 	})
-	http.Redirect(w, r, "/login", http.StatusFound)
+	http.Redirect(w, r, a.basePath+"/login", http.StatusFound)
 }
 
-func redirectLogin(w http.ResponseWriter, r *http.Request) {
+func redirectLogin(w http.ResponseWriter, r *http.Request, basePath string) {
 	if r.Header.Get("Upgrade") == "websocket" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	http.Redirect(w, r, "/login", http.StatusFound)
+	http.Redirect(w, r, basePath+"/login", http.StatusFound)
 }
 
 func generateToken() string {
@@ -182,7 +159,7 @@ func generateToken() string {
 	return hex.EncodeToString(b)
 }
 
-func loginPage(errMsg string) string {
+func loginPage(basePath, errMsg string) string {
 	errStyle := "display:none"
 	if errMsg != "" {
 		errStyle = ""
@@ -212,7 +189,7 @@ html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -ap
 <div class="login-box">
   <h1>WebSSH</h1>
   <div class="sub">请输入登录信息</div>
-  <form method="post" action="/login">
+  <form method="post" action="` + basePath + `/login">
     <div class="form-group">
       <label>用户名</label>
       <input type="text" name="user" autofocus>
@@ -227,4 +204,23 @@ html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -ap
 </div>
 </body>
 </html>`
+}
+
+func (a *Auth) cleanupLoop() {
+	for {
+		time.Sleep(10 * time.Minute)
+		a.mu.Lock()
+		for k, v := range a.tokens {
+			if time.Since(v.created) > a.tokenTTL {
+				delete(a.tokens, k)
+			}
+		}
+		now := time.Now()
+		for k, v := range a.rateLimit {
+			if now.Sub(v.firstTry) > a.banTime {
+				delete(a.rateLimit, k)
+			}
+		}
+		a.mu.Unlock()
+	}
 }

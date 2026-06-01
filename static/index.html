@@ -275,7 +275,7 @@ input, textarea, button { font-family: inherit; }
     <h1>WebSSH</h1>
     <div class="spacer"></div>
     <button class="toggle-files" id="toggle-files-btn" onclick="toggleFilePanel()">&#x1F4C1; 文件</button>
-    <button class="toggle-files" onclick="location.href='/logout'" style="margin-left:4px" title="退出登录">&#x23FB; 退出</button>
+    <button class="toggle-files" onclick="location.href='__BASE_PATH__/logout'" style="margin-left:4px" title="退出登录">&#x23FB; 退出</button>
   </div>
 
   <div class="body">
@@ -528,7 +528,7 @@ function connectToServer(id) {
 
   const sessionId = crypto.randomUUID();
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${location.host}/ws`;
+  const wsUrl = `${protocol}//${location.host}__BASE_PATH__/ws`;
 
   const ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
@@ -892,7 +892,7 @@ function loadFileList(dir) {
 
   renderBreadcrumb(ses.fsPath);
 
-  fetch(`/api/fs/${ses.sessionId}/list?path=${encodeURIComponent(ses.fsPath)}`)
+  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/list?path=${encodeURIComponent(ses.fsPath)}`)
     .then(r => r.json())
     .then(res => {
       ses._loading = false;
@@ -964,7 +964,7 @@ function fileDownload(name) {
   const ses = getActiveSession();
   if (!ses) return;
   const p = ses.fsPath + '/' + name;
-  window.open(`/api/fs/${ses.sessionId}/download?path=${encodeURIComponent(p)}`, '_blank');
+  window.open(`__BASE_PATH__/api/fs/${ses.sessionId}/download?path=${encodeURIComponent(p)}`, '_blank');
 }
 
 var _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
@@ -1030,7 +1030,7 @@ function processUploadQ() {
   if (!ses) { textEl.textContent = '会话已断开'; return; }
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', `/api/fs/${ses.sessionId}/upload?path=${encodeURIComponent(ses.fsPath)}`);
+  xhr.open('POST', `__BASE_PATH__/api/fs/${ses.sessionId}/upload?path=${encodeURIComponent(ses.fsPath)}`);
 
   xhr.upload.onprogress = (e) => {
     if (e.lengthComputable) {
@@ -1065,7 +1065,7 @@ function fileDelete(name) {
   showConfirm(`确认删除 "${name}"？`, () => {
     const ses = getActiveSession();
     if (!ses) return;
-    fetch(`/api/fs/${ses.sessionId}/remove`, {
+    fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/remove`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: ses.fsPath + '/' + name })
@@ -1081,7 +1081,7 @@ function fileRename(name) {
   if (!newName || newName === name) return;
   const ses = getActiveSession();
   if (!ses) return;
-  fetch(`/api/fs/${ses.sessionId}/rename`, {
+  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/rename`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ oldPath: ses.fsPath + '/' + name, newPath: ses.fsPath + '/' + newName })
@@ -1096,7 +1096,7 @@ function fileMkdir() {
   if (!name) return;
   const ses = getActiveSession();
   if (!ses) return;
-  fetch(`/api/fs/${ses.sessionId}/mkdir`, {
+  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/mkdir`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: ses.fsPath + '/' + name })
