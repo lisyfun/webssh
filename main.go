@@ -21,7 +21,7 @@ var (
 	addr      = flag.String("addr", ":8080", "listen address")
 	staticDir = flag.String("static", "static", "static files directory")
 	user      = flag.String("user", "admin", "login username")
-	pass      = flag.String("pass", "admin", "login password")
+	pass      = flag.String("pass", "", "login password (empty = auto-generate random)")
 	certFile  = flag.String("cert", "", "TLS certificate file (enables HTTPS)")
 	keyFile   = flag.String("key", "", "TLS private key file")
 	urlPath   = flag.String("url", "", "access path prefix (empty = auto-generate random)")
@@ -41,13 +41,20 @@ func main() {
 	}
 	log.Printf("access path: %s", basePath)
 
+	password := *pass
+	if password == "" {
+		password = generateSecret()
+		log.Printf("generated password: %s", password)
+	}
+	log.Printf("login user: %s", *user)
+
 	indexBytes, err := os.ReadFile(filepath.Join(*staticDir, "index.html"))
 	if err != nil {
 		log.Fatal("failed to read index.html:", err)
 	}
 	indexContent := bytes.ReplaceAll(indexBytes, []byte("__BASE_PATH__"), []byte(basePath))
 
-	a := auth.New(*user, *pass, basePath)
+	a := auth.New(*user, password, basePath)
 	r := mux.NewRouter()
 
 	r.HandleFunc(basePath+"/login", a.LoginHandler)
@@ -56,6 +63,7 @@ func main() {
 	s := r.PathPrefix(basePath).Subrouter()
 	s.Use(a.Middleware)
 	s.HandleFunc("/ws", sshterm.HandleWebSocket)
+	s.HandleFunc("/change-password", a.ChangePasswordHandler).Methods("POST")
 
 	api := s.PathPrefix("/api/fs/{id}").Subrouter()
 	api.HandleFunc("/list", sshterm.HandleFSList).Methods("GET")
@@ -88,7 +96,7 @@ func main() {
 }
 
 func generateSecret() string {
-	b := make([]byte, 12)
+	b := make([]byte, 5)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }

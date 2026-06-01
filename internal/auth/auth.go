@@ -45,6 +45,12 @@ func New(username, password, basePath string) *Auth {
 	return a
 }
 
+func (a *Auth) SetPassword(pass string) {
+	a.mu.Lock()
+	a.password = pass
+	a.mu.Unlock()
+}
+
 func (a *Auth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -76,6 +82,33 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.ParseForm()
+	oldPass := r.FormValue("old_pass")
+	newPass := r.FormValue("new_pass")
+
+	a.mu.RLock()
+	passOk := oldPass == a.password
+	a.mu.RUnlock()
+
+	if !passOk {
+		w.Write([]byte(`{"ok":false,"msg":"旧密码错误"}`))
+		return
+	}
+	if len(newPass) < 4 {
+		w.Write([]byte(`{"ok":false,"msg":"新密码至少4位"}`))
+		return
+	}
+
+	a.SetPassword(newPass)
+	w.Write([]byte(`{"ok":true,"msg":"密码已修改"}`))
 }
 
 func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {

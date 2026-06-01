@@ -276,6 +276,7 @@ input, textarea, button { font-family: inherit; }
     <div class="spacer"></div>
     <button class="toggle-files" id="toggle-files-btn" onclick="toggleFilePanel()">&#x1F4C1; 文件</button>
     <button class="toggle-files" onclick="location.href='__BASE_PATH__/logout'" style="margin-left:4px" title="退出登录">&#x23FB; 退出</button>
+    <button class="toggle-files" onclick="showChangePwd()" style="margin-left:4px" title="修改密码">&#x1F512; 密码</button>
   </div>
 
   <div class="body">
@@ -411,6 +412,29 @@ input, textarea, button { font-family: inherit; }
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideBatchImport()">取消</button>
       <button class="btn-primary" onclick="batchImport()">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="change-pwd-overlay" style="display:none">
+  <div class="modal" style="width:360px">
+    <h2>修改密码</h2>
+    <div class="form-group">
+      <label>旧密码</label>
+      <input type="password" id="cp-old" style="width:100%">
+    </div>
+    <div class="form-group">
+      <label>新密码</label>
+      <input type="password" id="cp-new" style="width:100%">
+    </div>
+    <div class="form-group">
+      <label>确认新密码</label>
+      <input type="password" id="cp-confirm" style="width:100%">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideChangePwd()">取消</button>
+      <button class="btn-primary" onclick="changePassword()">保存</button>
     </div>
   </div>
 </div>
@@ -770,6 +794,41 @@ function batchImport() {
   renderServers();
   hideBatchImport();
   showToast(`成功导入 ${added} 个服务器`, 'success');
+}
+
+function showChangePwd() {
+  document.getElementById('cp-old').value = '';
+  document.getElementById('cp-new').value = '';
+  document.getElementById('cp-confirm').value = '';
+  document.getElementById('change-pwd-overlay').style.display = 'flex';
+}
+
+function hideChangePwd() {
+  document.getElementById('change-pwd-overlay').style.display = 'none';
+}
+
+function changePassword() {
+  const oldPass = document.getElementById('cp-old').value;
+  const newPass = document.getElementById('cp-new').value;
+  const confirmPass = document.getElementById('cp-confirm').value;
+
+  if (!oldPass) { showToast('请输入旧密码', 'error'); return; }
+  if (!newPass) { showToast('请输入新密码', 'error'); return; }
+  if (newPass.length < 4) { showToast('新密码至少4位', 'error'); return; }
+  if (newPass !== confirmPass) { showToast('两次输入不一致', 'error'); return; }
+
+  fetch('__BASE_PATH__/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `old_pass=${encodeURIComponent(oldPass)}&new_pass=${encodeURIComponent(newPass)}`,
+  }).then(r => r.json()).then(data => {
+    if (data.ok) {
+      showToast(data.msg, 'success');
+      hideChangePwd();
+    } else {
+      showToast(data.msg, 'error');
+    }
+  }).catch(() => showToast('请求失败', 'error'));
 }
 
 function showConfirm(msg, onOk) {
