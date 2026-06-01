@@ -75,6 +75,10 @@ func main() {
 
 	fs := http.FileServer(http.Dir(*staticDir))
 	s.PathPrefix("/").Handler(http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "" {
+			http.Redirect(w, r, basePath+"/", http.StatusFound)
+			return
+		}
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write(indexContent)
