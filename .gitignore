@@ -1,4 +1,5 @@
 /webssh
+/release/
 *.exe
 *.exe~
 *.dll
