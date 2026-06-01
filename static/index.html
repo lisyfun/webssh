@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WebSSH Terminal</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<link rel="stylesheet" href="lib/xterm.min.css">
 <style>
 :root {
   --bg-primary: #0d1117;
@@ -417,8 +417,8 @@ input, textarea, button { font-family: inherit; }
 <input type="file" id="file-input" style="display:none" multiple onchange="fileUploadDo(this)">
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<script src="lib/xterm.min.js"></script>
+<script src="lib/xterm-addon-fit.min.js"></script>
 <script>
 // ---- State ----
 let servers = JSON.parse(localStorage.getItem('webssh_servers') || '[]');
