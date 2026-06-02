@@ -4,14 +4,16 @@
 
 ## 功能
 
-- Web 终端 — 浏览器中通过 SSH 连接远程服务器
-- 多会话管理 — 多个服务器同时连接，切换不断开
-- 文件管理 — 内嵌 SFTP 文件浏览器，随终端 CWD 联动
-- 上传下载 — 拖拽上传、目录列表下载
+- Web 终端 — 浏览器中通过 SSH 连接远程服务器，双因子 AES-256-GCM 加密
+- 多会话管理 — 多个服务器同时连接，切换不断开；同一服务器可开多个终端
+- 文件管理 — 内嵌 SFTP 文件浏览器，跟随终端 CWD 自动切换目录
+- 上传下载 — 拖拽上传（带进度、队列）、文件下载、内联编辑
+- 服务器列表 — SQLite 持久化（非 localStorage），密码/私钥加密存储
+- 标签分类 — 每个服务器可添加标签，按标签筛选
 - 用户认证 — 登录密码 + 随机访问路径 + 可选 HTTPS 三层防护
 - 批量导入 — 粘贴 tabular 数据批量添加服务器
 - 修改密码 — 登录后可在页面修改密码
-- 暗色主题 — Luna 风格三栏布局
+- 暗色主题 — GitHub Dark 风格，Catppuccin Mocha 可切换
 
 ## 快速开始
 
@@ -37,12 +39,16 @@
 | `-url` | _(随机生成)_ | 访问路径前缀，填则固定 |
 | `-cert` | `""` | TLS 证书文件路径 |
 | `-key` | `""` | TLS 私钥文件路径 |
+| `-maxbody` | `50` | 编辑器/上传最大 body (MB)，0=不限制 |
+| `-db` | `webssh.db` | SQLite 数据库文件路径 |
 
 ## 安全
 
 - **随机访问路径** — 每次启动生成 10 位 hex 路径，避免扫描
 - **随机密码** — `-pass` 留空时自动生成
 - **HTTPS** — `-cert cert.pem -key key.pem` 启用 TLS，流量全加密
+- **API 传输加密** — password/privateKey 使用每会话 AES-256-GCM 前端加密后传输
+- **CSRF 保护** — 所有写 API 需 X-CSRF-Token 验证
 - **Cookie** — HttpOnly + SameSite=Strict + Secure（TLS 时），JS 不可读
 - **Token 24h 过期** — 过期自动清除，后台每 10 分钟清理
 - **登录限速** — 同 IP 5 次失败封 15 分钟
@@ -76,6 +82,18 @@ cd webssh
 go build -o webssh .
 ```
 
+## 打包发布
+
+```bash
+# 构建所有平台二进制 + 打包为 .tar.gz
+make release
+
+# 产物在 dist/ 目录
+ls dist/
+# webssh-darwin-amd64.tar.gz  webssh-darwin-arm64.tar.gz
+# webssh-linux-amd64.tar.gz   webssh-linux-arm64.tar.gz
+```
+
 ## 直接部署
 
 单二进制，复制到服务器即可运行：
@@ -89,5 +107,6 @@ ssh server
 ## 技术栈
 
 - **后端**: Go, gorilla/mux, gorilla/websocket, golang.org/x/crypto/ssh, pkg/sftp
-- **前端**: xterm.js (嵌入, 无 CDN 依赖)
+- **前端**: xterm.js, CodeMirror 5（本地嵌入，无 CDN 依赖）
+- **存储**: SQLite (modernc.org/sqlite，纯 Go，无 CGO)
 - **嵌入**: go:embed，所有静态资源打进二进制
