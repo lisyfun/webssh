@@ -51,7 +51,7 @@ func main() {
 
 	password := *pass
 	if password == "" {
-		password = generateSecret()
+		password = generatePassword()
 		log.Printf("generated password: %s", password)
 	}
 	log.Printf("login user: %s", *user)
@@ -124,4 +124,14 @@ func generateSecret() string {
 	b := make([]byte, 5)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func generatePassword() string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 16)
+	rand.Read(b)
+	for i := range b {
+		b[i] = chars[int(b[i])%len(chars)]
+	}
+	return string(b)
 }
