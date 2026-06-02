@@ -781,8 +781,8 @@ function connectToServer(sid) {
       s.term.options.disableStdin = true;
     }
     renderServers();
-    updateStatus();
-    loadFileList();
+  updateStatus();
+  if (filePanelOpen) loadFileList();
   };
 
   initTerminal(sid);
@@ -1134,7 +1134,10 @@ function getActiveSession() {
 function loadFileList(dir) {
   const ses = getActiveSession();
   if (!ses) return;
-  if (dir !== undefined) ses.fsPath = dir;
+  if (dir !== undefined) {
+    if (dir === ses.fsPath) return;
+    ses.fsPath = dir;
+  }
   if (ses._loading) return;
   ses._loading = true;
 
