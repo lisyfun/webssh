@@ -219,8 +219,6 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 				}
 				if resize.Type == "resize" {
 					session.WindowChange(resize.Rows, resize.Cols)
-				} else if resize.Type == "keepalive" {
-					conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"pong"}`))
 				}
 			}
 		}
