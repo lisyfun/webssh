@@ -30,8 +30,9 @@ type ResizeMsg struct {
 }
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
+	ReadBufferSize:   4096,
+	WriteBufferSize:  4096,
+	HandshakeTimeout: 10 * time.Second,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
@@ -77,6 +78,13 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 			params.Port = 22
 		}
 
+		// WS 保活: 服务端定期发 ping，收到 pong 则续期读超时
+		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+			return nil
+		})
+
 		sshClient, cfg, err := dialSSH(&params)
 		if err != nil {
 			log.Printf("SSH dial failed: %v", err)
@@ -84,6 +92,18 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 			conn.Close()
 			return
 		}
+
+		// SSH 保活: 每 30s 发 keepalive，防止 NAT/防火墙超时断开
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				_, _, err := sshClient.SendRequest("keepalive@openssh.com", true, nil)
+				if err != nil {
+					return
+				}
+			}
+		}()
 
 		session, err := sshClient.NewSession()
 		if err != nil {
@@ -162,7 +182,10 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 				if err != nil {
 					break
 				}
-				conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+					break
+				}
 				if first {
 					first = false
 					go func() { time.Sleep(200 * time.Millisecond); writePROMPT() }()
@@ -177,7 +200,22 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 				if err != nil {
 					break
 				}
-				conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+					break
+				}
+			}
+		}()
+
+		// WS 保活 ping 协程
+		go func() {
+			ticker := time.NewTicker(25 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
 			}
 		}()
 
