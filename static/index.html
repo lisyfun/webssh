@@ -763,6 +763,7 @@ function connectToServer(sid) {
         updateStatus();
         return;
       }
+      if (typeof msg === 'string' && msg.startsWith('{"type":"pong"}')) return;
       const s = sessions[sid];
       if (s && s.term) s.term.write(msg);
     }
