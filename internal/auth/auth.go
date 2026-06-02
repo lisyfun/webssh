@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"net"
@@ -19,9 +20,15 @@ type rateEntry struct {
 	firstTry time.Time
 }
 
+type UserStore interface {
+	VerifyPassword(ctx context.Context, username, password string) bool
+	ChangePassword(ctx context.Context, username, oldPassword, newPassword string) error
+}
+
 type Auth struct {
+	store     UserStore
 	username  string
-	password  string
+	password  string // cached for fast path, synced on change
 	basePath  string
 	tokens    map[string]tokenEntry
 	rateLimit map[string]*rateEntry
@@ -31,8 +38,9 @@ type Auth struct {
 	banTime   time.Duration
 }
 
-func New(username, password, basePath string) *Auth {
+func New(store UserStore, username, password, basePath string) *Auth {
 	a := &Auth{
+		store:     store,
 		username:  username,
 		password:  password,
 		basePath:  basePath,
@@ -44,12 +52,6 @@ func New(username, password, basePath string) *Auth {
 	}
 	go a.cleanupLoop()
 	return a
-}
-
-func (a *Auth) SetPassword(pass string) {
-	a.mu.Lock()
-	a.password = pass
-	a.mu.Unlock()
 }
 
 func (a *Auth) Middleware(next http.Handler) http.Handler {
@@ -99,7 +101,6 @@ func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Basic CSRF protection: require same-origin Referer
 	ref := r.Header.Get("Referer")
 	if ref == "" || !sameOrigin(r, ref) {
 		w.Write([]byte(`{"ok":false,"msg":"非法请求来源"}`))
@@ -110,25 +111,26 @@ func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	oldPass := r.FormValue("old_pass")
 	newPass := r.FormValue("new_pass")
 
-	a.mu.RLock()
-	passOk := oldPass == a.password
-	a.mu.RUnlock()
-
-	if !passOk {
-		w.Write([]byte(`{"ok":false,"msg":"旧密码错误"}`))
-		return
-	}
 	if len(newPass) < 4 {
 		w.Write([]byte(`{"ok":false,"msg":"新密码至少4位"}`))
 		return
 	}
 
-	a.SetPassword(newPass)
+	err := a.store.ChangePassword(context.Background(), a.username, oldPass, newPass)
+	if err != nil {
+		w.Write([]byte(`{"ok":false,"msg":"` + err.Error() + `"}`))
+		return
+	}
+
+	// sync cached password
+	a.mu.Lock()
+	a.password = newPass
+	a.mu.Unlock()
+
 	w.Write([]byte(`{"ok":true,"msg":"密码已修改"}`))
 }
 
 func sameOrigin(r *http.Request, ref string) bool {
-	// Extract scheme + host from Referer and compare to request
 	scheme := "http://"
 	if r.TLS != nil {
 		scheme = "https://"
@@ -161,7 +163,20 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		user := r.FormValue("user")
 		pass := r.FormValue("pass")
 
+		// fast path checks cached password first
+		ok := false
 		if user == a.username && pass == a.password {
+			ok = true
+		} else {
+			ok = a.store.VerifyPassword(context.Background(), user, pass)
+			if ok {
+				a.mu.Lock()
+				a.password = pass
+				a.mu.Unlock()
+			}
+		}
+
+		if ok {
 			token := generateToken()
 			a.mu.Lock()
 			a.tokens[token] = tokenEntry{created: time.Now(), ip: ip}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"embed"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 
 	"webssh/internal/auth"
 	"webssh/internal/sshterm"
+	"webssh/internal/store"
 
 	"github.com/gorilla/mux"
 )
@@ -25,6 +27,7 @@ var (
 	keyFile  = flag.String("key", "", "TLS private key file")
 	urlPath  = flag.String("url", "", "access path prefix (empty = auto-generate random)")
 	maxBody  = flag.Int64("maxbody", 50, "max editor body size in MB (0 = no limit)")
+	dbPath   = flag.String("db", "webssh.db", "path to SQLite database file")
 )
 
 //go:embed all:static
@@ -65,13 +68,23 @@ func main() {
 		sshterm.MaxWriteBodySize = *maxBody << 20
 	}
 
+	st, err := store.New(*dbPath)
+	if err != nil {
+		log.Fatal("failed to init store:", err)
+	}
+	defer st.Close()
+
+	if err := st.EnsureUser(context.Background(), *user, password); err != nil {
+		log.Fatal("failed to create user:", err)
+	}
+	// Start with empty cached password; auth will verify via DB and cache on first successful login.
+	a := auth.New(st, *user, "", basePath)
+
 	indexBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
 		log.Fatal("failed to read index.html:", err)
 	}
 	indexContent := bytes.ReplaceAll(indexBytes, []byte("__BASE_PATH__"), []byte(basePath))
-
-	a := auth.New(*user, password, basePath)
 	r := mux.NewRouter()
 
 	r.HandleFunc(basePath+"/login", a.LoginHandler)
@@ -85,15 +98,41 @@ func main() {
 	s.HandleFunc("/ws", sshterm.HandleWebSocket)
 	s.HandleFunc("/change-password", a.ChangePasswordHandler).Methods("POST")
 
-	api := s.PathPrefix("/api/fs/{id}").Subrouter()
-	api.HandleFunc("/list", sshterm.HandleFSList).Methods("GET")
-	api.HandleFunc("/download", sshterm.HandleFSDownload).Methods("GET")
-	api.HandleFunc("/upload", sshterm.HandleFSUpload).Methods("POST")
-	api.HandleFunc("/remove", sshterm.HandleFSRemove).Methods("POST")
-	api.HandleFunc("/rename", sshterm.HandleFSRename).Methods("POST")
-	api.HandleFunc("/mkdir", sshterm.HandleFSMkdir).Methods("POST")
-	api.HandleFunc("/read", sshterm.HandleFSRead).Methods("GET")
-	api.HandleFunc("/write", sshterm.HandleFSWrite).Methods("POST")
+	api := s.PathPrefix("/api").Subrouter()
+
+	api.HandleFunc("/servers", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			store.HandleListServers(st, w, r)
+		case "POST":
+			store.HandleCreateServer(st, w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	api.HandleFunc("/servers/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "PUT":
+			store.HandleUpdateServer(st, w, r)
+		case "DELETE":
+			store.HandleDeleteServer(st, w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}).Methods("PUT", "DELETE")
+	api.HandleFunc("/servers/batch", func(w http.ResponseWriter, r *http.Request) {
+		store.HandleBatchImport(st, w, r)
+	}).Methods("POST")
+
+	fsAPI := api.PathPrefix("/fs/{id}").Subrouter()
+	fsAPI.HandleFunc("/list", sshterm.HandleFSList).Methods("GET")
+	fsAPI.HandleFunc("/download", sshterm.HandleFSDownload).Methods("GET")
+	fsAPI.HandleFunc("/upload", sshterm.HandleFSUpload).Methods("POST")
+	fsAPI.HandleFunc("/remove", sshterm.HandleFSRemove).Methods("POST")
+	fsAPI.HandleFunc("/rename", sshterm.HandleFSRename).Methods("POST")
+	fsAPI.HandleFunc("/mkdir", sshterm.HandleFSMkdir).Methods("POST")
+	fsAPI.HandleFunc("/read", sshterm.HandleFSRead).Methods("GET")
+	fsAPI.HandleFunc("/write", sshterm.HandleFSWrite).Methods("POST")
 
 	staticSub, _ := fs.Sub(staticFS, "static")
 	fileServer := http.FileServer(http.FS(staticSub))

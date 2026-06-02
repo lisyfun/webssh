@@ -484,9 +484,9 @@ input, textarea, button { font-family: inherit; }
 <script src="lib/codemirror.min.js"></script>
 <script>
 // ---- State ----
-let servers = JSON.parse(localStorage.getItem('webssh_servers') || '[]');
-let editingIdx = -1;
-let sessions = {}; // serverId -> { sessionId, ws, term, fitAddon, connected }
+let servers = [];
+let editingId = null;
+let sessions = {};
 let activeServerId = null;
 let filePanelOpen = false;
 
@@ -756,9 +756,27 @@ function disconnect() {
   loadFileList();
 }
 
+// ---- API ----
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  const j = await r.json();
+  if (!j.success) throw new Error(j.error || 'request failed');
+  return j;
+}
+
+async function fetchServers() {
+  try {
+    const j = await api('__BASE_PATH__/api/servers');
+    servers = j.data || [];
+  } catch (_) {
+    servers = [];
+  }
+  renderServers();
+}
+
 // ---- Server CRUD ----
 function showAddServer() {
-  editingIdx = -1;
+  editingId = null;
   document.getElementById('modal-title').textContent = '添加服务器';
   document.getElementById('svr-name').value = '';
   document.getElementById('svr-host').value = '';
@@ -771,10 +789,9 @@ function showAddServer() {
 }
 
 function editServer(id) {
-  const idx = servers.findIndex(s => s.id === id);
-  if (idx < 0) return;
-  editingIdx = idx;
-  const s = servers[idx];
+  const s = servers.find(x => x.id === id);
+  if (!s) return;
+  editingId = id;
   document.getElementById('modal-title').textContent = '编辑服务器';
   document.getElementById('svr-name').value = s.name || '';
   document.getElementById('svr-host').value = s.host || '';
@@ -804,33 +821,38 @@ function hideBatchImport() {
   document.getElementById('batch-import-overlay').style.display = 'none';
 }
 
-function batchImport() {
+async function batchImport() {
   const text = document.getElementById('batch-import-input').value.trim();
   if (!text) { showToast('请输入服务器数据', 'error'); return; }
 
   const lines = text.split('\n').filter(Boolean);
-  let added = 0;
+  const list = [];
 
   for (const line of lines) {
     const parts = line.split(/[\t ,]+/).map(s => s.trim()).filter(Boolean);
-    if (parts.length < 4) continue; // need at least host, port, user, password
-
+    if (parts.length < 4) continue;
     const name = parts.length > 4 ? parts[0] : '';
     const host = parts.length > 4 ? parts[1] : parts[0];
     const port = parseInt(parts.length > 4 ? parts[2] : parts[1]) || 22;
     const user = parts.length > 4 ? parts[3] : parts[2];
     const password = parts.length > 4 ? parts[4] : parts[3];
-
-    servers.push({ id: crypto.randomUUID(), name, host, port, user, authType: 'password', password, privateKey: '' });
-    added++;
+    list.push({ id: crypto.randomUUID(), name, host, port, user, authType: 'password', password, privateKey: '' });
   }
 
-  if (added === 0) { showToast('未能解析任何有效数据', 'error'); return; }
+  if (list.length === 0) { showToast('未能解析任何有效数据', 'error'); return; }
 
-  localStorage.setItem('webssh_servers', JSON.stringify(servers));
-  renderServers();
-  hideBatchImport();
-  showToast(`成功导入 ${added} 个服务器`, 'success');
+  try {
+    await api('__BASE_PATH__/api/servers/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ servers: list }),
+    });
+    showToast(`成功导入 ${list.length} 个服务器`, 'success');
+    hideBatchImport();
+    await fetchServers();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 }
 
 function showChangePwd() {
@@ -887,7 +909,7 @@ function modalSwitchAuth(mode) {
   document.getElementById('m-key-group').style.display = mode === 'key' ? 'block' : 'none';
 }
 
-function saveServer() {
+async function saveServer() {
   const name = document.getElementById('svr-name').value.trim();
   const host = document.getElementById('svr-host').value.trim();
   const port = parseInt(document.getElementById('svr-port').value) || 22;
@@ -901,32 +923,47 @@ function saveServer() {
   if (useKey && !privateKey) { showToast('请粘贴私钥', 'error'); return; }
   if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
 
-  const data = { name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey };
+  const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey };
 
-  if (editingIdx >= 0) {
-    data.id = servers[editingIdx].id;
-    servers[editingIdx] = data;
-  } else {
-    data.id = crypto.randomUUID();
-    servers.push(data);
+  try {
+    if (editingId) {
+      await api('__BASE_PATH__/api/servers/' + editingId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } else {
+      await api('__BASE_PATH__/api/servers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    }
+    hideModal();
+    await fetchServers();
+  } catch (e) {
+    showToast(e.message, 'error');
   }
-
-  localStorage.setItem('webssh_servers', JSON.stringify(servers));
-  hideModal();
-  renderServers();
 }
 
-function copyServer(id) {
-  const idx = servers.findIndex(s => s.id === id);
-  if (idx < 0) return;
-  const copy = { ...servers[idx], id: crypto.randomUUID(), name: (servers[idx].name || servers[idx].host) + ' (副本)' };
-  servers.push(copy);
-  localStorage.setItem('webssh_servers', JSON.stringify(servers));
-  renderServers();
+async function copyServer(id) {
+  const s = servers.find(x => x.id === id);
+  if (!s) return;
+  const data = { ...s, id: crypto.randomUUID(), name: (s.name || s.host) + ' (副本)' };
+  try {
+    await api('__BASE_PATH__/api/servers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    await fetchServers();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 }
 
-function deleteServer(id) {
-  showConfirm('确认删除此服务器？', () => {
+async function deleteServer(id) {
+  showConfirm('确认删除此服务器？', async () => {
     const ses = sessions[id];
     if (ses) {
       if (ses.ws) ses.ws.close();
@@ -935,15 +972,19 @@ function deleteServer(id) {
     }
     const container = document.getElementById(`term-${id}`);
     if (container) container.remove();
-    servers = servers.filter(s => s.id !== id);
-    localStorage.setItem('webssh_servers', JSON.stringify(servers));
-    if (activeServerId === id) {
-      activeServerId = null;
-      document.getElementById('terminal-tab').style.display = 'none';
-      document.getElementById('empty-state').style.display = 'flex';
+    try {
+      await api('__BASE_PATH__/api/servers/' + id, { method: 'DELETE' });
+      servers = servers.filter(s => s.id !== id);
+      if (activeServerId === id) {
+        activeServerId = null;
+        document.getElementById('terminal-tab').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'flex';
+      }
+      renderServers();
+      updateStatus();
+    } catch (e) {
+      showToast(e.message, 'error');
     }
-    renderServers();
-    updateStatus();
   });
 }
 
@@ -1319,8 +1360,10 @@ function escJsStr(s) {
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
-  renderServers();
-  updateStatus();
+  fetchServers().then(() => {
+    updateStatus();
+    renderServers();
+  });
 
   const fileList = document.getElementById('file-list');
   let dragCounter = 0;
