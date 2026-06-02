@@ -489,6 +489,61 @@ let editingId = null;
 let sessions = {};
 let activeServerId = null;
 let filePanelOpen = false;
+let sessionKey = null;
+let csrfToken = null;
+
+// ---- Encryption & CSRF ----
+async function fetchSessionKey() {
+  try {
+    const r = await fetch('__BASE_PATH__/api/key');
+    const j = await r.json();
+    sessionKey = j.key;
+    csrfToken = j.csrf;
+  } catch (_) {}
+}
+
+async function encField(plain) {
+  if (!sessionKey || !plain) return plain;
+  try {
+    const keyBytes = new Uint8Array(sessionKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
+    const combined = new Uint8Array(iv.length + new Uint8Array(enc).length);
+    combined.set(iv);
+    combined.set(new Uint8Array(enc), iv.length);
+    return btoa(String.fromCharCode(...combined));
+  } catch (_) { return plain; }
+}
+
+function apiHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (csrfToken) h['X-CSRF-Token'] = csrfToken;
+  return h;
+}
+
+async function api(url, opts) {
+  opts = opts || {};
+  opts.headers = { ...apiHeaders(), ...(opts.headers || {}) };
+  const r = await fetch(url, opts);
+  const j = await r.json();
+  if (!j.success) throw new Error(j.error || 'request failed');
+  return j;
+}
+
+async function encField(plain) {
+  if (!sessionKey || !plain) return plain;
+  try {
+    const keyBytes = new Uint8Array(sessionKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
+    const combined = new Uint8Array(iv.length + new Uint8Array(enc).length);
+    combined.set(iv);
+    combined.set(new Uint8Array(enc), iv.length);
+    return btoa(String.fromCharCode(...combined));
+  } catch (_) { return plain; }
+}
 
 // ---- Server List ----
 function renderServers() {
@@ -596,16 +651,18 @@ function connectToServer(id) {
 
   sessions[id] = { sessionId, ws, connected: false, fsPath: '/', info: { host: svr.host, port: svr.port, user: svr.user } };
 
-  ws.onopen = () => {
-    const auth = { authType: svr.authType };
-    ws.send(JSON.stringify({
+  ws.onopen = async () => {
+    const authMsg = {
       sessionId,
       host: svr.host,
       port: svr.port,
       username: svr.user,
       password: svr.authType === 'key' ? '' : (svr.password || ''),
       privateKey: svr.authType === 'key' ? (svr.privateKey || '') : '',
-    }));
+    };
+    authMsg.password = await encField(authMsg.password);
+    authMsg.privateKey = await encField(authMsg.privateKey);
+    ws.send(JSON.stringify(authMsg));
   };
 
   ws.onmessage = (evt) => {
@@ -841,6 +898,11 @@ async function batchImport() {
 
   if (list.length === 0) { showToast('未能解析任何有效数据', 'error'); return; }
 
+  for (const s of list) {
+    s.password = await encField(s.password);
+    s.privateKey = await encField(s.privateKey);
+  }
+
   try {
     await api('__BASE_PATH__/api/servers/batch', {
       method: 'POST',
@@ -924,6 +986,8 @@ async function saveServer() {
   if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
 
   const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey };
+  data.password = await encField(data.password);
+  data.privateKey = await encField(data.privateKey);
 
   try {
     if (editingId) {
@@ -950,6 +1014,8 @@ async function copyServer(id) {
   const s = servers.find(x => x.id === id);
   if (!s) return;
   const data = { ...s, id: crypto.randomUUID(), name: (s.name || s.host) + ' (副本)' };
+  data.password = await encField(data.password);
+  data.privateKey = await encField(data.privateKey);
   try {
     await api('__BASE_PATH__/api/servers', {
       method: 'POST',
@@ -1164,6 +1230,7 @@ function saveEditor() {
 
   fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/write?path=${encodeURIComponent(activeEditorFile)}`, {
     method: 'POST',
+    headers: { 'X-CSRF-Token': csrfToken || '' },
     body: content,
   }).then(r => r.json()).then(res => {
     if (res.success) {
@@ -1243,6 +1310,7 @@ function processUploadQ() {
 
   const xhr = new XMLHttpRequest();
   xhr.open('POST', `__BASE_PATH__/api/fs/${ses.sessionId}/upload?path=${encodeURIComponent(ses.fsPath)}`);
+  if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
 
   xhr.upload.onprogress = (e) => {
     if (e.lengthComputable) {
@@ -1279,7 +1347,7 @@ function fileDelete(name) {
     if (!ses) return;
     fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/remove`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
       body: JSON.stringify({ path: ses.fsPath + '/' + name })
     }).then(r => r.json()).then(res => {
       if (res.success) loadFileList();
@@ -1295,7 +1363,7 @@ function fileRename(name) {
   if (!ses) return;
   fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/rename`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
     body: JSON.stringify({ oldPath: ses.fsPath + '/' + name, newPath: ses.fsPath + '/' + newName })
   }).then(r => r.json()).then(res => {
     if (res.success) loadFileList();
@@ -1310,7 +1378,7 @@ function fileMkdir() {
   if (!ses) return;
   fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/mkdir`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
     body: JSON.stringify({ path: ses.fsPath + '/' + name })
   }).then(r => r.json()).then(res => {
     if (res.success) loadFileList();
@@ -1359,11 +1427,11 @@ function escJsStr(s) {
 }
 
 // ---- Init ----
-document.addEventListener('DOMContentLoaded', () => {
-  fetchServers().then(() => {
-    updateStatus();
-    renderServers();
-  });
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchSessionKey();
+  await fetchServers();
+  updateStatus();
+  renderServers();
 
   const fileList = document.getElementById('file-list');
   let dragCounter = 0;

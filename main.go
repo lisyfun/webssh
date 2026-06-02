@@ -17,6 +17,9 @@ import (
 	"webssh/internal/store"
 
 	"github.com/gorilla/mux"
+	"github.com/tdewolff/minify/v2"
+	"github.com/tdewolff/minify/v2/html"
+	"github.com/tdewolff/minify/v2/js"
 )
 
 var (
@@ -77,16 +80,33 @@ func main() {
 	if err := st.EnsureUser(context.Background(), *user, password); err != nil {
 		log.Fatal("failed to create user:", err)
 	}
-	// Start with empty cached password; auth will verify via DB and cache on first successful login.
+
 	a := auth.New(st, *user, "", basePath)
 
 	indexBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
 		log.Fatal("failed to read index.html:", err)
 	}
-	indexContent := bytes.ReplaceAll(indexBytes, []byte("__BASE_PATH__"), []byte(basePath))
-	r := mux.NewRouter()
 
+	m := minify.New()
+	m.Add("text/html", &html.Minifier{
+		KeepDocumentTags: true,
+		KeepEndTags:      true,
+	})
+	m.Add("text/javascript", &js.Minifier{})
+	indexBytes, err = m.Bytes("text/html", indexBytes)
+	if err != nil {
+		log.Fatal("failed to minify index.html:", err)
+	}
+
+	indexContent := bytes.ReplaceAll(indexBytes, []byte("__BASE_PATH__"), []byte(basePath))
+	log.Printf("index.html: %d bytes (%d minified)", len(indexBytes), len(indexContent))
+
+	decryptField := func(r *http.Request, s string) string {
+		return a.DecryptField(r, s)
+	}
+
+	r := mux.NewRouter()
 	r.HandleFunc(basePath+"/login", a.LoginHandler)
 	r.HandleFunc(basePath+"/logout", a.LogoutHandler)
 	r.HandleFunc(basePath, func(w http.ResponseWriter, r *http.Request) {
@@ -95,17 +115,18 @@ func main() {
 
 	s := r.PathPrefix(basePath).Subrouter()
 	s.Use(a.Middleware)
-	s.HandleFunc("/ws", sshterm.HandleWebSocket)
+	s.HandleFunc("/ws", sshterm.HandleWebSocket(decryptField))
 	s.HandleFunc("/change-password", a.ChangePasswordHandler).Methods("POST")
+	s.HandleFunc("/api/key", a.KeyHandler).Methods("GET")
 
 	api := s.PathPrefix("/api").Subrouter()
-
+	api.Use(a.CSRFValidate)
 	api.HandleFunc("/servers", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
 			store.HandleListServers(st, w, r)
 		case "POST":
-			store.HandleCreateServer(st, w, r)
+			store.HandleCreateServer(st, decryptField, w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -113,7 +134,7 @@ func main() {
 	api.HandleFunc("/servers/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "PUT":
-			store.HandleUpdateServer(st, w, r)
+			store.HandleUpdateServer(st, decryptField, w, r)
 		case "DELETE":
 			store.HandleDeleteServer(st, w, r)
 		default:
@@ -121,7 +142,7 @@ func main() {
 		}
 	}).Methods("PUT", "DELETE")
 	api.HandleFunc("/servers/batch", func(w http.ResponseWriter, r *http.Request) {
-		store.HandleBatchImport(st, w, r)
+		store.HandleBatchImport(st, decryptField, w, r)
 	}).Methods("POST")
 
 	fsAPI := api.PathPrefix("/fs/{id}").Subrouter()

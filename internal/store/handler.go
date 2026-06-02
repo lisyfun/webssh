@@ -9,12 +9,14 @@ import (
 )
 
 type ServerResponse struct {
-	Success bool     `json:"success"`
-	Data    any      `json:"data,omitempty"`
-	Error   string   `json:"error,omitempty"`
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
 }
 
-func jsonResp(w http.ResponseWriter, v any) {
+type DecryptFunc func(r *http.Request, value string) string
+
+func jsonResp(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
 }
@@ -28,7 +30,7 @@ func HandleListServers(st *Store, w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, ServerResponse{Success: true, Data: servers})
 }
 
-func HandleCreateServer(st *Store, w http.ResponseWriter, r *http.Request) {
+func HandleCreateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r *http.Request) {
 	var svr Server
 	if err := json.NewDecoder(r.Body).Decode(&svr); err != nil {
 		jsonResp(w, ServerResponse{Success: false, Error: "invalid json: " + err.Error()})
@@ -41,6 +43,10 @@ func HandleCreateServer(st *Store, w http.ResponseWriter, r *http.Request) {
 	if svr.Port == 0 {
 		svr.Port = 22
 	}
+	if decrypt != nil {
+		svr.Password = decrypt(r, svr.Password)
+		svr.PrivateKey = decrypt(r, svr.PrivateKey)
+	}
 
 	if err := st.CreateServer(context.Background(), &svr); err != nil {
 		jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
@@ -49,7 +55,7 @@ func HandleCreateServer(st *Store, w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, ServerResponse{Success: true, Data: svr})
 }
 
-func HandleUpdateServer(st *Store, w http.ResponseWriter, r *http.Request) {
+func HandleUpdateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -66,6 +72,10 @@ func HandleUpdateServer(st *Store, w http.ResponseWriter, r *http.Request) {
 	}
 	if svr.Port == 0 {
 		svr.Port = 22
+	}
+	if decrypt != nil {
+		svr.Password = decrypt(r, svr.Password)
+		svr.PrivateKey = decrypt(r, svr.PrivateKey)
 	}
 
 	if err := st.UpdateServer(context.Background(), &svr); err != nil {
@@ -86,7 +96,7 @@ func HandleDeleteServer(st *Store, w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, ServerResponse{Success: true})
 }
 
-func HandleBatchImport(st *Store, w http.ResponseWriter, r *http.Request) {
+func HandleBatchImport(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Servers []Server `json:"servers"`
 	}
@@ -107,8 +117,9 @@ func HandleBatchImport(st *Store, w http.ResponseWriter, r *http.Request) {
 		if svr.User == "" {
 			svr.User = "root"
 		}
-		if svr.ID == "" {
-			svr.ID = "" // will be set by frontend
+		if decrypt != nil {
+			svr.Password = decrypt(r, svr.Password)
+			svr.PrivateKey = decrypt(r, svr.PrivateKey)
 		}
 		if err := st.CreateServer(context.Background(), svr); err != nil {
 			jsonResp(w, ServerResponse{Success: false, Error: "import failed: " + err.Error()})

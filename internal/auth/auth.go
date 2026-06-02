@@ -2,8 +2,12 @@ package auth
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -13,6 +17,7 @@ import (
 type tokenEntry struct {
 	created time.Time
 	ip      string
+	encKey  []byte
 }
 
 type rateEntry struct {
@@ -28,7 +33,7 @@ type UserStore interface {
 type Auth struct {
 	store     UserStore
 	username  string
-	password  string // cached for fast path, synced on change
+	password  string
 	basePath  string
 	tokens    map[string]tokenEntry
 	rateLimit map[string]*rateEntry
@@ -52,6 +57,93 @@ func New(store UserStore, username, password, basePath string) *Auth {
 	}
 	go a.cleanupLoop()
 	return a
+}
+
+// SessionEncryptionKey returns the AES-256-GCM key associated with the request's session token.
+func (a *Auth) SessionEncryptionKey(r *http.Request) ([]byte, bool) {
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		return nil, false
+	}
+	a.mu.RLock()
+	entry, ok := a.tokens[cookie.Value]
+	a.mu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	return entry.encKey, true
+}
+
+// DecryptWithKey decrypts a base64(nonce+ciphertext) string using the given AES-256-GCM key.
+func (a *Auth) DecryptWithKey(key []byte, s string) string {
+	if len(key) == 0 || s == "" {
+		return s
+	}
+	data, err := base64.StdEncoding.DecodeString(s)
+	if err != nil || len(data) < 12 {
+		return s
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return s
+	}
+	ae, err := cipher.NewGCM(block)
+	if err != nil {
+		return s
+	}
+	nonce, ct := data[:12], data[12:]
+	plaintext, err := ae.Open(nil, nonce, ct, nil)
+	if err != nil {
+		return s
+	}
+	return string(plaintext)
+}
+
+// DecryptField decrypts a field using the request's session key. Returns original if not encrypted.
+func (a *Auth) DecryptField(r *http.Request, s string) string {
+	key, ok := a.SessionEncryptionKey(r)
+	if !ok {
+		return s
+	}
+	return a.DecryptWithKey(key, s)
+}
+
+func (a *Auth) KeyHandler(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	key, ok := a.SessionEncryptionKey(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	csrf := cookie.Value[:16] // first 16 chars of the session token as CSRF token
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"key":"` + hex.EncodeToString(key) + `","csrf":"` + csrf + `"}`))
+}
+
+// CSRFValidate is middleware that checks the X-CSRF-Token header for state-changing requests.
+func (a *Auth) CSRFValidate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" || r.Method == "HEAD" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		cookie, err := r.Cookie("token")
+		if err != nil {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		expected := cookie.Value[:16]
+		token := r.Header.Get("X-CSRF-Token")
+		if token == "" || token != expected {
+			http.Error(w, "invalid csrf token", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *Auth) Middleware(next http.Handler) http.Handler {
@@ -122,7 +214,6 @@ func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// sync cached password
 	a.mu.Lock()
 	a.password = newPass
 	a.mu.Unlock()
@@ -163,7 +254,6 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		user := r.FormValue("user")
 		pass := r.FormValue("pass")
 
-		// fast path checks cached password first
 		ok := false
 		if user == a.username && pass == a.password {
 			ok = true
@@ -178,8 +268,10 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 		if ok {
 			token := generateToken()
+			encKey := make([]byte, 32)
+			io.ReadFull(rand.Reader, encKey)
 			a.mu.Lock()
-			a.tokens[token] = tokenEntry{created: time.Now(), ip: ip}
+			a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
 			delete(a.rateLimit, ip)
 			a.mu.Unlock()
 
