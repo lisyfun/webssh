@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -12,15 +13,41 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// hostKeyStore implements Trust On First Use (TOFU) for SSH host keys.
+// On first connection to a host, the key is accepted and stored in memory.
+// On subsequent connections, the key is verified against the stored key.
+// A mismatch is rejected (potential MITM attack).
+//
+// Keys are scoped to the process lifetime and keyed by "host:port".
+// This is significantly better than InsecureIgnoreHostKey.
+var hostKeyStore sync.Map
+
+func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	addr := net.JoinHostPort(hostname, "22")
+	if _, port, err := net.SplitHostPort(hostname); err == nil && port != "" {
+		addr = hostname
+	}
+	stored, loaded := hostKeyStore.LoadOrStore(addr, key)
+	if !loaded {
+		log.Printf("TOFU: accepted host key for %s (%s)", addr, ssh.FingerprintSHA256(key))
+		return nil
+	}
+	storedKey := stored.(ssh.PublicKey)
+	if ssh.FingerprintSHA256(storedKey) != ssh.FingerprintSHA256(key) {
+		return fmt.Errorf("host key mismatch for %s (expected %s, got %s)",
+			addr, ssh.FingerprintSHA256(storedKey), ssh.FingerprintSHA256(key))
+	}
+	return nil
+}
+
 type Session struct {
-	ID         string
-	Client     *ssh.Client
-	CreatedAt  time.Time
-	Host       string
-	Port       int
-	Username   string
-	Password   string
-	PrivateKey string
+	ID           string
+	Client       *ssh.Client
+	ClientConfig *ssh.ClientConfig
+	CreatedAt    time.Time
+	Host         string
+	Port         int
+	Username     string
 }
 
 var sftpServerPaths = []string{
@@ -103,25 +130,12 @@ func (s *Session) DialSFTP() (*sftp.Client, error) {
 }
 
 func (s *Session) sftpViaFreshConn() (*sftp.Client, error) {
-	config := &ssh.ClientConfig{
-		User:            s.Username,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-	}
-	if s.Password != "" {
-		config.Auth = []ssh.AuthMethod{ssh.Password(s.Password)}
-	} else if s.PrivateKey != "" {
-		signer, err := ssh.ParsePrivateKey([]byte(s.PrivateKey))
-		if err != nil {
-			return nil, fmt.Errorf("parse private key: %w", err)
-		}
-		config.Auth = []ssh.AuthMethod{ssh.PublicKeys(signer)}
-	} else {
-		return nil, fmt.Errorf("no auth method available")
+	if s.ClientConfig == nil {
+		return nil, fmt.Errorf("no client config available")
 	}
 
 	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
-	client, err := ssh.Dial("tcp", addr, config)
+	client, err := ssh.Dial("tcp", addr, s.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("fresh dial: %w", err)
 	}
@@ -234,16 +248,15 @@ var Manager = &SessionManager{
 	sessions: make(map[string]*Session),
 }
 
-func (sm *SessionManager) Create(id string, client *ssh.Client, host string, port int, username string, password string, privateKey string) *Session {
+func (sm *SessionManager) Create(id string, client *ssh.Client, cfg *ssh.ClientConfig, host string, port int, username string) *Session {
 	s := &Session{
-		ID:         id,
-		Client:     client,
-		CreatedAt:  time.Now(),
-		Host:       host,
-		Port:       port,
-		Username:   username,
-		Password:   password,
-		PrivateKey: privateKey,
+		ID:           id,
+		Client:       client,
+		ClientConfig: cfg,
+		CreatedAt:    time.Now(),
+		Host:         host,
+		Port:         port,
+		Username:     username,
 	}
 	sm.mu.Lock()
 	sm.sessions[id] = s

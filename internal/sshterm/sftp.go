@@ -336,7 +336,11 @@ func HandleFSWrite(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dst.Close()
 
-	dst.Write(body)
+	_, err = dst.Write(body)
+	if err != nil {
+		jsonError(w, "write remote file failed: "+err.Error())
+		return
+	}
 	json.NewEncoder(w).Encode(ActionResponse{Success: true})
 }
 

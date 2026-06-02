@@ -16,7 +16,18 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			// No origin header = direct browser/API call, allow
+			return true
+		}
+		// Require same-origin for WebSocket connections
+		scheme := "http://"
+		if r.TLS != nil {
+			scheme = "https://"
+		}
+		expected := scheme + r.Host
+		return origin == expected
 	},
 }
 
@@ -60,7 +71,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		params.Port = 22
 	}
 
-	sshClient, err := dialSSH(&params)
+	sshClient, cfg, err := dialSSH(&params)
 	if err != nil {
 		log.Printf("SSH dial failed: %v", err)
 		conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: "+err.Error()))
@@ -77,7 +88,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	Manager.Create(params.SessionID, sshClient, params.Host, params.Port, params.Username, params.Password, params.PrivateKey)
+	Manager.Create(params.SessionID, sshClient, cfg, params.Host, params.Port, params.Username)
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
@@ -194,10 +205,10 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func dialSSH(params *ConnectParams) (*ssh.Client, error) {
+func dialSSH(params *ConnectParams) (*ssh.Client, *ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            params.Username,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         10 * time.Second,
 	}
 
@@ -206,11 +217,15 @@ func dialSSH(params *ConnectParams) (*ssh.Client, error) {
 	} else if params.PrivateKey != "" {
 		signer, err := ssh.ParsePrivateKey([]byte(params.PrivateKey))
 		if err != nil {
-			return nil, fmt.Errorf("parse private key: %w", err)
+			return nil, nil, fmt.Errorf("parse private key: %w", err)
 		}
 		config.Auth = []ssh.AuthMethod{ssh.PublicKeys(signer)}
 	}
 
 	addr := fmt.Sprintf("%s:%d", params.Host, params.Port)
-	return ssh.Dial("tcp", addr, config)
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, config, nil
 }

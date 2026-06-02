@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -84,9 +85,24 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 	})
 }
 
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
 func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Basic CSRF protection: require same-origin Referer
+	ref := r.Header.Get("Referer")
+	if ref == "" || !sameOrigin(r, ref) {
+		w.Write([]byte(`{"ok":false,"msg":"非法请求来源"}`))
 		return
 	}
 
@@ -111,9 +127,18 @@ func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"ok":true,"msg":"密码已修改"}`))
 }
 
+func sameOrigin(r *http.Request, ref string) bool {
+	// Extract scheme + host from Referer and compare to request
+	scheme := "http://"
+	if r.TLS != nil {
+		scheme = "https://"
+	}
+	return len(ref) >= len(scheme+r.Host) && ref[:len(scheme+r.Host)] == scheme+r.Host
+}
+
 func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		ip := r.RemoteAddr
+		ip := clientIP(r)
 
 		a.mu.Lock()
 		re, exists := a.rateLimit[ip]
