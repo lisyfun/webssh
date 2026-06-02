@@ -421,6 +421,18 @@ input, textarea, button { font-family: inherit; }
   </div>
 </div>
 
+<!-- Rename Modal -->
+<div class="modal-overlay" id="rename-overlay" style="display:none">
+  <div class="modal confirm-modal">
+    <p id="rename-label">新名称:</p>
+    <input type="text" id="rename-input" style="width:100%;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);font-size:14px;margin-top:8px;outline:none" onkeydown="if(event.key==='Enter')doRename()">
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-cancel" onclick="hideRename()">取消</button>
+      <button class="btn-primary" onclick="doRename()">确定</button>
+    </div>
+  </div>
+</div>
+
 <!-- Batch Import Modal -->
 <div class="modal-overlay" id="batch-import-overlay" style="display:none">
   <div class="modal" style="width:500px">
@@ -813,14 +825,6 @@ function disconnect() {
   loadFileList();
 }
 
-// ---- API ----
-async function api(url, opts) {
-  const r = await fetch(url, opts);
-  const j = await r.json();
-  if (!j.success) throw new Error(j.error || 'request failed');
-  return j;
-}
-
 async function fetchServers() {
   try {
     const j = await api('__BASE_PATH__/api/servers');
@@ -1168,7 +1172,13 @@ function fileDownload(name) {
   const ses = getActiveSession();
   if (!ses) return;
   const p = ses.fsPath + '/' + name;
-  window.open(`__BASE_PATH__/api/fs/${ses.sessionId}/download?path=${encodeURIComponent(p)}`, '_blank');
+  const a = document.createElement('a');
+  a.href = `__BASE_PATH__/api/fs/${ses.sessionId}/download?path=${encodeURIComponent(p)}`;
+  a.download = name;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 var activeEditorFile = null;
@@ -1357,14 +1367,33 @@ function fileDelete(name) {
 }
 
 function fileRename(name) {
-  const newName = prompt('新名称:', name);
-  if (!newName || newName === name) return;
+  showRename(name);
+}
+
+var _renaming = '';
+
+function showRename(name) {
+  _renaming = name;
+  document.getElementById('rename-label').textContent = '重命名: ' + name;
+  document.getElementById('rename-input').value = name;
+  document.getElementById('rename-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('rename-input').select(), 100);
+}
+
+function hideRename() {
+  document.getElementById('rename-overlay').style.display = 'none';
+}
+
+function doRename() {
+  const newName = document.getElementById('rename-input').value.trim();
+  if (!newName || newName === _renaming) { hideRename(); return; }
   const ses = getActiveSession();
-  if (!ses) return;
+  if (!ses) { hideRename(); return; }
+  hideRename();
   fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/rename`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
-    body: JSON.stringify({ oldPath: ses.fsPath + '/' + name, newPath: ses.fsPath + '/' + newName })
+    body: JSON.stringify({ oldPath: ses.fsPath + '/' + _renaming, newPath: ses.fsPath + '/' + newName })
   }).then(r => r.json()).then(res => {
     if (res.success) loadFileList();
     else showToast(res.error, 'error');
