@@ -629,6 +629,7 @@ function switchSession(sid) {
 function closeSession(sid) {
   const ses = sessions[sid];
   if (!ses) return;
+  if (ses._ka) clearInterval(ses._ka);
   if (ses.ws) { ses.ws.close(); }
   if (ses.term) { ses.term.dispose(); }
   const container = document.getElementById(`term-${sid}`);
@@ -740,6 +741,10 @@ function connectToServer(sid) {
     authMsg.password = await encField(authMsg.password);
     authMsg.privateKey = await encField(authMsg.privateKey);
     ws.send(JSON.stringify(authMsg));
+    // 每 30s 发 keepalive，防止 WS 被 NAT/防火墙超时断开
+    ses._ka = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'keepalive'}));
+    }, 30000);
   };
 
   ws.onmessage = (evt) => {

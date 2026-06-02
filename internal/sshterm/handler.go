@@ -78,13 +78,6 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 			params.Port = 22
 		}
 
-		// WS 保活: 服务端定期发 ping，收到 pong 则续期读超时
-		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
-		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
-			return nil
-		})
-
 		sshClient, cfg, err := dialSSH(&params)
 		if err != nil {
 			log.Printf("SSH dial failed: %v", err)
@@ -206,19 +199,6 @@ func HandleWebSocket(decrypt DecryptFunc) http.HandlerFunc {
 				}
 			}
 		}()
-
-		// WS 保活 ping 协程
-		go func() {
-			ticker := time.NewTicker(25 * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
-				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					return
-				}
-			}
-		}()
-
 		defer func() {
 			Manager.Remove(params.SessionID)
 			conn.Close()
