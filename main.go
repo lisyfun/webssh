@@ -55,13 +55,6 @@ func main() {
 	}
 	log.Printf("access path: %s", basePath)
 
-	password := *pass
-	if password == "" {
-		password = generatePassword()
-		log.Printf("generated password: %s", password)
-	}
-	log.Printf("login user: %s", *user)
-
 	if *maxBody < 0 {
 		log.Fatal("-maxbody must be >= 0")
 	}
@@ -76,6 +69,25 @@ func main() {
 		log.Fatal("failed to init store:", err)
 	}
 	defer st.Close()
+
+	password := *pass
+	if password == "" {
+		exists, err := st.UserExists(context.Background(), *user)
+		if err != nil || !exists {
+			password = generatePassword()
+			log.Printf("generated password: %s", password)
+		}
+	}
+	if password != "" {
+		if err := st.EnsureUser(context.Background(), *user, password); err != nil {
+			log.Fatal("failed to create user:", err)
+		}
+	}
+	if password == "" {
+		log.Printf("login user: %s (use existing password)", *user)
+	} else {
+		log.Printf("login user: %s", *user)
+	}
 
 	if err := st.EnsureUser(context.Background(), *user, password); err != nil {
 		log.Fatal("failed to create user:", err)

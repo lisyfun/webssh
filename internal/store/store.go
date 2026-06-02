@@ -151,13 +151,32 @@ func (s *Store) decrypt(ciphertext string) string {
 
 // ---- User operations ----
 
+func (s *Store) UserExists(ctx context.Context, username string) (bool, error) {
+	var existing int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE username=?", username).Scan(&existing)
+	if err != nil {
+		return false, err
+	}
+	return existing > 0, nil
+}
+
 func (s *Store) EnsureUser(ctx context.Context, username, password string) error {
 	var existing int
 	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE username=?", username).Scan(&existing)
 	if existing > 0 {
-		return nil
+		return s.updatePassword(ctx, username, password)
 	}
 	return s.createUser(ctx, username, password)
+}
+
+func (s *Store) updatePassword(ctx context.Context, username, password string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err = s.db.ExecContext(ctx, "UPDATE users SET password_hash=?, updated_at=? WHERE username=?", string(hash), now, username)
+	return err
 }
 
 func (s *Store) createUser(ctx context.Context, username, password string) error {

@@ -3,14 +3,32 @@ package sshterm
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/sftp"
 )
+
+func sanitizePath(p string) (string, error) {
+	cleaned := path.Clean(p)
+	if cleaned == "." {
+		cleaned = "/"
+	}
+	if strings.HasPrefix(cleaned, "..") || cleaned == ".." {
+		return "", errors.New("path contains traversal")
+	}
+	for _, part := range strings.Split(cleaned, "/") {
+		if part == ".." {
+			return "", errors.New("path contains traversal")
+		}
+	}
+	return cleaned, nil
+}
 
 // MaxWriteBodySize limits the request body size for the inline editor
 // save endpoint (HandleFSWrite). 0 = no limit. Default 50MB.
@@ -42,7 +60,11 @@ func HandleFSList(w http.ResponseWriter, r *http.Request) {
 	if reqPath == "" {
 		reqPath = "/"
 	}
-	reqPath = path.Clean(reqPath)
+	reqPath, err := sanitizePath(reqPath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
 
 	s, err := Manager.Get(sessionID)
 	if err != nil {
@@ -85,7 +107,11 @@ func HandleFSDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "path required", http.StatusBadRequest)
 		return
 	}
-	filePath = path.Clean(filePath)
+	filePath, err := sanitizePath(filePath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	s, err := Manager.Get(sessionID)
 	if err != nil {
@@ -120,6 +146,11 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 	if destPath == "" {
 		destPath = "/"
 	}
+	destPath, err := sanitizePath(destPath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
 
 	s, err := Manager.Get(sessionID)
 	if err != nil {
@@ -147,6 +178,11 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	remotePath := path.Join(destPath, part.FileName())
+	remotePath, err = sanitizePath(remotePath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
 	dst, err := sc.Create(remotePath)
 	if err != nil {
 		jsonError(w, "create remote file failed: "+err.Error())
@@ -169,6 +205,16 @@ func HandleFSRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
+	if req.Path == "" {
+		jsonError(w, "path required")
+		return
+	}
+	reqPath, err := sanitizePath(req.Path)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
+
 	s, err := Manager.Get(sessionID)
 	if err != nil {
 		jsonError(w, "session not found")
@@ -182,16 +228,16 @@ func HandleFSRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	defer sc.Close()
 
-	info, err := sc.Stat(req.Path)
+	info, err := sc.Stat(reqPath)
 	if err != nil {
 		jsonError(w, err.Error())
 		return
 	}
 
 	if info.IsDir() {
-		err = removeDir(sc, req.Path)
+		err = removeDir(sc, reqPath)
 	} else {
-		err = sc.Remove(req.Path)
+		err = sc.Remove(reqPath)
 	}
 
 	if err != nil {
@@ -211,6 +257,21 @@ func HandleFSRename(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
+	if req.OldPath == "" || req.NewPath == "" {
+		jsonError(w, "oldPath and newPath required")
+		return
+	}
+	oldPath, err := sanitizePath(req.OldPath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
+	newPath, err := sanitizePath(req.NewPath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
+
 	s, err := Manager.Get(sessionID)
 	if err != nil {
 		jsonError(w, "session not found")
@@ -224,7 +285,7 @@ func HandleFSRename(w http.ResponseWriter, r *http.Request) {
 	}
 	defer sc.Close()
 
-	err = sc.Rename(req.OldPath, req.NewPath)
+	err = sc.Rename(oldPath, newPath)
 	if err != nil {
 		jsonError(w, err.Error())
 		return
@@ -241,6 +302,16 @@ func HandleFSMkdir(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
+	if req.Path == "" {
+		jsonError(w, "path required")
+		return
+	}
+	reqPath, err := sanitizePath(req.Path)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
+
 	s, err := Manager.Get(sessionID)
 	if err != nil {
 		jsonError(w, "session not found")
@@ -254,7 +325,7 @@ func HandleFSMkdir(w http.ResponseWriter, r *http.Request) {
 	}
 	defer sc.Close()
 
-	err = sc.Mkdir(req.Path)
+	err = sc.Mkdir(reqPath)
 	if err != nil {
 		jsonError(w, err.Error())
 		return
@@ -270,7 +341,11 @@ func HandleFSRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "path required", http.StatusBadRequest)
 		return
 	}
-	filePath = path.Clean(filePath)
+	filePath, err := sanitizePath(filePath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	s, err := Manager.Get(sessionID)
 	if err != nil {
@@ -304,7 +379,11 @@ func HandleFSWrite(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "path required")
 		return
 	}
-	filePath = path.Clean(filePath)
+	filePath, err := sanitizePath(filePath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
 
 	s, err := Manager.Get(sessionID)
 	if err != nil {
