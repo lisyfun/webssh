@@ -21,7 +21,7 @@ import (
 var staticFS embed.FS
 
 var (
-	addr     = flag.String("addr", ":8080", "listen address")
+	addr     = flag.String("addr", "8080", "listen port or address (e.g. 8080 or :8080)")
 	user     = flag.String("user", "admin", "login username")
 	pass     = flag.String("pass", "", "login password (empty = auto-generate random)")
 	certFile = flag.String("cert", "", "TLS certificate file (enables HTTPS)")
@@ -31,6 +31,11 @@ var (
 
 func main() {
 	flag.Parse()
+
+	listenAddr := *addr
+	if !strings.HasPrefix(listenAddr, ":") {
+		listenAddr = ":" + listenAddr
+	}
 
 	basePath := *urlPath
 	if basePath == "" {
@@ -99,11 +104,9 @@ func main() {
 
 	if *certFile != "" && *keyFile != "" {
 		log.Printf("TLS enabled")
-		log.Fatal(http.ListenAndServeTLS(*addr, *certFile, *keyFile, r))
+		log.Fatal(http.ListenAndServeTLS(listenAddr, *certFile, *keyFile, r))
 	} else {
-		log.Println("WARNING: plain HTTP — all traffic including passwords is visible on the network!")
-		log.Println("         use -cert and -key to enable HTTPS encryption")
-		log.Fatal(http.ListenAndServe(*addr, r))
+		log.Fatal(http.ListenAndServe(listenAddr, r))
 	}
 }
 
