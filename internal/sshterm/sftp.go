@@ -12,6 +12,10 @@ import (
 	"github.com/pkg/sftp"
 )
 
+// MaxWriteBodySize limits the request body size for the inline editor
+// save endpoint (HandleFSWrite). 0 = no limit. Default 50MB.
+var MaxWriteBodySize int64 = 50 << 20
+
 type FileEntry struct {
 	Name    string `json:"name"`
 	Size    int64  `json:"size"`
@@ -315,7 +319,11 @@ func HandleFSWrite(w http.ResponseWriter, r *http.Request) {
 	}
 	defer sc.Close()
 
-	body, err := io.ReadAll(r.Body)
+	var bodyReader io.Reader = r.Body
+	if MaxWriteBodySize > 0 {
+		bodyReader = http.MaxBytesReader(w, r.Body, MaxWriteBodySize)
+	}
+	body, err := io.ReadAll(bodyReader)
 	if err != nil {
 		jsonError(w, "read body failed: "+err.Error())
 		return

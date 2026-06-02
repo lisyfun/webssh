@@ -17,9 +17,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-//go:embed all:static
-var staticFS embed.FS
-
 var (
 	addr     = flag.String("addr", "8080", "listen port or address (e.g. 8080 or :8080)")
 	user     = flag.String("user", "admin", "login username")
@@ -27,7 +24,11 @@ var (
 	certFile = flag.String("cert", "", "TLS certificate file (enables HTTPS)")
 	keyFile  = flag.String("key", "", "TLS private key file")
 	urlPath  = flag.String("url", "", "access path prefix (empty = auto-generate random)")
+	maxBody  = flag.Int64("maxbody", 50, "max editor body size in MB (0 = no limit)")
 )
+
+//go:embed all:static
+var staticFS embed.FS
 
 func main() {
 	flag.Parse()
@@ -54,6 +55,15 @@ func main() {
 		log.Printf("generated password: %s", password)
 	}
 	log.Printf("login user: %s", *user)
+
+	if *maxBody < 0 {
+		log.Fatal("-maxbody must be >= 0")
+	}
+	if *maxBody == 0 {
+		sshterm.MaxWriteBodySize = 0
+	} else {
+		sshterm.MaxWriteBodySize = *maxBody << 20
+	}
 
 	indexBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
