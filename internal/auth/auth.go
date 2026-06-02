@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -41,9 +42,10 @@ type Auth struct {
 	tokenTTL  time.Duration
 	maxLogins int
 	banTime   time.Duration
+	maxBodyMB int64
 }
 
-func New(store UserStore, username, password, basePath string) *Auth {
+func New(store UserStore, username, password, basePath string, maxBodyMB int64) *Auth {
 	a := &Auth{
 		store:     store,
 		username:  username,
@@ -54,6 +56,7 @@ func New(store UserStore, username, password, basePath string) *Auth {
 		tokenTTL:  24 * time.Hour,
 		maxLogins: 5,
 		banTime:   15 * time.Minute,
+		maxBodyMB: maxBodyMB,
 	}
 	go a.cleanupLoop()
 	return a
@@ -119,9 +122,9 @@ func (a *Auth) KeyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	csrf := cookie.Value[:16] // first 16 chars of the session token as CSRF token
+	csrf := cookie.Value[:16]
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"key":"` + hex.EncodeToString(key) + `","csrf":"` + csrf + `"}`))
+	fmt.Fprintf(w, `{"key":"%s","csrf":"%s","maxBodyMB":%d}`, hex.EncodeToString(key), csrf, a.maxBodyMB)
 }
 
 // CSRFValidate is middleware that checks the X-CSRF-Token header for state-changing requests.

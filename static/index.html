@@ -47,7 +47,7 @@ input, textarea, button { font-family: inherit; }
 }
 .header h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
 .header .spacer { flex: 1; }
-.header .toggle-files { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+.header .toggle-files { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
 .header .toggle-files:hover { background: var(--bg-hover); color: var(--text-primary); }
 .header .toggle-files.active { color: var(--accent); }
 
@@ -70,8 +70,13 @@ input, textarea, button { font-family: inherit; }
   border-bottom: 1px solid var(--border-color);
 }
 .sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; }
+.sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; }
+.sidebar-header .add-btn svg { display: block; }
 .sidebar-header .add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.server-search { padding: 6px 12px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+.server-search input { width:100%; padding:5px 8px; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; outline:none; }
+.server-search input:focus { border-color:var(--accent); }
+.server-search input::placeholder { color:var(--text-muted); }
 .server-list { flex: 1; overflow-y: auto; padding: 4px 0; }
 .server-item {
   padding: 8px 12px;
@@ -92,27 +97,23 @@ input, textarea, button { font-family: inherit; }
 .server-item .server-info { flex: 1; min-width: 0; }
 .server-item .server-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .server-item .server-host { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.server-item .del-btn { opacity: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+.server-item .server-tags { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
+.server-item .server-tags .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; }
+.server-item .server-tags .tag:hover { background: var(--accent); color: #fff; }
+.server-item .del-btn { opacity: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
 .server-item:hover .del-btn { opacity: 1; }
 .server-item .del-btn:hover { color: var(--red); }
 
 /* Center - Terminal */
 .center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.terminal-tab {
-  height: 34px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  flex-shrink: 0;
-}
-.terminal-tab .tab-label { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
-.terminal-tab .tab-label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
-.terminal-tab .tab-label .name { color: var(--text-primary); font-weight: 500; }
-.terminal-tab .disconnect-btn { margin-left: auto; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
-.terminal-tab .disconnect-btn:hover { color: var(--red); background: var(--bg-hover); }
-
+.tab-bar { display: flex; align-items: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border); height: 34px; flex-shrink: 0; padding: 0 8px; }
+.tab-list { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tab-list::-webkit-scrollbar { display: none; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; flex-shrink: 0; }
+.tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); }
+.tab .tab-host { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
+.tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
+.tab-close:hover { color: var(--text-primary); }
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
 .terminal-wrapper .xterm { padding: 6px 0 0 14px; box-sizing: border-box; }
 .terminal-wrapper .empty-state {
@@ -182,7 +183,7 @@ input, textarea, button { font-family: inherit; }
   border-radius: 2px;
 }
 .file-item:hover { background: var(--bg-tertiary); }
-.file-item .icon { flex-shrink: 0; font-size: 14px; width: 18px; text-align: center; }
+.file-item .icon { flex-shrink: 0; width: 18px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
 .file-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-item .size { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 50px; text-align: right; }
 .file-item .mtime { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 60px; text-align: right; }
@@ -295,9 +296,9 @@ input, textarea, button { font-family: inherit; }
   <div class="header">
     <h1>WebSSH</h1>
     <div class="spacer"></div>
-    <button class="toggle-files" id="toggle-files-btn" onclick="toggleFilePanel()">&#x1F4C1; 文件</button>
-    <button class="toggle-files" onclick="location.href='__BASE_PATH__/logout'" style="margin-left:4px" title="退出登录">&#x23FB; 退出</button>
-    <button class="toggle-files" onclick="showChangePwd()" style="margin-left:4px" title="修改密码">&#x1F512; 密码</button>
+    <button class="toggle-files" id="toggle-files-btn" onclick="toggleFilePanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> 文件</button>
+    <button class="toggle-files" onclick="location.href='__BASE_PATH__/logout'" style="margin-left:4px" title="退出登录"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> 退出</button>
+    <button class="toggle-files" onclick="showChangePwd()" style="margin-left:4px" title="修改密码"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 密码</button>
   </div>
 
   <div class="body">
@@ -306,26 +307,22 @@ input, textarea, button { font-family: inherit; }
       <div class="sidebar-header">
         <span>服务器</span>
         <div style="display:flex;gap:2px">
-          <button class="add-btn" onclick="showBatchImport()" title="批量导入">&#x1F4C2;</button>
+          <button class="add-btn" onclick="showBatchImport()" title="批量导入"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
           <button class="add-btn" onclick="showAddServer()" title="添加服务器">+</button>
         </div>
       </div>
+      <div class="server-search"><input type="text" id="server-search-input" placeholder="搜索名称/主机/用户..." oninput="renderServers()"></div>
       <div class="server-list" id="server-list"></div>
     </div>
 
     <!-- Center -->
     <div class="center">
-      <div class="terminal-tab" id="terminal-tab" style="display:none">
-        <div class="tab-label">
-          <span class="dot"></span>
-          <span class="name" id="tab-name">连接中...</span>
-          <span class="host" id="tab-host" style="color:var(--text-muted);font-size:11px"></span>
-        </div>
-        <button class="disconnect-btn" onclick="disconnect()">断开</button>
+      <div class="tab-bar" id="tab-bar" style="display:none">
+        <div class="tab-list" id="tab-list"></div>
       </div>
       <div class="terminal-wrapper" id="terminal-wrapper">
         <div class="empty-state" id="empty-state">
-          <div style="font-size:32px;opacity:0.3">&#x1F4BB;</div>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <div>选择左侧服务器进行连接</div>
           <div class="key-hint">点击 + 添加新的服务器</div>
         </div>
@@ -402,6 +399,10 @@ input, textarea, button { font-family: inherit; }
     <div class="form-group" id="m-key-group" style="display:none">
       <label>私钥</label>
       <textarea id="svr-key" placeholder="粘贴私钥内容"></textarea>
+    </div>
+    <div class="form-group">
+      <label>标签 <span style="color:var(--text-muted);font-size:11px">(逗号分隔)</span></label>
+      <input type="text" id="svr-tags" placeholder="例如: 生产,香港">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideModal()">取消</button>
@@ -498,11 +499,12 @@ input, textarea, button { font-family: inherit; }
 // ---- State ----
 let servers = [];
 let editingId = null;
-let sessions = {};
-let activeServerId = null;
+let sessions = {};          // sid -> { serverId, ws, term, fitAddon, connected, fsPath, info }
+let activeSessionId = null;
 let filePanelOpen = false;
 let sessionKey = null;
 let csrfToken = null;
+let maxUploadMB = 0;
 
 // ---- Encryption & CSRF ----
 async function fetchSessionKey() {
@@ -511,6 +513,7 @@ async function fetchSessionKey() {
     const j = await r.json();
     sessionKey = j.key;
     csrfToken = j.csrf;
+    maxUploadMB = j.maxBodyMB || 0;
   } catch (_) {}
 }
 
@@ -558,63 +561,132 @@ async function encField(plain) {
 }
 
 // ---- Server List ----
+function filterTag(tag) {
+  document.getElementById('server-search-input').value = tag;
+  renderServers();
+}
+
 function renderServers() {
+  const q = document.getElementById('server-search-input').value.toLowerCase().trim();
+  const filtered = q ? servers.filter(s =>
+    (s.name || '').toLowerCase().includes(q) ||
+    (s.host || '').toLowerCase().includes(q) ||
+    (s.user || '').toLowerCase().includes(q) ||
+    (s.tags || '').toLowerCase().includes(q)
+  ) : servers;
   const el = document.getElementById('server-list');
-  el.innerHTML = servers.map((s, i) => {
-    const ses = sessions[s.id];
-    const status = ses ? (ses.connected ? 'connected' : 'connecting') : 'disconnected';
-    const isActive = activeServerId === s.id;
+  el.innerHTML = filtered.map((s, i) => {
+    const ss = Object.values(sessions).filter(x => x.serverId === s.id);
+    const connected = ss.some(x => x.connected);
+    const connecting = ss.some(x => x.ws && x.ws.readyState <= 1);
+    const status = connected ? 'connected' : (connecting ? 'connecting' : 'disconnected');
+    const isActive = activeSessionId && sessions[activeSessionId]?.serverId === s.id;
+    const tags = (s.tags || '').split(',').map(t => t.trim()).filter(Boolean);
     return `<div class="server-item ${isActive?'active':''}" onclick="selectServer('${s.id}')" data-id="${s.id}">
       <span class="status-dot ${status}"></span>
       <div class="server-info">
         <div class="server-name">${escHtml(s.name) || escHtml(s.host)}</div>
         <div class="server-host">${escHtml(s.user)}@${escHtml(s.host)}:${s.port}</div>
+        ${tags.length ? '<div class="server-tags">'+tags.map(t=>'<span class="tag" onclick="event.stopPropagation();filterTag(\''+escJsStr(t)+'\')">'+escHtml(t)+'</span>').join('')+'</div>' : ''}
       </div>
+      <button class="del-btn" onclick="event.stopPropagation();openNewTerminal('${s.id}')" title="新建终端"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
       <button class="del-btn" onclick="event.stopPropagation();editServer('${s.id}')" title="编辑">&#x270E;</button>
-      <button class="del-btn" onclick="event.stopPropagation();copyServer('${s.id}')" title="复制">&#x1F4CB;</button>
+      <button class="del-btn" onclick="event.stopPropagation();copyServer('${s.id}')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
       <button class="del-btn" onclick="event.stopPropagation();deleteServer('${s.id}')" title="删除">&times;</button>
     </div>`;
   }).join('');
 }
 
 function selectServer(id) {
-  const ses = sessions[id];
-  if (ses && ses.connected) {
-    setActiveServer(id);
+  const ss = Object.keys(sessions).filter(sid => sessions[sid].serverId === id);
+  if (ss.length > 0) {
+    switchSession(ss[ss.length - 1]);
     return;
   }
-  if (ses && ses.ws && ses.ws.readyState <= 1) {
-    setActiveServer(id);
-    return;
-  }
-  connectToServer(id);
+  openNewTerminal(id);
 }
 
-function setActiveServer(id) {
-  activeServerId = id;
+function openNewTerminal(serverId) {
+  const svr = servers.find(s => s.id === serverId);
+  if (!svr) return;
+  const sid = crypto.randomUUID();
+  sessions[sid] = { serverId, connected: false, fsPath: '/', info: { host: svr.host, port: svr.port, user: svr.user } };
+  activeSessionId = sid;
   renderServers();
-  const tab = document.getElementById('terminal-tab');
+  renderTabs();
+  setActiveSession(sid);
+  connectToServer(sid);
+}
+
+function switchSession(sid) {
+  if (!sessions[sid]) return;
+  activeSessionId = sid;
+  renderServers();
+  renderTabs();
+  setActiveSession(sid);
+}
+
+function closeSession(sid) {
+  const ses = sessions[sid];
+  if (!ses) return;
+  if (ses.ws) { ses.ws.close(); }
+  if (ses.term) { ses.term.dispose(); }
+  const container = document.getElementById(`term-${sid}`);
+  if (container) container.remove();
+  delete sessions[sid];
+  if (activeSessionId === sid) {
+    const remaining = Object.keys(sessions);
+    if (remaining.length > 0) {
+      switchSession(remaining[remaining.length - 1]);
+    } else {
+      activeSessionId = null;
+      document.getElementById('tab-bar').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'flex';
+      renderServers();
+      renderTabs();
+      updateStatus();
+    }
+  } else {
+    renderTabs();
+    updateStatus();
+  }
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tab-bar');
+  const list = document.getElementById('tab-list');
+  const sids = Object.keys(sessions);
+  if (sids.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  list.innerHTML = sids.map(sid => {
+    const ses = sessions[sid];
+    const svr = servers.find(s => s.id === ses.serverId);
+    const name = svr ? (svr.name || svr.host) : '?';
+    const host = svr ? `${svr.user}@${svr.host}:${svr.port}` : '?';
+    const active = sid === activeSessionId ? ' active' : '';
+    return `<div class="tab${active}" onclick="switchSession('${sid}')">
+      <span class="tab-name">${escHtml(name)}</span>
+      <span class="tab-host">${escHtml(host)}</span>
+      <button class="tab-close" onclick="event.stopPropagation();closeSession('${sid}')">&times;</button>
+    </div>`;
+  }).join('');
+}
+
+function setActiveSession(sid) {
+  const ses = sessions[sid];
+  if (!ses) return;
   const empty = document.getElementById('empty-state');
   const load = document.getElementById('loading-state');
-
-  const ses = sessions[id];
-
-  if (ses && ses.connected) {
-    tab.style.display = 'flex';
-    document.getElementById('tab-name').textContent = servers.find(s => s.id === id)?.name || '';
-    document.getElementById('tab-host').textContent = `${ses.info?.user}@${ses.info?.host}:${ses.info?.port}`;
+  if (ses.connected) {
     empty.style.display = 'none';
     load.style.display = 'none';
     document.querySelectorAll('[id^="term-"]').forEach(el => {
-      el.style.display = el.id === `term-${id}` ? 'block' : 'none';
+      el.style.display = el.id === `term-${sid}` ? 'block' : 'none';
     });
     if (ses.term && ses.fitAddon) {
       setTimeout(() => ses.fitAddon.fit(), 50);
     }
-  } else if (ses && ses.ws && ses.ws.readyState <= 1) {
-    tab.style.display = 'flex';
-    document.getElementById('tab-name').textContent = servers.find(s => s.id === id)?.name || '';
-    document.getElementById('tab-host').textContent = `${ses.info?.user}@${ses.info?.host}:${ses.info?.port}`;
+  } else if (ses.ws && ses.ws.readyState <= 1) {
     empty.style.display = 'none';
     load.style.display = 'flex';
     document.getElementById('loading-text').textContent = '连接中...';
@@ -622,7 +694,6 @@ function setActiveServer(id) {
       el.style.display = 'none';
     });
   } else {
-    tab.style.display = 'none';
     empty.style.display = 'flex';
     load.style.display = 'none';
     document.querySelectorAll('[id^="term-"]').forEach(el => {
@@ -633,39 +704,33 @@ function setActiveServer(id) {
   loadFileList();
 }
 
-function connectToServer(id) {
-  const svr = servers.find(s => s.id === id);
+function connectToServer(sid) {
+  const ses = sessions[sid];
+  if (!ses) return;
+  const svr = servers.find(s => s.id === ses.serverId);
   if (!svr) return;
 
-  const tab = document.getElementById('terminal-tab');
   const empty = document.getElementById('empty-state');
   const load = document.getElementById('loading-state');
-  const tcon = document.getElementById('terminal-container');
-
-  tab.style.display = 'flex';
-  document.getElementById('tab-name').textContent = svr.name || svr.host;
-  document.getElementById('tab-host').textContent = `${svr.user}@${svr.host}:${svr.port}`;
   empty.style.display = 'none';
   load.style.display = 'flex';
   document.getElementById('loading-text').textContent = '连接中...';
-  tcon.style.display = 'none';
 
-  activeServerId = id;
   renderServers();
   updateStatus();
 
   const sessionId = crypto.randomUUID();
+  ses.sessionId = sessionId;
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${location.host}__BASE_PATH__/ws`;
 
   const ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
-
-  sessions[id] = { sessionId, ws, connected: false, fsPath: '/', info: { host: svr.host, port: svr.port, user: svr.user } };
+  ses.ws = ws;
 
   ws.onopen = async () => {
     const authMsg = {
-      sessionId,
+      sessionId: ses.sessionId,
       host: svr.host,
       port: svr.port,
       username: svr.user,
@@ -679,23 +744,22 @@ function connectToServer(id) {
 
   ws.onmessage = (evt) => {
     if (evt.data instanceof ArrayBuffer) {
-      const ses = sessions[id];
-      if (ses && ses.term) ses.term.write(new Uint8Array(evt.data));
+      const s = sessions[sid];
+      if (s && s.term) s.term.write(new Uint8Array(evt.data));
     } else {
       const msg = evt.data;
       if (typeof msg === 'string' && (msg.startsWith('SSH connection failed') || msg.startsWith('SSH session failed'))) {
         load.style.display = 'none';
         empty.style.display = 'flex';
-        tab.style.display = 'none';
         document.getElementById('loading-text').textContent = msg;
-        const ses = sessions[id];
-        if (ses) { ses.connected = false; }
+        const s = sessions[sid];
+        if (s) { s.connected = false; }
         renderServers();
         updateStatus();
         return;
       }
-      const ses = sessions[id];
-      if (ses && ses.term) ses.term.write(msg);
+      const s = sessions[sid];
+      if (s && s.term) s.term.write(msg);
     }
   };
 
@@ -704,54 +768,55 @@ function connectToServer(id) {
   };
 
   ws.onclose = () => {
-    const ses = sessions[id];
-    if (!ses) return;
-    ses.connected = false;
-    if (ses.term) {
-      ses.term.write('\r\n\x1b[31m连接已关闭\x1b[0m');
-      ses.term.options.disableStdin = true;
+    const s = sessions[sid];
+    if (!s) return;
+    s.connected = false;
+    if (s.term) {
+      s.term.write('\r\n\x1b[31m连接已关闭\x1b[0m');
+      s.term.options.disableStdin = true;
     }
     renderServers();
     updateStatus();
     loadFileList();
   };
 
-  initTerminal(id);
+  initTerminal(sid);
 }
 
-function initTerminal(id) {
+function initTerminal(sid) {
   document.getElementById('loading-state').style.display = 'none';
 
-  const old = document.getElementById(`term-${id}`);
+  const old = document.getElementById(`term-${sid}`);
   if (old) old.remove();
 
   const container = document.createElement('div');
-  container.id = `term-${id}`;
+  container.id = `term-${sid}`;
   container.style.position = 'absolute';
   container.style.inset = '0';
   document.getElementById('terminal-wrapper').appendChild(container);
 
   document.querySelectorAll('[id^="term-"]').forEach(el => {
-    el.style.display = el.id === `term-${id}` ? 'block' : 'none';
+    el.style.display = el.id === `term-${sid}` ? 'block' : 'none';
   });
 
   const term = new Terminal({
     cursorBlink: true,
     cursorStyle: 'block',
     fontSize: 13,
-    fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+    fontFamily: "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
     letterSpacing: 0.5,
     lineHeight: 1.3,
     theme: {
       background: '#0d1117', foreground: '#e6edf3', cursor: '#e6edf3',
       selectionBackground: '#3b5998',
-      black: '#484f58', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
+      black: '#000000', red: '#ff7b72', green: '#1f7a2e', yellow: '#e3b341',
       blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
-      brightBlack: '#6e7681', brightRed: '#ffa198', brightGreen: '#56d364',
-      brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+      brightBlack: '#484f58', brightRed: '#ffa198', brightGreen: '#56d364',
+      brightYellow: '#e9c46a', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
       brightCyan: '#56d4dd', brightWhite: '#e6edf3',
     },
     allowTransparency: true,
+    drawBoldTextInBrightColors: false,
   });
 
   const fitAddon = new FitAddon.FitAddon();
@@ -765,7 +830,7 @@ function initTerminal(id) {
         const slashIdx = data.indexOf('/', 7); // after "file://"
         if (slashIdx >= 0) {
           const path = data.substring(slashIdx);
-          if (path && activeServerId && filePanelOpen) {
+          if (path && activeSessionId && filePanelOpen) {
             clearTimeout(cwdTimer);
             cwdTimer = setTimeout(() => loadFileList(path), 200);
           }
@@ -777,8 +842,16 @@ function initTerminal(id) {
 
   term.open(container);
 
+  // 选中即复制
+  term.onSelectionChange(() => {
+    const sel = term.getSelection();
+    if (sel) {
+      navigator.clipboard.writeText(sel).catch(() => {});
+    }
+  });
+
   term.onData((data) => {
-    const ses = sessions[id];
+    const ses = sessions[sid];
     if (ses && ses.ws && ses.ws.readyState === WebSocket.OPEN) {
       ses.ws.send(new TextEncoder().encode(data));
     }
@@ -787,7 +860,7 @@ function initTerminal(id) {
   fitAddon.fit();
 
   term.onResize(({ cols, rows }) => {
-    const ses = sessions[id];
+    const ses = sessions[sid];
     if (ses && ses.ws && ses.ws.readyState === WebSocket.OPEN) {
       ses.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
     }
@@ -795,34 +868,20 @@ function initTerminal(id) {
 
   setTimeout(() => fitAddon.fit(), 100);
 
-  if (sessions[id]) {
-    sessions[id].term = term;
-    sessions[id].fitAddon = fitAddon;
-    sessions[id].connected = true;
+  if (sessions[sid]) {
+    sessions[sid].term = term;
+    sessions[sid].fitAddon = fitAddon;
+    sessions[sid].connected = true;
   }
 
   renderServers();
+  renderTabs();
   updateStatus();
   loadFileList();
 }
 
 function disconnect() {
-  if (!activeServerId) return;
-  const id = activeServerId;
-  const ses = sessions[id];
-  if (ses) {
-    if (ses.ws) { ses.ws.close(); }
-    if (ses.term) { ses.term.dispose(); }
-    delete sessions[id];
-  }
-  const container = document.getElementById(`term-${id}`);
-  if (container) container.remove();
-  document.getElementById('terminal-tab').style.display = 'none';
-  document.getElementById('empty-state').style.display = 'flex';
-  activeServerId = null;
-  renderServers();
-  updateStatus();
-  loadFileList();
+  if (activeSessionId) closeSession(activeSessionId);
 }
 
 async function fetchServers() {
@@ -845,6 +904,7 @@ function showAddServer() {
   document.getElementById('svr-user').value = 'root';
   document.getElementById('svr-password').value = '';
   document.getElementById('svr-key').value = '';
+  document.getElementById('svr-tags').value = '';
   modalSwitchAuth('password');
   document.getElementById('modal-overlay').style.display = 'flex';
 }
@@ -866,6 +926,7 @@ function editServer(id) {
     document.getElementById('svr-password').value = s.password || '';
     document.getElementById('svr-key').value = '';
   }
+  document.getElementById('svr-tags').value = s.tags || '';
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
@@ -989,7 +1050,7 @@ async function saveServer() {
   if (useKey && !privateKey) { showToast('请粘贴私钥', 'error'); return; }
   if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
 
-  const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey };
+  const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey, tags: document.getElementById('svr-tags').value.trim() };
   data.password = await encField(data.password);
   data.privateKey = await encField(data.privateKey);
 
@@ -1034,22 +1095,12 @@ async function copyServer(id) {
 
 async function deleteServer(id) {
   showConfirm('确认删除此服务器？', async () => {
-    const ses = sessions[id];
-    if (ses) {
-      if (ses.ws) ses.ws.close();
-      if (ses.term) ses.term.dispose();
-      delete sessions[id];
-    }
-    const container = document.getElementById(`term-${id}`);
-    if (container) container.remove();
+    const toClose = Object.keys(sessions).filter(sid => sessions[sid].serverId === id);
+    for (const sid of toClose) closeSession(sid);
     try {
       await api('__BASE_PATH__/api/servers/' + id, { method: 'DELETE' });
       servers = servers.filter(s => s.id !== id);
-      if (activeServerId === id) {
-        activeServerId = null;
-        document.getElementById('terminal-tab').style.display = 'none';
-        document.getElementById('empty-state').style.display = 'flex';
-      }
+      if (Object.keys(sessions).length === 0) document.getElementById('empty-state').style.display = 'flex';
       renderServers();
       updateStatus();
     } catch (e) {
@@ -1072,7 +1123,7 @@ function toggleFilePanel() {
 }
 
 function getActiveSession() {
-  return activeServerId ? sessions[activeServerId] : null;
+  return activeSessionId ? sessions[activeSessionId] : null;
 }
 
 function loadFileList(dir) {
@@ -1113,7 +1164,7 @@ function loadFileList(dir) {
       const all = [...dirs, ...files];
 
       list.innerHTML = all.map(f => {
-        const icon = f.isDir ? '&#x1F4C1;' : getFileIcon(f.name);
+        const icon = f.isDir ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' : getFileIcon(f.name);
         const size = f.isDir ? '-' : formatSize(f.size);
         const mtime = f.modTime ? f.modTime.split('T')[0] : '';
         return `<div class="file-item" onclick="${f.isDir ? `loadFileList('${escJsStr(ses.fsPath+'/'+f.name)}')` : ''}">
@@ -1123,7 +1174,7 @@ function loadFileList(dir) {
           <span class="mtime">${mtime}</span>
           <span class="file-actions">
             ${f.isDir ? '' : `<button onclick="event.stopPropagation();fileDownload('${escJsStr(f.name)}')" title="下载">&#x2193;</button>`}
-            ${f.isDir ? '' : `<button onclick="event.stopPropagation();openEditor('${escJsStr(f.name)}')" title="编辑">&#x270D;</button>`}
+            ${f.isDir ? '' : `<button onclick="event.stopPropagation();openEditor('${escJsStr(f.name)}')" title="编辑"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`}
             <button onclick="event.stopPropagation();fileRename('${escJsStr(f.name)}')" title="重命名">&#x270E;</button>
             <button class="del" onclick="event.stopPropagation();fileDelete('${escJsStr(f.name)}')" title="删除">&times;</button>
           </span>
@@ -1150,13 +1201,15 @@ function renderBreadcrumb(p) {
 
 function getFileIcon(name) {
   const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-  const icons = { txt:'&#x1F4C4;', pdf:'&#x1F4D1;', zip:'&#x1F4E6;', gz:'&#x1F4E6;', tar:'&#x1F4E6;',
-    js:'&#x1F7E8;', ts:'&#x1F7E8;', py:'&#x1F7E9;', go:'&#x1F7E6;', java:'&#x1F7E7;', rs:'&#x1F7EA;',
-    png:'&#x1F5BC;', jpg:'&#x1F5BC;', jpeg:'&#x1F5BC;', gif:'&#x1F5BC;', svg:'&#x1F5BC;',
-    mp3:'&#x1F3B5;', mp4:'&#x1F3AC;', json:'&#x1F4CB;', yml:'&#x2699;', yaml:'&#x2699;',
-    md:'&#x1F4DD;', css:'&#x1F3A8;', html:'&#x1F310;', sh:'&#x1F4BB;', conf:'&#x2699;', log:'&#x1F4DD;',
-    dockerfile:'&#x1F433;', mod:'&#x1F4E6;', sum:'&#x1F4CA;' };
-  return icons[ext] || '&#x1F4C4;';
+  const colors = {
+    txt:'#8b949e', pdf:'#f85149', zip:'#d29922', gz:'#d29922', tar:'#d29922',
+    js:'#f0db4f', ts:'#3178c6', py:'#3572A5', go:'#00ADD8', java:'#b07219', rs:'#dea584',
+    png:'#bf4b85', jpg:'#bf4b85', jpeg:'#bf4b85', gif:'#bf4b85', svg:'#bf4b85',
+    mp3:'#1db954', mp4:'#ff6b6b', json:'#8b949e', yml:'#8b949e', yaml:'#8b949e',
+    md:'#58a6ff', css:'#563d7c', html:'#e34c26', sh:'#89e051', conf:'#8b949e', log:'#8b949e',
+    dockerfile:'#2496ed', mod:'#8b949e', sum:'#8b949e' };
+  const c = colors[ext] || '#8b949e';
+  return `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c};vertical-align:middle"></span>`;
 }
 
 function formatSize(bytes) {
@@ -1272,7 +1325,17 @@ function uploadFiles(files) {
   if (!ses || !ses.connected || !files.length) return;
 
   const arr = Array.from(files);
-  _uploadQ.items.push(...arr);
+  const limitBytes = maxUploadMB > 0 ? maxUploadMB * 1024 * 1024 : 0;
+  const ok = [];
+  for (const f of arr) {
+    if (limitBytes > 0 && f.size > limitBytes) {
+      showToast(`跳过 ${f.name}（超过 ${maxUploadMB}MB 限制）`, 'error');
+    } else {
+      ok.push(f);
+    }
+  }
+  if (ok.length === 0) return;
+  _uploadQ.items.push(...ok);
   _uploadQ.totalBytes += arr.reduce((s, f) => s + f.size, 0);
 
   if (window._uploadHideTimer) clearTimeout(window._uploadHideTimer);
@@ -1301,6 +1364,9 @@ function processUploadQ() {
 
   if (_uploadQ.items.length === 0) {
     _uploadQ.active = false;
+    _uploadQ.totalBytes = 0;
+    _uploadQ.sentBytes = 0;
+    _uploadQ.done = 0;
     textEl.textContent = '上传完成';
     fillEl.style.width = '100%';
     pctEl.textContent = '100%';

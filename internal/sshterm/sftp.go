@@ -1,7 +1,6 @@
 package sshterm
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -165,6 +164,9 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer sc.Close()
 
+	if MaxWriteBodySize > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, MaxWriteBodySize)
+	}
 	mr, err := r.MultipartReader()
 	if err != nil {
 		jsonError(w, "multipart reader failed: "+err.Error())
@@ -190,9 +192,13 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dst.Close()
 
-	bw := bufio.NewWriterSize(dst, 1<<20)
-	io.Copy(bw, part)
-	bw.Flush()
+	_, err = io.Copy(dst, part)
+	if err != nil {
+		dst.Close()
+		sc.Remove(remotePath)
+		jsonError(w, "write failed: "+err.Error())
+		return
+	}
 	json.NewEncoder(w).Encode(ActionResponse{Success: true})
 }
 

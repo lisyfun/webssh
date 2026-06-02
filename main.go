@@ -93,7 +93,7 @@ func main() {
 		log.Fatal("failed to create user:", err)
 	}
 
-	a := auth.New(st, *user, "", basePath)
+	a := auth.New(st, *user, "", basePath, *maxBody)
 
 	indexBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {

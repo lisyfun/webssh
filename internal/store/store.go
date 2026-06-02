@@ -25,6 +25,7 @@ type Server struct {
 	AuthType   string `json:"authType"`
 	Password   string `json:"password,omitempty"`
 	PrivateKey string `json:"privateKey,omitempty"`
+	Tags       string `json:"tags,omitempty"`
 	CreatedAt  string `json:"createdAt"`
 	UpdatedAt  string `json:"updatedAt"`
 }
@@ -75,6 +76,7 @@ func (s *Store) migrate() error {
 			auth_type TEXT NOT NULL DEFAULT 'password',
 			password_enc BLOB NOT NULL DEFAULT '',
 			private_key_enc BLOB NOT NULL DEFAULT '',
+			tags TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);
@@ -85,7 +87,11 @@ func (s *Store) migrate() error {
 			updated_at TEXT NOT NULL
 		)
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	s.db.Exec("ALTER TABLE servers ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+	return nil
 }
 
 func (s *Store) initEncryptionKey() error {
@@ -217,7 +223,7 @@ func (s *Store) ChangePassword(ctx context.Context, username, oldPassword, newPa
 
 func (s *Store) ListServers(ctx context.Context) ([]Server, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, name, host, port, user, auth_type, password_enc, private_key_enc, created_at, updated_at FROM servers ORDER BY name, host")
+		"SELECT id, name, host, port, user, auth_type, password_enc, private_key_enc, tags, created_at, updated_at FROM servers ORDER BY name, host")
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +233,7 @@ func (s *Store) ListServers(ctx context.Context) ([]Server, error) {
 	for rows.Next() {
 		var svr Server
 		var passwordEnc, privateKeyEnc string
-		if err := rows.Scan(&svr.ID, &svr.Name, &svr.Host, &svr.Port, &svr.User, &svr.AuthType, &passwordEnc, &privateKeyEnc, &svr.CreatedAt, &svr.UpdatedAt); err != nil {
+		if err := rows.Scan(&svr.ID, &svr.Name, &svr.Host, &svr.Port, &svr.User, &svr.AuthType, &passwordEnc, &privateKeyEnc, &svr.Tags, &svr.CreatedAt, &svr.UpdatedAt); err != nil {
 			return nil, err
 		}
 		svr.Password = s.decrypt(passwordEnc)
@@ -241,8 +247,8 @@ func (s *Store) GetServer(ctx context.Context, id string) (*Server, error) {
 	var svr Server
 	var passwordEnc, privateKeyEnc string
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, name, host, port, user, auth_type, password_enc, private_key_enc, created_at, updated_at FROM servers WHERE id=?",
-		id).Scan(&svr.ID, &svr.Name, &svr.Host, &svr.Port, &svr.User, &svr.AuthType, &passwordEnc, &privateKeyEnc, &svr.CreatedAt, &svr.UpdatedAt)
+		"SELECT id, name, host, port, user, auth_type, password_enc, private_key_enc, tags, created_at, updated_at FROM servers WHERE id=?",
+		id).Scan(&svr.ID, &svr.Name, &svr.Host, &svr.Port, &svr.User, &svr.AuthType, &passwordEnc, &privateKeyEnc, &svr.Tags, &svr.CreatedAt, &svr.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +262,8 @@ func (s *Store) CreateServer(ctx context.Context, svr *Server) error {
 	svr.CreatedAt = now
 	svr.UpdatedAt = now
 	_, err := s.db.ExecContext(ctx,
-		"INSERT INTO servers (id, name, host, port, user, auth_type, password_enc, private_key_enc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		svr.ID, svr.Name, svr.Host, svr.Port, svr.User, svr.AuthType, s.encrypt(svr.Password), s.encrypt(svr.PrivateKey), now, now)
+		"INSERT INTO servers (id, name, host, port, user, auth_type, password_enc, private_key_enc, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		svr.ID, svr.Name, svr.Host, svr.Port, svr.User, svr.AuthType, s.encrypt(svr.Password), s.encrypt(svr.PrivateKey), svr.Tags, now, now)
 	return err
 }
 
@@ -265,8 +271,8 @@ func (s *Store) UpdateServer(ctx context.Context, svr *Server) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	svr.UpdatedAt = now
 	_, err := s.db.ExecContext(ctx,
-		"UPDATE servers SET name=?, host=?, port=?, user=?, auth_type=?, password_enc=?, private_key_enc=?, updated_at=? WHERE id=?",
-		svr.Name, svr.Host, svr.Port, svr.User, svr.AuthType, s.encrypt(svr.Password), s.encrypt(svr.PrivateKey), now, svr.ID)
+		"UPDATE servers SET name=?, host=?, port=?, user=?, auth_type=?, password_enc=?, private_key_enc=?, tags=?, updated_at=? WHERE id=?",
+		svr.Name, svr.Host, svr.Port, svr.User, svr.AuthType, s.encrypt(svr.Password), s.encrypt(svr.PrivateKey), svr.Tags, now, svr.ID)
 	return err
 }
 
