@@ -127,7 +127,7 @@ func generateSecret() string {
 }
 
 func generatePassword() string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*-_+=?"
 	b := make([]byte, 16)
 	rand.Read(b)
 	for i := range b {
