@@ -4,6 +4,8 @@ import (
 	"embed"
 	"flag"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -15,11 +17,21 @@ import (
 var assets embed.FS
 
 var (
-	dbPath   = flag.String("db", "webssh.db", "path to SQLite database file")
-	maxBody  = flag.Int64("maxbody", 50, "max upload body size in MB (0 = no limit)")
+	maxBody = flag.Int64("maxbody", 50, "max upload body size in MB (0 = no limit)")
 )
 
+func defaultDBPath() string {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return "webssh.db"
+	}
+	p := filepath.Join(dir, "Library", "Application Support", "WebSSH", "webssh.db")
+	os.MkdirAll(filepath.Dir(p), 0755)
+	return p
+}
+
 func main() {
+	dbPath := flag.String("db", defaultDBPath(), "path to SQLite database file")
 	flag.Parse()
 
 	if *maxBody < 0 {
