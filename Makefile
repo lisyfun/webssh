@@ -21,7 +21,9 @@ release: build-all
 	@for f in release/webssh-*; do \
 		name=$$(basename $$f); \
 		echo "packing $$name..."; \
-		tar czf dist/$$name.tar.gz -C release $$name README.md; \
+		cp release/$$name release/$(BINARY); \
+		tar czf dist/$$name.tar.gz -C release $(BINARY) README.md; \
+		rm release/$(BINARY); \
 	done
 	rm release/README.md
 	@echo ""
