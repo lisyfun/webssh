@@ -1,43 +1,26 @@
 BINARY=webssh
-PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+APP=WebSSH.app
 
 build:
-	go build -o $(BINARY) .
+	CGO_ENABLED=1 CGO_LDFLAGS="-framework UniformTypeIdentifiers" go build -tags "desktop,production" -o $(BINARY) .
 
-build-all:
-	@mkdir -p release
-	@for p in $(PLATFORMS); do \
-		os=$$(echo $$p | cut -d/ -f1); \
-		arch=$$(echo $$p | cut -d/ -f2); \
-		suffix=$$os-$$arch; \
-		echo "building $$os/$$arch..."; \
-		GOOS=$$os GOARCH=$$arch go build -o release/$(BINARY)-$$suffix .; \
-	done
-	@echo "all done, see release/"
+run: build
+	open ./$(BINARY)
 
-release: build-all
-	@mkdir -p dist
-	cp README.md release/
-	@for f in release/webssh-*; do \
-		name=$$(basename $$f); \
-		echo "packing $$name..."; \
-		cp release/$$name release/$(BINARY); \
-		tar czf dist/$$name.tar.gz -C release $(BINARY) README.md; \
-		rm release/$(BINARY); \
-	done
-	rm release/README.md
-	@echo ""
-	@echo "packages in dist/:"
-	@ls -lh dist/
+package: build
+	rm -rf $(APP)
+	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
+	cp build/darwin/Info.plist $(APP)/Contents/
+	cp $(BINARY) $(APP)/Contents/MacOS/
+	cp frontend/favicon.png $(APP)/Contents/Resources/iconfile.png
+	@echo "created $(APP)"
 
 vet:
 	go vet ./...
 
-run: build
-	./$(BINARY)
-
 clean:
 	rm -f $(BINARY)
-	rm -rf release/ dist/
+	rm -rf $(APP)
+	rm -rf build/bin/
 
-.PHONY: build build-all release vet run clean
+.PHONY: build run package vet clean

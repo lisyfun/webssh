@@ -48,6 +48,8 @@ type Session struct {
 	Host         string
 	Port         int
 	Username     string
+	Stdin        io.WriteCloser
+	SSHSession   *ssh.Session
 }
 
 var sftpServerPaths = []string{

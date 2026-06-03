@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebSSH Terminal</title>
+<title>WebSSH</title>
 <link rel="icon" href="favicon.png">
 <link rel="stylesheet" href="lib/xterm.min.css">
 <link rel="stylesheet" href="lib/codemirror.min.css">
@@ -22,71 +22,29 @@
   --green: #3fb950;
   --red: #ff7b72;
   --sidebar-width: 240px;
-  --header-height: 40px;
   --file-panel-width: 320px;
 }
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; }
 input, textarea, button { font-family: inherit; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
-
-/* Layout */
 .app { display: flex; flex-direction: column; height: 100vh; }
-
-.header {
-  height: var(--header-height);
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  flex-shrink: 0;
-}
-.header h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
-.header .spacer { flex: 1; }
-.header .toggle-files { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
-.header .toggle-files:hover { background: var(--bg-hover); color: var(--text-primary); }
-.header .toggle-files.active { color: var(--accent); }
-
 .body { display: flex; flex: 1; overflow: hidden; }
-
-/* Left Sidebar - Server List */
-.sidebar {
-  width: var(--sidebar-width);
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-.sidebar-header {
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
-}
+.sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-header { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
 .sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; }
 .sidebar-header .add-btn svg { display: block; }
 .sidebar-header .add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar-header .add-btn.active { color: var(--accent); }
 .server-search { padding: 6px 12px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
 .server-search input { width:100%; padding:5px 8px; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; outline:none; }
 .server-search input:focus { border-color:var(--accent); }
 .server-search input::placeholder { color:var(--text-muted); }
 .server-list { flex: 1; overflow-y: auto; padding: 4px 0; }
-.server-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-left: 3px solid transparent;
-  transition: all 0.15s;
-}
+.server-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent; transition: all 0.15s; }
 .server-item:hover { background: var(--bg-tertiary); }
 .server-item.active { background: var(--bg-tertiary); border-left-color: var(--accent); }
 .server-item .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -103,85 +61,42 @@ input, textarea, button { font-family: inherit; }
 .server-item .del-btn { opacity: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
 .server-item:hover .del-btn { opacity: 1; }
 .server-item .del-btn:hover { color: var(--red); }
-
-/* Center - Terminal */
 .center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.tab-bar { display: flex; align-items: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border); height: 34px; flex-shrink: 0; padding: 0 8px; }
+.tab-bar { display: flex; align-items: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); height: 34px; flex-shrink: 0; padding: 0 8px; }
+.tab-bar .tab-bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.tab-bar .tab-bar-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 3px 6px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+.tab-bar .tab-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tab-bar .tab-bar-btn.active { color: var(--accent); }
 .tab-list { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tab-list::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; flex-shrink: 0; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; flex-shrink: 0; }
 .tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); }
 .tab .tab-host { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
 .tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
 .tab-close:hover { color: var(--text-primary); }
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
 .terminal-wrapper .xterm { padding: 6px 0 0 14px; box-sizing: border-box; }
-.terminal-wrapper .empty-state {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  color: var(--text-muted); font-size: 14px; gap: 8px;
-}
+.terminal-wrapper .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; gap: 8px; }
 .terminal-wrapper .empty-state .key-hint { font-size: 12px; color: var(--text-muted); opacity: 0.6; }
-.terminal-wrapper .loading-state {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-secondary); font-size: 13px; gap: 8px;
-}
+.terminal-wrapper .loading-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 13px; gap: 8px; }
 .terminal-wrapper .loading-state .spinner { width: 16px; height: 16px; border: 2px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #terminal-container { position: absolute; inset: 0; }
-
-/* Right - File Browser */
-.file-panel {
-  width: var(--file-panel-width);
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  overflow: hidden;
-  transition: width 0.2s, opacity 0.2s;
-}
+.file-panel { width: var(--file-panel-width); background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
 .file-panel.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
-.file-panel-header {
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
+.file-panel-header { padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
 .file-panel-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .file-panel-header .actions { display: flex; gap: 4px; }
 .file-panel-header .actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
 .file-panel-header .actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .file-panel-header .actions button:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.file-breadcrumb {
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow-x: auto;
-  flex-shrink: 0;
-}
+.file-breadcrumb { padding: 6px 12px; border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow-x: auto; flex-shrink: 0; }
 .file-breadcrumb::-webkit-scrollbar { height: 2px; }
 .file-breadcrumb .crumb { cursor: pointer; padding: 2px 4px; border-radius: 2px; }
 .file-breadcrumb .crumb:hover { color: var(--accent); background: var(--bg-hover); }
 .file-breadcrumb .sep { margin: 0 2px; color: var(--text-muted); }
-
 .file-list { flex: 1; overflow-y: auto; padding: 2px 0; }
-.file-item {
-  padding: 5px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  border-radius: 2px;
-}
+.file-item { padding: 5px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; border-radius: 2px; }
 .file-item:hover { background: var(--bg-tertiary); }
 .file-item .icon { flex-shrink: 0; width: 18px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
 .file-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -194,69 +109,33 @@ input, textarea, button { font-family: inherit; }
 .file-item .file-actions .del:hover { color: var(--red); }
 .file-loading { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
 .file-list.drag-over { background: var(--bg-tertiary); outline: 2px dashed var(--accent); outline-offset: -2px; }
-
 .file-progress { flex-shrink: 0; padding: 6px 12px; border-top: 1px solid var(--border-color); background: var(--bg-tertiary); position: sticky; bottom: 0; }
 .file-progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
 .file-progress-label .file-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px; }
 .file-progress-label .pct { flex-shrink: 0; }
 .file-progress-track { height: 4px; background: var(--bg-primary); border-radius: 2px; overflow: hidden; }
 .file-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .2s; width: 0%; }
-
 .toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--bg-tertiary); color: var(--text-primary); padding: 6px 16px; border-radius: 6px; font-size: 13px; border: 1px solid var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 2000; pointer-events: none; opacity: 0; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 .toast.error { border-color: var(--red); }
 .toast.success { border-color: var(--green); }
-
-/* Status Bar */
-.status-bar {
-  height: 24px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  font-size: 11px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
+.status-bar { height: 24px; background: var(--bg-secondary); border-top: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 12px; font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 .status-bar .item { margin-right: 16px; display: flex; align-items: center; gap: 4px; }
 .status-bar .item .dot { width: 6px; height: 6px; border-radius: 50%; }
 .status-bar .item .dot.green { background: var(--green); }
 .status-bar .item .dot.yellow { background: #d29922; }
 .status-bar .item .dot.gray { background: var(--text-muted); }
 .status-bar .spacer { flex: 1; }
-
-/* Modal */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-}
-.modal {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 24px;
-  width: 400px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-}
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
 .modal h2 { font-size: 16px; margin-bottom: 20px; }
 .modal .form-group { margin-bottom: 12px; }
 .modal .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
-.modal .form-group input, .modal .form-group textarea, .modal .form-group select {
-  width: 100%; padding: 8px 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-}
+.modal .form-group input, .modal .form-group textarea, .modal .form-group select { width: 100%; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; }
 .modal .form-group input:focus, .modal .form-group textarea:focus { border-color: var(--accent); }
 .modal .form-group textarea { height: 80px; font-family: 'Menlo', 'Monaco', monospace; resize: vertical; }
 .modal .form-row { display: flex; gap: 8px; }
 .modal .form-row .form-group { flex: 1; }
-
 .modal .auth-toggle { display: flex; gap: 1px; margin-bottom: 12px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; }
 .modal .auth-toggle button { flex: 1; padding: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; }
 .modal .auth-toggle button.active { background: var(--accent); color: #fff; }
@@ -268,7 +147,6 @@ input, textarea, button { font-family: inherit; }
 .modal .modal-actions .btn-cancel:hover { background: var(--bg-hover); }
 .confirm-modal { width: 340px; }
 .confirm-modal p { font-size: 14px; margin: 0; line-height: 1.6; color: var(--text-primary); }
-
 .editor-modal .CodeMirror { height: 60vh; font-size: 13px; border: 1px solid var(--border-color); border-radius: 4px; }
 .editor-modal .CodeMirror-gutters { background: var(--bg-tertiary); border-right: 1px solid var(--border-color); }
 .editor-modal .CodeMirror-linenumber { color: var(--text-muted); }
@@ -293,16 +171,7 @@ input, textarea, button { font-family: inherit; }
 <body>
 
 <div class="app">
-  <div class="header">
-    <h1>WebSSH</h1>
-    <div class="spacer"></div>
-    <button class="toggle-files" id="toggle-files-btn" onclick="toggleFilePanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> 文件</button>
-    <button class="toggle-files" onclick="location.href='__BASE_PATH__/logout'" style="margin-left:4px" title="退出登录"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> 退出</button>
-    <button class="toggle-files" onclick="showChangePwd()" style="margin-left:4px" title="修改密码"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 密码</button>
-  </div>
-
   <div class="body">
-    <!-- Left Sidebar -->
     <div class="sidebar">
       <div class="sidebar-header">
         <span>服务器</span>
@@ -315,10 +184,12 @@ input, textarea, button { font-family: inherit; }
       <div class="server-list" id="server-list"></div>
     </div>
 
-    <!-- Center -->
     <div class="center">
       <div class="tab-bar" id="tab-bar" style="display:none">
         <div class="tab-list" id="tab-list"></div>
+        <div class="tab-bar-right">
+          <button class="tab-bar-btn" id="toggle-files-btn" onclick="toggleFilePanel()" title="文件浏览器"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+        </div>
       </div>
       <div class="terminal-wrapper" id="terminal-wrapper">
         <div class="empty-state" id="empty-state">
@@ -334,7 +205,6 @@ input, textarea, button { font-family: inherit; }
       </div>
     </div>
 
-    <!-- Right File Panel -->
     <div class="file-panel collapsed" id="file-panel">
       <div class="file-panel-header">
         <span>文件浏览器</span>
@@ -462,29 +332,6 @@ input, textarea, button { font-family: inherit; }
   </div>
 </div>
 
-<!-- Change Password Modal -->
-<div class="modal-overlay" id="change-pwd-overlay" style="display:none">
-  <div class="modal" style="width:360px">
-    <h2>修改密码</h2>
-    <div class="form-group">
-      <label>旧密码</label>
-      <input type="password" id="cp-old" style="width:100%">
-    </div>
-    <div class="form-group">
-      <label>新密码</label>
-      <input type="password" id="cp-new" style="width:100%">
-    </div>
-    <div class="form-group">
-      <label>确认新密码</label>
-      <input type="password" id="cp-confirm" style="width:100%">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="hideChangePwd()">取消</button>
-      <button class="btn-primary" onclick="changePassword()">保存</button>
-    </div>
-  </div>
-</div>
-
 <!-- Editor Modal -->
 <div class="modal-overlay" id="editor-overlay" style="display:none">
   <div class="modal editor-modal" style="width:800px">
@@ -507,70 +354,21 @@ input, textarea, button { font-family: inherit; }
 <script src="lib/xterm.min.js"></script>
 <script src="lib/xterm-addon-fit.min.js"></script>
 <script src="lib/codemirror.min.js"></script>
+<script src="wailsjs/runtime/runtime.js"></script>
 <script>
 // ---- State ----
 let servers = [];
 let editingId = null;
-let sessions = {};          // sid -> { serverId, ws, term, fitAddon, connected, fsPath, info }
+let sessions = {};
 let activeSessionId = null;
 let filePanelOpen = false;
-let sessionKey = null;
-let csrfToken = null;
 let maxUploadMB = 0;
+let _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
+let activeEditorFile = null;
+let activeEditorCM = null;
+var _renaming = '';
 
-// ---- Encryption & CSRF ----
-async function fetchSessionKey() {
-  try {
-    const r = await fetch('__BASE_PATH__/api/key');
-    const j = await r.json();
-    sessionKey = j.key;
-    csrfToken = j.csrf;
-    maxUploadMB = j.maxBodyMB || 0;
-  } catch (_) {}
-}
-
-async function encField(plain) {
-  if (!sessionKey || !plain) return plain;
-  try {
-    const keyBytes = new Uint8Array(sessionKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
-    const combined = new Uint8Array(iv.length + new Uint8Array(enc).length);
-    combined.set(iv);
-    combined.set(new Uint8Array(enc), iv.length);
-    return btoa(String.fromCharCode(...combined));
-  } catch (_) { return plain; }
-}
-
-function apiHeaders() {
-  const h = { 'Content-Type': 'application/json' };
-  if (csrfToken) h['X-CSRF-Token'] = csrfToken;
-  return h;
-}
-
-async function api(url, opts) {
-  opts = opts || {};
-  opts.headers = { ...apiHeaders(), ...(opts.headers || {}) };
-  const r = await fetch(url, opts);
-  const j = await r.json();
-  if (!j.success) throw new Error(j.error || 'request failed');
-  return j;
-}
-
-async function encField(plain) {
-  if (!sessionKey || !plain) return plain;
-  try {
-    const keyBytes = new Uint8Array(sessionKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
-    const combined = new Uint8Array(iv.length + new Uint8Array(enc).length);
-    combined.set(iv);
-    combined.set(new Uint8Array(enc), iv.length);
-    return btoa(String.fromCharCode(...combined));
-  } catch (_) { return plain; }
-}
+function App() { return window.go.main.App; }
 
 // ---- Server List ----
 function filterTag(tag) {
@@ -590,7 +388,7 @@ function renderServers() {
   el.innerHTML = filtered.map((s, i) => {
     const ss = Object.values(sessions).filter(x => x.serverId === s.id);
     const connected = ss.some(x => x.connected);
-    const connecting = ss.some(x => x.ws && x.ws.readyState <= 1);
+    const connecting = ss.some(x => x.connecting);
     const status = connected ? 'connected' : (connecting ? 'connecting' : 'disconnected');
     const isActive = activeSessionId && sessions[activeSessionId]?.serverId === s.id;
     const tags = (s.tags || '').split(',').map(t => t.trim()).filter(Boolean);
@@ -622,7 +420,7 @@ function openNewTerminal(serverId) {
   const svr = servers.find(s => s.id === serverId);
   if (!svr) return;
   const sid = crypto.randomUUID();
-  sessions[sid] = { serverId, connected: false, fsPath: '/', info: { host: svr.host, port: svr.port, user: svr.user } };
+  sessions[sid] = { serverId, connected: false, connecting: true, fsPath: '/', info: { host: svr.host, port: svr.port, user: svr.user } };
   activeSessionId = sid;
   renderServers();
   renderTabs();
@@ -641,8 +439,9 @@ function switchSession(sid) {
 function closeSession(sid) {
   const ses = sessions[sid];
   if (!ses) return;
-  if (ses._ka) clearInterval(ses._ka);
-  if (ses.ws) { ses.ws.close(); }
+  if (ses.connected && ses.sessionId) {
+    App().CloseSession(ses.sessionId).catch(() => {});
+  }
   if (ses.term) { ses.term.dispose(); }
   const container = document.getElementById(`term-${sid}`);
   if (container) container.remove();
@@ -699,7 +498,7 @@ function setActiveSession(sid) {
     if (ses.term && ses.fitAddon) {
       setTimeout(() => ses.fitAddon.fit(), 50);
     }
-  } else if (ses.ws && ses.ws.readyState <= 1) {
+  } else if (ses.connecting) {
     empty.style.display = 'none';
     load.style.display = 'flex';
     document.getElementById('loading-text').textContent = '连接中...';
@@ -717,7 +516,7 @@ function setActiveSession(sid) {
   loadFileList();
 }
 
-function connectToServer(sid) {
+async function connectToServer(sid) {
   const ses = sessions[sid];
   if (!ses) return;
   const svr = servers.find(s => s.id === ses.serverId);
@@ -728,81 +527,30 @@ function connectToServer(sid) {
   empty.style.display = 'none';
   load.style.display = 'flex';
   document.getElementById('loading-text').textContent = '连接中...';
-
   renderServers();
   updateStatus();
 
-  const sessionId = crypto.randomUUID();
-  ses.sessionId = sessionId;
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${location.host}__BASE_PATH__/ws`;
-
-  const ws = new WebSocket(wsUrl);
-  ws.binaryType = 'arraybuffer';
-  ses.ws = ws;
-
-  ws.onopen = async () => {
-    const authMsg = {
-      sessionId: ses.sessionId,
-      host: svr.host,
-      port: svr.port,
-      username: svr.user,
-      password: svr.authType === 'key' ? '' : (svr.password || ''),
-      privateKey: svr.authType === 'key' ? (svr.privateKey || '') : '',
-    };
-    authMsg.password = await encField(authMsg.password);
-    authMsg.privateKey = await encField(authMsg.privateKey);
-    ws.send(JSON.stringify(authMsg));
-    // 每 30s 发 keepalive，防止 WS 被 NAT/防火墙超时断开
-    ses._ka = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'keepalive'}));
-    }, 30000);
-  };
-
-  ws.onmessage = (evt) => {
-    if (evt.data instanceof ArrayBuffer) {
-      const s = sessions[sid];
-      if (s && s.term) s.term.write(new Uint8Array(evt.data));
-    } else {
-      const msg = evt.data;
-      if (typeof msg === 'string' && (msg.startsWith('SSH connection failed') || msg.startsWith('SSH session failed'))) {
-        load.style.display = 'none';
-        empty.style.display = 'flex';
-        document.getElementById('loading-text').textContent = msg;
-        const s = sessions[sid];
-        if (s) { s.connected = false; }
-        renderServers();
-        updateStatus();
-        return;
-      }
-      const s = sessions[sid];
-      if (s && s.term) s.term.write(msg);
-    }
-  };
-
-  ws.onerror = () => {
-    document.getElementById('loading-text').textContent = 'WebSocket 连接失败';
-  };
-
-  ws.onclose = () => {
-    const s = sessions[sid];
-    if (!s) return;
-    s.connected = false;
-    if (s.term) {
-      s.term.write('\r\n\x1b[31m连接已关闭\x1b[0m');
-      s.term.options.disableStdin = true;
-    }
+  try {
+    const sessionId = await App().Connect(svr.host, svr.port || 22, svr.user, svr.password || '', svr.privateKey || '');
+    ses.sessionId = sessionId;
+    ses.connecting = false;
+    ses.connected = true;
+    initTerminal(sid);
+    load.style.display = 'none';
     renderServers();
-  updateStatus();
-  if (filePanelOpen) loadFileList();
-  };
-
-  initTerminal(sid);
+    updateStatus();
+  } catch (err) {
+    ses.connecting = false;
+    ses.connected = false;
+    load.style.display = 'none';
+    empty.style.display = 'flex';
+    document.getElementById('loading-text').textContent = '连接失败: ' + err;
+    renderServers();
+    updateStatus();
+  }
 }
 
 function initTerminal(sid) {
-  document.getElementById('loading-state').style.display = 'none';
-
   const old = document.getElementById(`term-${sid}`);
   if (old) old.remove();
 
@@ -839,12 +587,11 @@ function initTerminal(sid) {
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
 
-  // OSC 7 — CWD tracking (industry standard, used by VS Code/iTerm2)
   if (term.parser && term.parser.registerOscHandler) {
     let cwdTimer;
     term.parser.registerOscHandler(7, (data) => {
       try {
-        const slashIdx = data.indexOf('/', 7); // after "file://"
+        const slashIdx = data.indexOf('/', 7);
         if (slashIdx >= 0) {
           const path = data.substring(slashIdx);
           if (path && activeSessionId && filePanelOpen) {
@@ -859,18 +606,15 @@ function initTerminal(sid) {
 
   term.open(container);
 
-  // 选中即复制
   term.onSelectionChange(() => {
     const sel = term.getSelection();
-    if (sel) {
-      navigator.clipboard.writeText(sel).catch(() => {});
-    }
+    if (sel) navigator.clipboard.writeText(sel).catch(() => {});
   });
 
   term.onData((data) => {
     const ses = sessions[sid];
-    if (ses && ses.ws && ses.ws.readyState === WebSocket.OPEN) {
-      ses.ws.send(new TextEncoder().encode(data));
+    if (ses && ses.sessionId) {
+      App().TerminalInput(ses.sessionId, data).catch(() => {});
     }
   });
 
@@ -878,18 +622,15 @@ function initTerminal(sid) {
 
   term.onResize(({ cols, rows }) => {
     const ses = sessions[sid];
-    if (ses && ses.ws && ses.ws.readyState === WebSocket.OPEN) {
-      ses.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+    if (ses && ses.sessionId) {
+      App().TerminalResize(ses.sessionId, cols, rows).catch(() => {});
     }
   });
 
   setTimeout(() => fitAddon.fit(), 100);
 
-  if (sessions[sid]) {
-    sessions[sid].term = term;
-    sessions[sid].fitAddon = fitAddon;
-    sessions[sid].connected = true;
-  }
+  sessions[sid].term = term;
+  sessions[sid].fitAddon = fitAddon;
 
   renderServers();
   renderTabs();
@@ -897,14 +638,9 @@ function initTerminal(sid) {
   loadFileList();
 }
 
-function disconnect() {
-  if (activeSessionId) closeSession(activeSessionId);
-}
-
 async function fetchServers() {
   try {
-    const j = await api('__BASE_PATH__/api/servers');
-    servers = j.data || [];
+    servers = await App().ListServers();
   } catch (_) {
     servers = [];
   }
@@ -947,104 +683,12 @@ function editServer(id) {
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
-function hideModal() {
-  document.getElementById('modal-overlay').style.display = 'none';
-}
-
+function hideModal() { document.getElementById('modal-overlay').style.display = 'none'; }
 function showBatchImport() {
   document.getElementById('batch-import-input').value = '';
   document.getElementById('batch-import-overlay').style.display = 'flex';
 }
-
-function hideBatchImport() {
-  document.getElementById('batch-import-overlay').style.display = 'none';
-}
-
-async function batchImport() {
-  const text = document.getElementById('batch-import-input').value.trim();
-  if (!text) { showToast('请输入服务器数据', 'error'); return; }
-
-  const lines = text.split('\n').filter(Boolean);
-  const list = [];
-
-  for (const line of lines) {
-    const parts = line.split(/[\t ,]+/).map(s => s.trim()).filter(Boolean);
-    if (parts.length < 4) continue;
-    const name = parts.length > 4 ? parts[0] : '';
-    const host = parts.length > 4 ? parts[1] : parts[0];
-    const port = parseInt(parts.length > 4 ? parts[2] : parts[1]) || 22;
-    const user = parts.length > 4 ? parts[3] : parts[2];
-    const password = parts.length > 4 ? parts[4] : parts[3];
-    list.push({ id: crypto.randomUUID(), name, host, port, user, authType: 'password', password, privateKey: '' });
-  }
-
-  if (list.length === 0) { showToast('未能解析任何有效数据', 'error'); return; }
-
-  for (const s of list) {
-    s.password = await encField(s.password);
-    s.privateKey = await encField(s.privateKey);
-  }
-
-  try {
-    await api('__BASE_PATH__/api/servers/batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ servers: list }),
-    });
-    showToast(`成功导入 ${list.length} 个服务器`, 'success');
-    hideBatchImport();
-    await fetchServers();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
-
-function showChangePwd() {
-  document.getElementById('cp-old').value = '';
-  document.getElementById('cp-new').value = '';
-  document.getElementById('cp-confirm').value = '';
-  document.getElementById('change-pwd-overlay').style.display = 'flex';
-}
-
-function hideChangePwd() {
-  document.getElementById('change-pwd-overlay').style.display = 'none';
-}
-
-function changePassword() {
-  const oldPass = document.getElementById('cp-old').value;
-  const newPass = document.getElementById('cp-new').value;
-  const confirmPass = document.getElementById('cp-confirm').value;
-
-  if (!oldPass) { showToast('请输入旧密码', 'error'); return; }
-  if (!newPass) { showToast('请输入新密码', 'error'); return; }
-  if (newPass.length < 4) { showToast('新密码至少4位', 'error'); return; }
-  if (newPass !== confirmPass) { showToast('两次输入不一致', 'error'); return; }
-
-  fetch('__BASE_PATH__/change-password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `old_pass=${encodeURIComponent(oldPass)}&new_pass=${encodeURIComponent(newPass)}`,
-  }).then(r => r.json()).then(data => {
-    if (data.ok) {
-      showToast(data.msg, 'success');
-      hideChangePwd();
-    } else {
-      showToast(data.msg, 'error');
-    }
-  }).catch(() => showToast('请求失败', 'error'));
-}
-
-function showConfirm(msg, onOk) {
-  const overlay = document.getElementById('confirm-overlay');
-  document.getElementById('confirm-msg').textContent = msg;
-  const okBtn = document.getElementById('confirm-ok-btn');
-  okBtn.onclick = () => { overlay.style.display = 'none'; onOk(); };
-  overlay.style.display = 'flex';
-}
-
-function hideConfirm() {
-  document.getElementById('confirm-overlay').style.display = 'none';
-}
+function hideBatchImport() { document.getElementById('batch-import-overlay').style.display = 'none'; }
 
 function modalSwitchAuth(mode) {
   document.getElementById('m-password-btn').classList.toggle('active', mode === 'password');
@@ -1068,22 +712,12 @@ async function saveServer() {
   if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
 
   const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey, tags: document.getElementById('svr-tags').value.trim() };
-  data.password = await encField(data.password);
-  data.privateKey = await encField(data.privateKey);
 
   try {
     if (editingId) {
-      await api('__BASE_PATH__/api/servers/' + editingId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      await App().UpdateServer(data);
     } else {
-      await api('__BASE_PATH__/api/servers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      await App().CreateServer(data);
     }
     hideModal();
     await fetchServers();
@@ -1095,15 +729,8 @@ async function saveServer() {
 async function copyServer(id) {
   const s = servers.find(x => x.id === id);
   if (!s) return;
-  const data = { ...s, id: crypto.randomUUID(), name: (s.name || s.host) + ' (副本)' };
-  data.password = await encField(data.password);
-  data.privateKey = await encField(data.privateKey);
   try {
-    await api('__BASE_PATH__/api/servers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    await App().CreateServer({ ...s, id: null, name: (s.name || s.host) + ' (副本)' });
     await fetchServers();
   } catch (e) {
     showToast(e.message, 'error');
@@ -1115,7 +742,7 @@ async function deleteServer(id) {
     const toClose = Object.keys(sessions).filter(sid => sessions[sid].serverId === id);
     for (const sid of toClose) closeSession(sid);
     try {
-      await api('__BASE_PATH__/api/servers/' + id, { method: 'DELETE' });
+      await App().DeleteServer(id);
       servers = servers.filter(s => s.id !== id);
       if (Object.keys(sessions).length === 0) document.getElementById('empty-state').style.display = 'flex';
       renderServers();
@@ -1125,6 +752,72 @@ async function deleteServer(id) {
     }
   });
 }
+
+async function batchImport() {
+  const text = document.getElementById('batch-import-input').value.trim();
+  if (!text) { showToast('请输入服务器数据', 'error'); return; }
+
+  const lines = text.split('\n').filter(Boolean);
+  const list = [];
+
+  for (const line of lines) {
+    const parts = line.split(/[\t ,]+/).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 4) continue;
+    const name = parts.length > 4 ? parts[0] : '';
+    const host = parts.length > 4 ? parts[1] : parts[0];
+    const port = parseInt(parts.length > 4 ? parts[2] : parts[1]) || 22;
+    const user = parts.length > 4 ? parts[3] : parts[2];
+    const password = parts.length > 4 ? parts[4] : parts[3];
+    list.push({ name, host, port, user, authType: 'password', password, privateKey: '' });
+  }
+
+  if (list.length === 0) { showToast('未能解析任何有效数据', 'error'); return; }
+
+  try {
+    await App().BatchImport(list);
+    showToast(`成功导入 ${list.length} 个服务器`, 'success');
+    hideBatchImport();
+    await fetchServers();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function showConfirm(msg, onOk) {
+  const overlay = document.getElementById('confirm-overlay');
+  document.getElementById('confirm-msg').textContent = msg;
+  const okBtn = document.getElementById('confirm-ok-btn');
+  okBtn.onclick = () => { overlay.style.display = 'none'; onOk(); };
+  overlay.style.display = 'flex';
+}
+
+function hideConfirm() { document.getElementById('confirm-overlay').style.display = 'none'; }
+
+// ---- Events from Go ----
+window.runtime.EventsOn("terminal:output", function(data) {
+  const ses = sessions[activeSessionId];
+  if (!ses || !ses.term || data.sessionId !== ses.sessionId) return;
+  try {
+    const bytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0));
+    ses.term.write(bytes);
+  } catch (_) {}
+});
+
+window.runtime.EventsOn("terminal:closed", function(sessionId) {
+  for (const [sid, ses] of Object.entries(sessions)) {
+    if (ses.sessionId === sessionId) {
+      ses.connected = false;
+      if (ses.term) {
+        ses.term.write('\r\n\x1b[31m连接已关闭\x1b[0m');
+        ses.term.options.disableStdin = true;
+      }
+      renderServers();
+      updateStatus();
+      if (filePanelOpen) loadFileList();
+      break;
+    }
+  }
+});
 
 // ---- File Browser ----
 function toggleFilePanel() {
@@ -1139,11 +832,9 @@ function toggleFilePanel() {
   }, 250);
 }
 
-function getActiveSession() {
-  return activeSessionId ? sessions[activeSessionId] : null;
-}
+function getActiveSession() { return activeSessionId ? sessions[activeSessionId] : null; }
 
-function loadFileList(dir) {
+async function loadFileList(dir) {
   const ses = getActiveSession();
   if (!ses) return;
   if (dir !== undefined) {
@@ -1167,44 +858,40 @@ function loadFileList(dir) {
   }
 
   list.innerHTML = '<div class="file-loading"><div class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--border-color);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:middle"></div>加载中...</div>';
-
   renderBreadcrumb(ses.fsPath);
 
-  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/list?path=${encodeURIComponent(ses.fsPath)}`)
-    .then(r => r.json())
-    .then(res => {
-      ses._loading = false;
-      if (!res.success) { list.innerHTML = `<div class="file-loading">${escHtml(res.error)}</div>`; return; }
-      if (!res.data || res.data.length === 0) {
-        list.innerHTML = '<div class="file-loading">目录为空</div>';
-        return;
-      }
-      const dirs = res.data.filter(f => f.isDir).sort((a,b) => a.name.localeCompare(b.name));
-      const files = res.data.filter(f => !f.isDir).sort((a,b) => a.name.localeCompare(b.name));
-      const all = [...dirs, ...files];
+  try {
+    const res = await App().SFTPList(ses.sessionId, ses.fsPath);
+    ses._loading = false;
+    if (!res || res.length === 0) {
+      list.innerHTML = '<div class="file-loading">目录为空</div>';
+      return;
+    }
+    const dirs = res.filter(f => f.isDir).sort((a,b) => a.name.localeCompare(b.name));
+    const files = res.filter(f => !f.isDir).sort((a,b) => a.name.localeCompare(b.name));
+    const all = [...dirs, ...files];
 
-      list.innerHTML = all.map(f => {
-        const icon = f.isDir ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' : getFileIcon(f.name);
-        const size = f.isDir ? '-' : formatSize(f.size);
-        const mtime = f.modTime ? f.modTime.split('T')[0] : '';
-        return `<div class="file-item" onclick="${f.isDir ? `loadFileList('${escJsStr(ses.fsPath+'/'+f.name)}')` : ''}">
-          <span class="icon">${icon}</span>
-          <span class="name">${escHtml(f.name)}</span>
-          <span class="size">${size}</span>
-          <span class="mtime">${mtime}</span>
-          <span class="file-actions">
-            ${f.isDir ? '' : `<button onclick="event.stopPropagation();fileDownload('${escJsStr(f.name)}')" title="下载">&#x2193;</button>`}
-            ${f.isDir ? '' : `<button onclick="event.stopPropagation();openEditor('${escJsStr(f.name)}')" title="编辑"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`}
-            <button onclick="event.stopPropagation();fileRename('${escJsStr(f.name)}')" title="重命名">&#x270E;</button>
-            <button class="del" onclick="event.stopPropagation();fileDelete('${escJsStr(f.name)}')" title="删除">&times;</button>
-          </span>
-        </div>`;
-      }).join('');
-    })
-    .catch(err => {
-      ses._loading = false;
-      list.innerHTML = `<div class="file-loading">加载失败: ${escHtml(err.message)}</div>`;
-    });
+    list.innerHTML = all.map(f => {
+      const icon = f.isDir ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' : getFileIcon(f.name);
+      const size = f.isDir ? '-' : formatSize(f.size);
+      const mtime = f.modTime ? f.modTime.split('T')[0] : '';
+      return `<div class="file-item" onclick="${f.isDir ? `loadFileList('${escJsStr(ses.fsPath+'/'+f.name)}')` : ''}">
+        <span class="icon">${icon}</span>
+        <span class="name">${escHtml(f.name)}</span>
+        <span class="size">${size}</span>
+        <span class="mtime">${mtime}</span>
+        <span class="file-actions">
+          ${f.isDir ? '' : `<button onclick="event.stopPropagation();fileDownload('${escJsStr(f.name)}')" title="下载">&#x2193;</button>`}
+          ${f.isDir ? '' : `<button onclick="event.stopPropagation();openEditor('${escJsStr(f.name)}')" title="编辑"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`}
+          <button onclick="event.stopPropagation();fileRename('${escJsStr(f.name)}')" title="重命名">&#x270E;</button>
+          <button class="del" onclick="event.stopPropagation();fileDelete('${escJsStr(f.name)}')" title="删除">&times;</button>
+        </span>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    ses._loading = false;
+    list.innerHTML = `<div class="file-loading">加载失败: ${escHtml(err.message)}</div>`;
+  }
 }
 
 function renderBreadcrumb(p) {
@@ -1240,22 +927,21 @@ function formatSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
 }
 
-// File operations
-function fileDownload(name) {
+async function fileDownload(name) {
   const ses = getActiveSession();
   if (!ses) return;
-  const p = ses.fsPath + '/' + name;
-  const a = document.createElement('a');
-  a.href = `__BASE_PATH__/api/fs/${ses.sessionId}/download?path=${encodeURIComponent(p)}`;
-  a.download = name;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  try {
+    const data = await App().SFTPDownload(ses.sessionId, ses.fsPath + '/' + name);
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    showToast('下载失败: ' + err, 'error');
+  }
 }
-
-var activeEditorFile = null;
-var activeEditorCM = null;
 
 function openEditor(name) {
   const ses = getActiveSession();
@@ -1266,11 +952,7 @@ function openEditor(name) {
   document.getElementById('editor-status').textContent = '加载中...';
   document.getElementById('editor-overlay').style.display = 'flex';
 
-  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/read?path=${encodeURIComponent(activeEditorFile)}`)
-    .then(r => {
-      if (!r.ok) throw new Error(r.statusText);
-      return r.text();
-    })
+  App().SFTPRead(ses.sessionId, activeEditorFile)
     .then(text => {
       document.getElementById('editor-status').textContent = '';
       var container = document.getElementById('editor-cm');
@@ -1293,7 +975,7 @@ function openEditor(name) {
       activeEditorCM.focus();
     })
     .catch(err => {
-      document.getElementById('editor-status').textContent = '加载失败: ' + err.message;
+      document.getElementById('editor-status').textContent = '加载失败: ' + err;
     });
 }
 
@@ -1311,154 +993,68 @@ function saveEditor() {
   const content = activeEditorCM.getValue();
   document.getElementById('editor-status').textContent = '保存中...';
 
-  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/write?path=${encodeURIComponent(activeEditorFile)}`, {
-    method: 'POST',
-    headers: { 'X-CSRF-Token': csrfToken || '' },
-    body: content,
-  }).then(r => r.json()).then(res => {
-    if (res.success) {
+  App().SFTPWrite(ses.sessionId, activeEditorFile, content)
+    .then(() => {
       showToast('保存成功', 'success');
       closeEditor();
-    } else {
-      document.getElementById('editor-status').textContent = '保存失败: ' + (res.error || '');
-      showToast(res.error || '保存失败', 'error');
-    }
-  }).catch(err => {
-    document.getElementById('editor-status').textContent = '保存失败: ' + err.message;
-    showToast('保存失败', 'error');
-  });
+    })
+    .catch(err => {
+      document.getElementById('editor-status').textContent = '保存失败: ' + err;
+      showToast('保存失败', 'error');
+    });
 }
 
-var _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
-
-function fileUpload() {
-  document.getElementById('file-input').click();
-}
+function fileUpload() { document.getElementById('file-input').click(); }
 
 function fileUploadDo(input) {
   uploadFiles(input.files);
   input.value = '';
 }
 
-function uploadFiles(files) {
+async function uploadFiles(files) {
   const ses = getActiveSession();
   if (!ses || !ses.connected || !files.length) return;
 
   const arr = Array.from(files);
-  const limitBytes = maxUploadMB > 0 ? maxUploadMB * 1024 * 1024 : 0;
-  const ok = [];
-  for (const f of arr) {
-    if (limitBytes > 0 && f.size > limitBytes) {
-      showToast(`跳过 ${f.name}（超过 ${maxUploadMB}MB 限制）`, 'error');
-    } else {
-      ok.push(f);
-    }
-  }
-  if (ok.length === 0) return;
-  _uploadQ.items.push(...ok);
-  _uploadQ.totalBytes += arr.reduce((s, f) => s + f.size, 0);
-
-  if (window._uploadHideTimer) clearTimeout(window._uploadHideTimer);
-
   const progressEl = document.getElementById('file-progress');
   const fillEl = document.getElementById('progress-fill');
   const textEl = document.getElementById('progress-text');
   const pctEl = document.getElementById('progress-pct');
 
   progressEl.style.display = 'block';
-  textEl.textContent = `排队中 ${_uploadQ.items.length} 个文件...`;
-  pctEl.textContent = '0%';
-  fillEl.style.width = '0%';
 
-  if (!_uploadQ.active) {
-    _uploadQ.active = true;
-    processUploadQ();
+  let uploaded = 0;
+  for (const f of arr) {
+    textEl.textContent = `上传中 ${uploaded+1}/${arr.length} ${f.name}`;
+    pctEl.textContent = '0%';
+    fillEl.style.width = '0%';
+    try {
+      const bytes = await f.arrayBuffer();
+      await App().SFTPUpload(ses.sessionId, ses.fsPath, f.name, new Uint8Array(bytes));
+      uploaded++;
+    } catch (err) {
+      showToast(`上传失败 ${f.name}: ${err}`, 'error');
+    }
   }
+  progressEl.style.display = uploaded === arr.length ? 'none' : 'block';
+  if (uploaded === arr.length) showToast(`成功上传 ${uploaded} 个文件`, 'success');
+  loadFileList();
 }
 
-function processUploadQ() {
-  const progressEl = document.getElementById('file-progress');
-  const fillEl = document.getElementById('progress-fill');
-  const textEl = document.getElementById('progress-text');
-  const pctEl = document.getElementById('progress-pct');
-
-  if (_uploadQ.items.length === 0) {
-    _uploadQ.active = false;
-    _uploadQ.totalBytes = 0;
-    _uploadQ.sentBytes = 0;
-    _uploadQ.done = 0;
-    textEl.textContent = '上传完成';
-    fillEl.style.width = '100%';
-    pctEl.textContent = '100%';
-    window._uploadHideTimer = setTimeout(() => { progressEl.style.display = 'none'; }, 1500);
-    loadFileList();
-    return;
-  }
-
-  const item = _uploadQ.items[0];
-  const total = _uploadQ.done + _uploadQ.items.length;
-  textEl.textContent = `${_uploadQ.done + 1}/${total} ${item.name}`;
-  pctEl.textContent = '0%';
-  fillEl.style.width = '0%';
-
-  const ses = getActiveSession();
-  if (!ses) { textEl.textContent = '会话已断开'; return; }
-
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', `__BASE_PATH__/api/fs/${ses.sessionId}/upload?path=${encodeURIComponent(ses.fsPath)}`);
-  if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
-
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const overall = ((_uploadQ.sentBytes + e.loaded) / _uploadQ.totalBytes) * 100;
-      fillEl.style.width = overall + '%';
-      pctEl.textContent = Math.round(overall) + '%';
-    }
-  };
-
-  xhr.onload = () => {
-    if (xhr.status === 200) {
-      _uploadQ.sentBytes += item.size;
-      _uploadQ.done++;
-      _uploadQ.items.shift();
-      progressEl.style.display = 'block';
-      setTimeout(processUploadQ, 80);
-    } else {
-      textEl.textContent = `失败: ${item.name}`;
-    }
-  };
-
-  xhr.onerror = () => {
-    textEl.textContent = `失败: ${item.name}`;
-  };
-
-  const form = new FormData();
-  form.append('file', item);
-  xhr.send(form);
-}
-
-function fileDelete(name) {
-  showConfirm(`确认删除 "${name}"？`, () => {
+async function fileDelete(name) {
+  showConfirm(`确认删除 "${name}"？`, async () => {
     const ses = getActiveSession();
     if (!ses) return;
-    fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/remove`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
-      body: JSON.stringify({ path: ses.fsPath + '/' + name })
-    }).then(r => r.json()).then(res => {
-      if (res.success) loadFileList();
-      else showToast(res.error, 'error');
-    });
+    try {
+      await App().SFTPRemove(ses.sessionId, ses.fsPath + '/' + name);
+      loadFileList();
+    } catch (err) {
+      showToast(err, 'error');
+    }
   });
 }
 
 function fileRename(name) {
-  showRename(name);
-}
-
-var _renaming = '';
-
-function showRename(name) {
   _renaming = name;
   document.getElementById('rename-label').textContent = '重命名: ' + name;
   document.getElementById('rename-input').value = name;
@@ -1466,28 +1062,20 @@ function showRename(name) {
   setTimeout(() => document.getElementById('rename-input').select(), 100);
 }
 
-function hideRename() {
-  document.getElementById('rename-overlay').style.display = 'none';
-}
+function hideRename() { document.getElementById('rename-overlay').style.display = 'none'; }
 
-function doRename() {
+async function doRename() {
   const newName = document.getElementById('rename-input').value.trim();
   if (!newName || newName === _renaming) { hideRename(); return; }
   const ses = getActiveSession();
   if (!ses) { hideRename(); return; }
   hideRename();
-  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/rename`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
-    body: JSON.stringify({ oldPath: ses.fsPath + '/' + _renaming, newPath: ses.fsPath + '/' + newName })
-  }).then(r => r.json()).then(res => {
-    if (res.success) loadFileList();
-    else showToast(res.error, 'error');
-  });
-}
-
-function fileMkdir() {
-  showMkdir();
+  try {
+    await App().SFTPRename(ses.sessionId, ses.fsPath + '/' + _renaming, ses.fsPath + '/' + newName);
+    loadFileList();
+  } catch (err) {
+    showToast(err, 'error');
+  }
 }
 
 function showMkdir() {
@@ -1497,25 +1085,23 @@ function showMkdir() {
   setTimeout(() => document.getElementById('mkdir-input').focus(), 100);
 }
 
-function hideMkdir() {
-  document.getElementById('mkdir-overlay').style.display = 'none';
-}
+function hideMkdir() { document.getElementById('mkdir-overlay').style.display = 'none'; }
 
-function doMkdir() {
+async function doMkdir() {
   const name = document.getElementById('mkdir-input').value.trim();
   if (!name) { hideMkdir(); return; }
   const ses = getActiveSession();
   if (!ses) { hideMkdir(); return; }
   hideMkdir();
-  fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/mkdir`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
-    body: JSON.stringify({ path: ses.fsPath + '/' + name })
-  }).then(r => r.json()).then(res => {
-    if (res.success) loadFileList();
-    else showToast(res.error, 'error');
-  });
+  try {
+    await App().SFTPMkdir(ses.sessionId, ses.fsPath + '/' + name);
+    loadFileList();
+  } catch (err) {
+    showToast(err, 'error');
+  }
 }
+
+function fileMkdir() { showMkdir(); }
 
 function showToast(msg, type) {
   const el = document.getElementById('toast');
@@ -1559,7 +1145,6 @@ function escJsStr(s) {
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
-  await fetchSessionKey();
   await fetchServers();
   updateStatus();
   renderServers();
@@ -1581,7 +1166,6 @@ window.addEventListener('resize', () => {
   Object.values(sessions).forEach(s => { if (s.fitAddon) setTimeout(() => s.fitAddon.fit(), 50); });
 });
 
-// Keyboard shortcut
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     document.getElementById('modal-overlay').style.display = 'none';

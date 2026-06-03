@@ -18,21 +18,54 @@
 
 ## Progress
 ### Done
-- `main.go`: HTTP 入口，路由注册（WS、静态资源、SFTP API、登录/登出、密码修改、内联编辑器 `/read`/`/write`）；flags: `-addr`, `-user`, `-pass`, `-cert`/`-key`, `-url`, `-maxbody`, `-db`；store 初始化、用户确保、运行时压缩、CSRF 中间件
-- `internal/sshterm/handler.go`: WebSocket SSH 中继（双向二进制、resize JSON）；PROMPT_COMMAND OSC 7 注入；接受 `DecryptFunc` 解密连接参数；`dialSSH` 同时支持密码和私钥认证
-- `internal/sshterm/session.go`: `SessionManager`，`DialSFTP()` 三级回退，`preambleReader`，`hostKeyCallback` TOFU
-- `internal/sshterm/sftp.go`: SFTP REST handlers（list/download/upload/remove/rename/mkdir/read/write）；**`sanitizePath()` 拒绝所有 `..` 遍历**；`HandleFSUpload` 添加 `MaxBytesReader` 限制 + `io.Copy` error 检查 + 失败自动清理远端残缺文件
-- `internal/auth/auth.go`: 用户认证、bcrypt 密码校验、每会话 AES-256-GCM 密钥、`KeyHandler` 返回 `{key, csrf, maxBodyMB}`、`CSRFValidate` 中间件、`DecryptField`/`DecryptWithKey`、速率限制（5 次/15 分钟封禁）、token 过期（24h）、密码修改
-- `internal/store/store.go`: SQLite 操作 — `config` 表（AES-256-GCM 主密钥）、`servers` 表（password/privateKey AES-GCM 加密、`tags` 字段）、`users` 表（bcrypt 哈希）；方法包括 `EnsureUser`、`VerifyPassword`、`ChangePassword`、`UserExists`、`updatePassword`；服务器 CRUD 加解密；`EnsureUser` 已存在时调用 `updatePassword` 修复 `-pass` 覆盖
-- `internal/store/handler.go`: 服务器 CRUD HTTP handlers，接受 `DecryptFunc` 参数
-- `static/index.html`: 三栏布局、多会话终端、文件浏览器（拖拽上传、进度条、队列）、OSC 7 CWD、自定义确认/重命名模态框、Toast 通知、批量导入、密码修改、CodeMirror 内联编辑器、服务器搜索/过滤输入框、标签输入与展示、服务器列表 "+" 按钮新建终端、标签栏多会话切换/关闭；`encField()` Web Crypto API AES-GCM 加密；`apiHeaders()` 统一添加 `X-CSRF-Token`；文件下载用 `<a download>`；重命名用自定义模态框替代 `prompt()`；修复重复 `api()` 函数导致 CSRF 头丢失；所有图标使用内嵌 SVG（Feather 风格），文件类型用彩色方块替代 emoji；终端 Consolas 字体、GitHub Dark 配色、深绿 `#1f7a2e` 改善 777 目录可读性；选中即复制（`onSelectionChange` → `clipboard.writeText`）；上传前检查 `maxUploadMB`，超限跳过并 toast 提示
-- `static/lib/`: xterm.min.js / xterm.min.css / xterm-addon-fit.min.js / codemirror.min.js / codemirror.min.css（本地嵌入无 CDN）
-- `static/favicon.png`: 应用图标
-- `.gitignore`: 排除 `/webssh`、`/release/`、`*.db*`
-- `AGENTS.md`: 项目上下文
+- `main.go`: Wails 应用入口，flag 解析，wails.Run() 启动原生窗口；嵌入 `frontend/` 目录
+- `app.go`: App struct 包含所有 Wails 绑定方法：
+  - 服务器 CRUD（ListServers/CreateServer/UpdateServer/DeleteServer/BatchImport）
+  - 终端管理（Connect/TerminalInput/TerminalResize/CloseSession/ListSessions）
+  - SFTP 操作（SFTPList/SFTPDownload/SFTPUpload/SFTPRemove/SFTPRename/SFTPMkdir/SFTPRead/SFTPWrite）
+  - 通过 runtime.EventsEmit 发送 terminal:output/terminal:closed 事件
+  - 通过 Manager 创建会话以供 SFTP 复用；cleanupSession 自动清理
+- `wails.json`: Wails 项目配置，无前端构建步骤
+- `build/darwin/Info.plist`: macOS 应用配置（深色模式、无 Dock 图标）
+- `frontend/index.html`: 单文件前端（从 static/index.html 适配）：
+  - 去掉登录页面、退出按钮、修改密码功能
+  - 去掉 `__BASE_PATH__`、encField、CSRF 等 HTTP 相关代码
+  - `window.go.main.App.*()` 替代 `fetch()` API 调用
+  - `window.runtime.EventsOn("terminal:output")` 替代 WebSocket
+  - 文件上传/下载通过 Go 方法直接传递二进制数据
+  - 去掉 keepalive 定时器（WS 不再需要）
+- `frontend/lib/`: xterm.js + CodeMirror（从 static/ 复制）
+- `frontend/wailsjs/`: Wails 自动生成的 JS 绑定
+- `internal/sshterm/handler.go`: 重构 — 移除 WebSocket handler，导出 DialSSH
+- `internal/sshterm/session.go`: Session 增加 Stdin/SSHSession 字段
+- `internal/sshterm/sftp.go`: 精简 — 移除 HTTP handler，保留核心类型和辅助函数
+- `internal/store/handler.go`: 删除（不再需要 HTTP handler）
+- `internal/auth/auth.go`: 删除（不再需要 HTTP 认证）
+- `Makefile`: 更新为 Wails 构建目标（build/run/package/vet/clean）
+- `.gitignore`: 增加 WebSSH.app 和 build/bin/ 排除
 
 ### In Progress
 - (无)
+
+### Blocked
+- (无)
+
+## Key Decisions
+- 使用 Wails v2 构建原生 macOS 桌面应用，无需 HTTP 服务器
+- 前后端通过 Wails 绑定直接通信，无需 fetch/WebSocket/CSRF/传输加密
+- SSH 终端输出通过 `runtime.EventsEmit("terminal:output")` 推送 base64 数据
+- SSH 终端输入通过 `TerminalInput(sessionID, data)` 方法调用
+- 文件上传下载通过 `[]byte` 参数直接传递（Wails JSON 序列化处理）
+- 去掉登录页面 — 桌面应用信任当前用户
+- 数据存储仍使用 SQLite + AES-GCM 加密（store 包保持不变）
+- macOS 构建需额外 `CGO_LDFLAGS="-framework UniformTypeIdentifiers"` 解决 Wails v2.9.2 在 Go 1.26 的链接问题
+
+## Build
+- `make build`: 编译二进制
+- `make run`: 编译并运行
+- `make package`: 编译并打包为 WebSSH.app
+- `make vet`: 代码检查
+- `make clean`: 清理构建产物
 
 ### Blocked
 - (无)
@@ -52,7 +85,10 @@
 - 前端通过 `/api/key` 获取 `maxBodyMB`，上传前拦截超限文件
 
 ## Next Steps
-- (待定)
+- **feat/wails-gui 分支**: 使用 Wails 构建原生 GUI 工具
+  - 复用现有前端（xterm.js、CodeMirror、SFTP 文件浏览器等）和后端（SSH、SFTP、加密等）代码
+  - 去掉登录页面（原生应用无需 HTTP 认证）
+  - 利用 Wails 的 Go + 前端绑定能力，将现有 web 架构适配为桌面应用
 
 ## Relevant Files
 - `main.go`: 入口、路由、压缩、CSRF

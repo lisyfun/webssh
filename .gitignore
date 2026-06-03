@@ -1,12 +1,7 @@
 /webssh
+/WebSSH.app
 /release/
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-/vendor/
-.DS_Store
+/dist/
+/build/bin/
 *.db*
+
