@@ -1029,8 +1029,10 @@ async function uploadFiles(files) {
     pctEl.textContent = '0%';
     fillEl.style.width = '0%';
     try {
-      const bytes = await f.arrayBuffer();
-      await App().SFTPUpload(ses.sessionId, ses.fsPath, f.name, new Uint8Array(bytes));
+      const u8 = new Uint8Array(await f.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]);
+      await App().SFTPUpload(ses.sessionId, ses.fsPath, f.name, btoa(binary));
       uploaded++;
     } catch (err) {
       showToast(`上传失败 ${f.name}: ${err}`, 'error');
