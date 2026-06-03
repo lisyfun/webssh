@@ -5,7 +5,7 @@ build:
 	CGO_ENABLED=1 CGO_LDFLAGS="-framework UniformTypeIdentifiers" go build -tags "desktop,production" -o $(BINARY) .
 
 run: build
-	open ./$(BINARY)
+	./$(BINARY)
 
 package: build
 	rm -rf $(APP)
@@ -13,6 +13,7 @@ package: build
 	cp build/darwin/Info.plist $(APP)/Contents/
 	cp $(BINARY) $(APP)/Contents/MacOS/
 	cp frontend/favicon.png $(APP)/Contents/Resources/iconfile.png
+	codesign --force --deep --sign - $(APP)
 	@echo "created $(APP)"
 
 vet:
