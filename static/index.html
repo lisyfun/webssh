@@ -434,6 +434,18 @@ input, textarea, button { font-family: inherit; }
   </div>
 </div>
 
+<!-- Mkdir Modal -->
+<div class="modal-overlay" id="mkdir-overlay" style="display:none">
+  <div class="modal confirm-modal">
+    <p id="mkdir-label">新建目录:</p>
+    <input type="text" id="mkdir-input" style="width:100%;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);font-size:14px;margin-top:8px;outline:none" onkeydown="if(event.key==='Enter')doMkdir()">
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-cancel" onclick="hideMkdir()">取消</button>
+      <button class="btn-primary" onclick="doMkdir()">确定</button>
+    </div>
+  </div>
+</div>
+
 <!-- Batch Import Modal -->
 <div class="modal-overlay" id="batch-import-overlay" style="display:none">
   <div class="modal" style="width:500px">
@@ -1475,10 +1487,26 @@ function doRename() {
 }
 
 function fileMkdir() {
-  const name = prompt('目录名:');
-  if (!name) return;
+  showMkdir();
+}
+
+function showMkdir() {
+  document.getElementById('mkdir-label').textContent = '新建目录:';
+  document.getElementById('mkdir-input').value = '';
+  document.getElementById('mkdir-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('mkdir-input').focus(), 100);
+}
+
+function hideMkdir() {
+  document.getElementById('mkdir-overlay').style.display = 'none';
+}
+
+function doMkdir() {
+  const name = document.getElementById('mkdir-input').value.trim();
+  if (!name) { hideMkdir(); return; }
   const ses = getActiveSession();
-  if (!ses) return;
+  if (!ses) { hideMkdir(); return; }
+  hideMkdir();
   fetch(`__BASE_PATH__/api/fs/${ses.sessionId}/mkdir`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
