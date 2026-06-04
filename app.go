@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"path"
 	"sync"
 	"time"
@@ -359,6 +360,46 @@ func (a *App) SFTPDownload(sessionID, filePath string) ([]byte, error) {
 	defer f.Close()
 
 	return io.ReadAll(f)
+}
+
+func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
+	remotePath, err := sshterm.SanitizePath(remotePath)
+	if err != nil {
+		return err
+	}
+
+	fileName := path.Base(remotePath)
+	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: fileName,
+		Title:           "保存文件 - " + fileName,
+	})
+	if err != nil {
+		return err
+	}
+	if savePath == "" {
+		return nil
+	}
+
+	sc, err := a.getSFTPClient(sessionID)
+	if err != nil {
+		return err
+	}
+	defer sc.Close()
+
+	f, err := sc.Open(remotePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	dst, err := os.Create(savePath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, f)
+	return err
 }
 
 func (a *App) SFTPUpload(sessionID, destPath, fileName string, data []byte) error {

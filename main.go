@@ -10,7 +10,6 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend
@@ -21,11 +20,11 @@ var (
 )
 
 func defaultDBPath() string {
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "webssh.db"
 	}
-	p := filepath.Join(dir, "Library", "Application Support", "WebSSH", "webssh.db")
+	p := filepath.Join(dir, "WebSSH", "webssh.db")
 	os.MkdirAll(filepath.Dir(p), 0755)
 	return p
 }
@@ -58,12 +57,8 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
-		Mac: &mac.Options{
-			TitleBar:             mac.TitleBarDefault(),
-			Appearance:           mac.NSAppearanceNameDarkAqua,
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
-		},
+		Mac:     macOptions(),
+		Windows: windowsOptions(),
 	})
 
 	if err != nil {

@@ -1,7 +1,7 @@
 # WebSSH — 项目上下文
 
 ## Goal
-构建一个轻量级 JumpServer 风格的 Web SSH 终端，支持服务器列表、终端面板、可折叠 SFTP 文件浏览器（跟随终端 CWD）、用户认证、内联文件编辑及安全加固。
+构建一个轻量级 JumpServer 风格的 Web SSH 终端，支持服务器列表、终端面板、可折叠 SFTP 文件浏览器（跟随终端 CWD）、内联文件编辑及安全加固。
 
 ## Constraints & Preferences
 - Go 后端，xterm.js 前端，单二进制内嵌所有静态资源
@@ -9,11 +9,8 @@
 - 多服务器连接通过 session ID 管理，切换不断开；支持同一服务器开多个终端
 - 服务器列表持久化到 SQLite（非 localStorage）；密码/私钥 AES-GCM 加密存储
 - CWD 跟踪必须无感（终端不可见转义输出）
-- 认证后方可访问页面；用户 bcrypt 哈希存 SQLite
 - 支持内网/离线部署（无 CDN 依赖）
-- 访问路径和登录密码均自动随机生成；自动密码仅在首次运行（无用户时）生成
 - 敏感字段（password/privateKey）API 传输时使用每会话 AES-256-GCM 加密
-- CSRF 保护所有写 API（POST/PUT/DELETE）
 - 静态资源运行时压缩（HTML + JS）
 
 ## Progress
@@ -48,58 +45,51 @@
 - (无)
 
 ### Blocked
-- (无)
+- `wails build` CLI fails with `internal error: package "fmt" without types` — Go 1.26 incompatibility with Wails v2.9.2; workaround: use `go build -tags "desktop,production"` directly
 
 ## Key Decisions
-- 使用 Wails v2 构建原生 macOS 桌面应用，无需 HTTP 服务器
+- 使用 Wails v2 构建原生桌面应用，无需 HTTP 服务器（支持 macOS/Windows/Linux）
 - 前后端通过 Wails 绑定直接通信，无需 fetch/WebSocket/CSRF/传输加密
 - SSH 终端输出通过 `runtime.EventsEmit("terminal:output")` 推送 base64 数据
 - SSH 终端输入通过 `TerminalInput(sessionID, data)` 方法调用
 - 文件上传下载通过 `[]byte` 参数直接传递（Wails JSON 序列化处理）
 - 去掉登录页面 — 桌面应用信任当前用户
 - 数据存储仍使用 SQLite + AES-GCM 加密（store 包保持不变）
-- macOS 构建需额外 `CGO_LDFLAGS="-framework UniformTypeIdentifiers"` 解决 Wails v2.9.2 在 Go 1.26 的链接问题
-
-## Build
-- `make build`: 编译二进制
-- `make run`: 编译并运行
-- `make package`: 编译并打包为 WebSSH.app
-- `make vet`: 代码检查
-- `make clean`: 清理构建产物
-
-### Blocked
-- (无)
-
-## Key Decisions
-- 使用 `github.com/gorilla/websocket`、`github.com/gorilla/mux`、`github.com/pkg/sftp`
-- 使用 `modernc.org/sqlite`（纯 Go，无 CGO）
-- 使用 `github.com/tdewolff/minify` 运行时压缩
 - 存储加密密钥独立于登录密码：随机 AES-256-GCM 密钥存 `config` 表，改登录密码不影响已存服务器密码
-- CSRF token = session token 前 16 字符
-- 自动生成密码仅首次创建用户时生成；后续启动检测到已有用户则直接使用
 - Three-stage SFTP fallback: subsystem → exec sftp-server → 新 SSH 连接
 - `hostKeyCallback` 使用 TOFU（内存 sync.Map）
 - 标签以逗号分隔存 `tags` 字段；ALTER TABLE 迁移兼容旧库
 - sessions 以 session UUID 为 key（非 serverId），每个 session 持有 serverId 引用，支持同服务器多终端
-- 上传使用 `MaxBytesReader` 限制 body 大小，`io.Copy` 错误不再忽略，失败自动 `sc.Remove` 清理残缺文件
-- 前端通过 `/api/key` 获取 `maxBodyMB`，上传前拦截超限文件
+- macOS 构建需额外 `CGO_LDFLAGS="-framework UniformTypeIdentifiers"` 解决 Wails v2.9.2 在 Go 1.26 的链接问题
+- Windows 构建需 `mingw-w64` 交叉编译器，`-ldflags="-H=windowsgui"` 隐藏控制台窗口
+- Windows 深色标题栏通过 `windows.Options` 的 `Theme: windows.Dark` + `CustomTheme` 实现
+- Windows 应用图标由 `frontend/favicon.png` 生成 `.ico`，经 `go-winres` 嵌入 `.syso` 到二进制
+- 平台选项通过 build tag 隔离：`options_darwin.go` / `options_windows.go` / `options_default.go`
 
-## Next Steps
-- **feat/wails-gui 分支**: 使用 Wails 构建原生 GUI 工具
-  - 复用现有前端（xterm.js、CodeMirror、SFTP 文件浏览器等）和后端（SSH、SFTP、加密等）代码
-  - 去掉登录页面（原生应用无需 HTTP 认证）
-  - 利用 Wails 的 Go + 前端绑定能力，将现有 web 架构适配为桌面应用
+## Build
+- `make build`: 编译当前平台二进制
+- `make run`: 编译并运行
+- `make package`: 编译并打包为 WebSSH.app（仅 macOS）
+- `make release`: 打包为 DMG 或 tar.gz（仅 macOS）
+- `make universal`: 编译 arm64 + amd64 通用二进制（仅 macOS）
+- `make build-windows`: 交叉编译 Windows 版（需 `brew install mingw-w64`）
+- `make build-linux`: 交叉编译 Linux 版
+- `make vet`: 代码检查
+- `make clean`: 清理构建产物
 
 ## Relevant Files
-- `main.go`: 入口、路由、压缩、CSRF
-- `internal/sshterm/handler.go`: WebSocket ↔ SSH、dialSSH
+- `main.go`: Wails 入口、flag 解析、wails.Run()、嵌入 `frontend/`
+- `options_darwin.go`: macOS 专用选项（`mac.Options`，build tag: darwin）
+- `options_windows.go`: Windows 专用选项（`windows.Options` + 深色标题栏，build tag: windows）
+- `options_default.go`: 其他平台存根（build tag: !darwin,!windows）
+- `app.go`: App struct + 所有绑定方法（服务器 CRUD、终端、SFTP）
+- `internal/sshterm/handler.go`: dialSSH（无 WebSocket）
 - `internal/sshterm/session.go`: SessionManager、SFTP 重连、preambleReader、TOFU
-- `internal/sshterm/sftp.go`: SFTP handlers、sanitizePath、上传限流
-- `internal/auth/auth.go`: 认证、加密、CSRF、速率限制、KeyHandler（含 maxBodyMB）
-- `internal/store/store.go`: SQLite 操作、加解密、服务器 CRUD、标签
-- `internal/store/handler.go`: 服务器 CRUD HTTP handlers
-- `static/index.html`: 完整前端（多会话标签栏、服务器列表新建终端、标签搜索/过滤、标签输入/展示、内嵌 SVG 图标、彩色方块文件类型、选中复制、上传前大小检查）
-- `static/lib/`: 前端依赖（xterm.js + codemirror）
+- `internal/sshterm/sftp.go`: SFTP 核心类型，导出 SanitizePath/RemoveDir/FormatFileEntry
+- `internal/store/store.go`: SQLite + AES-GCM 加密（未改动）
+- `frontend/index.html`: 完整 Wails 前端（多标签、文件浏览器、编辑器、Wails 事件绑定）
+- `frontend/wailsjs/`: Wails 自动生成的 JS 绑定
+- `build/darwin/Info.plist`: macOS bundle 元数据
 
 ## Key Bug Fixes
 - `connectToServer` 中缺少 `const empty = document.getElementById('empty-state')` 导致 ReferenceError

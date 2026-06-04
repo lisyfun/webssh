@@ -34,6 +34,10 @@ export function SFTPDownload(arg1, arg2) {
   return window['go']['main']['App']['SFTPDownload'](arg1, arg2);
 }
 
+export function SFTPDownloadDialog(arg1, arg2) {
+  return window['go']['main']['App']['SFTPDownloadDialog'](arg1, arg2);
+}
+
 export function SFTPList(arg1, arg2) {
   return window['go']['main']['App']['SFTPList'](arg1, arg2);
 }

@@ -837,11 +837,17 @@ function getActiveSession() { return activeSessionId ? sessions[activeSessionId]
 async function loadFileList(dir) {
   const ses = getActiveSession();
   if (!ses) return;
+
+  // 正在加载中：记下待处理路径，不更新 ses.fsPath（防竞态）
+  if (ses._loading) {
+    if (dir !== undefined) ses._pendingPath = dir;
+    return;
+  }
+
   if (dir !== undefined) {
     if (dir === ses.fsPath) return;
     ses.fsPath = dir;
   }
-  if (ses._loading) return;
   ses._loading = true;
 
   const list = document.getElementById('file-list');
@@ -863,6 +869,15 @@ async function loadFileList(dir) {
   try {
     const res = await App().SFTPList(ses.sessionId, ses.fsPath);
     ses._loading = false;
+
+    // 加载期间有路径变更：用最新路径重载
+    if (ses._pendingPath && ses._pendingPath !== ses.fsPath) {
+      const pp = ses._pendingPath;
+      ses._pendingPath = null;
+      loadFileList(pp);
+      return;
+    }
+
     if (!res || res.length === 0) {
       list.innerHTML = '<div class="file-loading">目录为空</div>';
       return;
@@ -931,13 +946,7 @@ async function fileDownload(name) {
   const ses = getActiveSession();
   if (!ses) return;
   try {
-    const data = await App().SFTPDownload(ses.sessionId, ses.fsPath + '/' + name);
-    const blob = new Blob([data], { type: 'application/octet-stream' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    await App().SFTPDownloadDialog(ses.sessionId, ses.fsPath + '/' + name);
   } catch (err) {
     showToast('下载失败: ' + err, 'error');
   }

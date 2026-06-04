@@ -19,6 +19,8 @@ export function ListSessions():Promise<Array<string>>;
 
 export function SFTPDownload(arg1:string,arg2:string):Promise<Array<number>>;
 
+export function SFTPDownloadDialog(arg1:string,arg2:string):Promise<void>;
+
 export function SFTPList(arg1:string,arg2:string):Promise<Array<sshterm.FileEntry>>;
 
 export function SFTPMkdir(arg1:string,arg2:string):Promise<void>;

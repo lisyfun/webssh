@@ -1,7 +1,13 @@
 /webssh
+/webssh.exe
+/webssh-linux
 /WebSSH.app
+/WebSSH*.zip
 /release/
 /dist/
 /build/bin/
 *.db*
+frontend/favicon.ico
+rsrc_windows_*.syso
+winres/
 
