@@ -31,6 +31,7 @@ var (
 	urlPath  = flag.String("url", "", "access path prefix (empty = auto-generate random)")
 	maxBody  = flag.Int64("maxbody", 50, "max editor body size in MB (0 = no limit)")
 	dbPath   = flag.String("db", "webssh.db", "path to SQLite database file")
+	enable2FA = flag.Bool("2fa", false, "enable two-factor authentication (TOTP)")
 )
 
 //go:embed all:static
@@ -93,7 +94,7 @@ func main() {
 		log.Fatal("failed to create user:", err)
 	}
 
-	a := auth.New(st, *user, "", basePath, *maxBody)
+	a := auth.New(st, *user, "", basePath, *maxBody, *enable2FA)
 
 	indexBytes, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
@@ -130,6 +131,10 @@ func main() {
 	s.HandleFunc("/ws", sshterm.HandleWebSocket(decryptField))
 	s.HandleFunc("/change-password", a.ChangePasswordHandler).Methods("POST")
 	s.HandleFunc("/api/key", a.KeyHandler).Methods("GET")
+	s.HandleFunc("/api/2fa/status", a.TOTPStatusHandler).Methods("GET")
+	s.HandleFunc("/api/2fa/setup", a.TOTPSetupHandler).Methods("GET")
+	s.HandleFunc("/api/2fa/enable", a.TOTPEnableHandler).Methods("POST")
+	s.HandleFunc("/api/2fa/disable", a.TOTPDisableHandler).Methods("POST")
 
 	api := s.PathPrefix("/api").Subrouter()
 	api.Use(a.CSRFValidate)

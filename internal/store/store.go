@@ -83,6 +83,7 @@ func (s *Store) migrate() error {
 		CREATE TABLE IF NOT EXISTS users (
 			username TEXT PRIMARY KEY,
 			password_hash TEXT NOT NULL,
+			totp_secret TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)
@@ -91,6 +92,7 @@ func (s *Store) migrate() error {
 		return err
 	}
 	s.db.Exec("ALTER TABLE servers ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+	s.db.Exec("ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT ''")
 	return nil
 }
 
@@ -216,6 +218,36 @@ func (s *Store) ChangePassword(ctx context.Context, username, oldPassword, newPa
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err = s.db.ExecContext(ctx, "UPDATE users SET password_hash=?, updated_at=? WHERE username=?", string(hash), now, username)
+	return err
+}
+
+// ---- TOTP operations ----
+
+func (s *Store) SetTOTPSecret(ctx context.Context, username, secret string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET totp_secret=? WHERE username=?", secret, username)
+	return err
+}
+
+func (s *Store) GetTOTPSecret(ctx context.Context, username string) (string, error) {
+	var secret string
+	err := s.db.QueryRowContext(ctx, "SELECT totp_secret FROM users WHERE username=?", username).Scan(&secret)
+	if err != nil {
+		return "", err
+	}
+	return secret, nil
+}
+
+func (s *Store) HasTOTPEnabled(ctx context.Context, username string) (bool, error) {
+	var secret string
+	err := s.db.QueryRowContext(ctx, "SELECT totp_secret FROM users WHERE username=?", username).Scan(&secret)
+	if err != nil {
+		return false, nil
+	}
+	return secret != "", nil
+}
+
+func (s *Store) DisableTOTP(ctx context.Context, username string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET totp_secret='' WHERE username=?", username)
 	return err
 }
 
