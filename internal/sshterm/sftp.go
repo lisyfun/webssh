@@ -5,7 +5,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,6 +127,12 @@ func HandleFSDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer sc.Close()
 
+	stat, err := sc.Stat(filePath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	f, err := sc.Open(filePath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -135,6 +143,7 @@ func HandleFSDownload(w http.ResponseWriter, r *http.Request) {
 	fileName := path.Base(filePath)
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
 	io.Copy(w, f)
 }
 
@@ -163,6 +172,50 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer sc.Close()
+
+	if offsetStr := r.Header.Get("X-Upload-Offset"); offsetStr != "" {
+		offset, err := strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			jsonError(w, "invalid offset")
+			return
+		}
+		fileName := r.Header.Get("X-Upload-Name")
+		if fileName == "" {
+			jsonError(w, "X-Upload-Name header required")
+			return
+		}
+		remotePath := path.Join(destPath, fileName)
+		remotePath, err = sanitizePath(remotePath)
+		if err != nil {
+			jsonError(w, err.Error())
+			return
+		}
+		if MaxWriteBodySize > 0 {
+			r.Body = http.MaxBytesReader(w, r.Body, MaxWriteBodySize)
+		}
+		var dst io.WriteCloser
+		if offset == 0 {
+			dst, err = sc.Create(remotePath)
+		} else {
+			dst, err = sc.OpenFile(remotePath, os.O_WRONLY|os.O_APPEND)
+		}
+		if err != nil {
+			jsonError(w, "open remote file failed: "+err.Error())
+			return
+		}
+		defer dst.Close()
+		_, err = io.Copy(dst, r.Body)
+		if err != nil {
+			dst.Close()
+			if offset == 0 {
+				sc.Remove(remotePath)
+			}
+			jsonError(w, "write failed: "+err.Error())
+			return
+		}
+		json.NewEncoder(w).Encode(ActionResponse{Success: true})
+		return
+	}
 
 	if MaxWriteBodySize > 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, MaxWriteBodySize)

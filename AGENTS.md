@@ -21,11 +21,11 @@
 - `main.go`: HTTP 入口，路由注册（WS、静态资源、SFTP API、登录/登出、密码修改、内联编辑器 `/read`/`/write`）；flags: `-addr`, `-user`, `-pass`, `-cert`/`-key`, `-url`, `-maxbody`, `-db`；store 初始化、用户确保、运行时压缩、CSRF 中间件
 - `internal/sshterm/handler.go`: WebSocket SSH 中继（双向二进制、resize JSON）；PROMPT_COMMAND OSC 7 注入；接受 `DecryptFunc` 解密连接参数；`dialSSH` 同时支持密码和私钥认证
 - `internal/sshterm/session.go`: `SessionManager`，`DialSFTP()` 三级回退，`preambleReader`，`hostKeyCallback` TOFU
-- `internal/sshterm/sftp.go`: SFTP REST handlers（list/download/upload/remove/rename/mkdir/read/write）；**`sanitizePath()` 拒绝所有 `..` 遍历**；`HandleFSUpload` 添加 `MaxBytesReader` 限制 + `io.Copy` error 检查 + 失败自动清理远端残缺文件
+- `internal/sshterm/sftp.go`: SFTP REST handlers（list/download/upload/remove/rename/mkdir/read/write）；**`sanitizePath()` 拒绝所有 `..` 遍历**；`HandleFSUpload` 添加 `MaxBytesReader` 限制 + `io.Copy` error 检查 + 失败自动清理远端残缺文件；`HandleFSDownload` 设置 `Content-Length` 头支持前端进度条；`HandleFSUpload` 支持 `X-Upload-Offset`/`X-Upload-Name` 头部实现分块上传续写
 - `internal/auth/auth.go`: 用户认证、bcrypt 密码校验、每会话 AES-256-GCM 密钥、`KeyHandler` 返回 `{key, csrf, maxBodyMB}`、`CSRFValidate` 中间件、`DecryptField`/`DecryptWithKey`、速率限制（5 次/15 分钟封禁）、token 过期（24h）、密码修改
 - `internal/store/store.go`: SQLite 操作 — `config` 表（AES-256-GCM 主密钥）、`servers` 表（password/privateKey AES-GCM 加密、`tags` 字段）、`users` 表（bcrypt 哈希）；方法包括 `EnsureUser`、`VerifyPassword`、`ChangePassword`、`UserExists`、`updatePassword`；服务器 CRUD 加解密；`EnsureUser` 已存在时调用 `updatePassword` 修复 `-pass` 覆盖
 - `internal/store/handler.go`: 服务器 CRUD HTTP handlers，接受 `DecryptFunc` 参数
-- `static/index.html`: 三栏布局、多会话终端、文件浏览器（拖拽上传、进度条、队列）、OSC 7 CWD、自定义确认/重命名模态框、Toast 通知、批量导入、密码修改、CodeMirror 内联编辑器、服务器搜索/过滤输入框、标签输入与展示、服务器列表 "+" 按钮新建终端、标签栏多会话切换/关闭；`encField()` Web Crypto API AES-GCM 加密；`apiHeaders()` 统一添加 `X-CSRF-Token`；文件下载用 `<a download>`；重命名用自定义模态框替代 `prompt()`；修复重复 `api()` 函数导致 CSRF 头丢失；所有图标使用内嵌 SVG（Feather 风格），文件类型用彩色方块替代 emoji；终端 Consolas 字体、GitHub Dark 配色、深绿 `#1f7a2e` 改善 777 目录可读性；选中即复制（`onSelectionChange` → `clipboard.writeText`）；上传前检查 `maxUploadMB`，超限跳过并 toast 提示
+- `static/index.html`: 三栏布局、多会话终端、文件浏览器（拖拽上传、进度条、队列）、OSC 7 CWD、自定义确认/重命名模态框、Toast 通知、批量导入、密码修改、CodeMirror 内联编辑器、服务器搜索/过滤输入框、标签输入与展示、服务器列表 "+" 按钮新建终端、标签栏多会话切换/关闭；`encField()` Web Crypto API AES-GCM 加密；`apiHeaders()` 统一添加 `X-CSRF-Token`；文件下载用 XHR + 进度条替代 `<a download>`；重命名用自定义模态框替代 `prompt()`；修复重复 `api()` 函数导致 CSRF 头丢失；所有图标使用内嵌 SVG（Feather 风格），文件类型用彩色方块替代 emoji；终端 Consolas 字体、GitHub Dark 配色、深绿 `#1f7a2e` 改善 777 目录可读性；选中即复制（`onSelectionChange` → `clipboard.writeText`）；上传前检查 `maxUploadMB`，超限跳过并 toast 提示；大文件 >512KB 自动分块上传（`FileReader.readAsArrayBuffer` + `X-Upload-Offset`）
 - `static/lib/`: xterm.min.js / xterm.min.css / xterm-addon-fit.min.js / codemirror.min.js / codemirror.min.css（本地嵌入无 CDN）
 - `static/favicon.png`: 应用图标
 - `.gitignore`: 排除 `/webssh`、`/release/`、`*.db*`
@@ -50,6 +50,8 @@
 - sessions 以 session UUID 为 key（非 serverId），每个 session 持有 serverId 引用，支持同服务器多终端
 - 上传使用 `MaxBytesReader` 限制 body 大小，`io.Copy` 错误不再忽略，失败自动 `sc.Remove` 清理残缺文件
 - 前端通过 `/api/key` 获取 `maxBodyMB`，上传前拦截超限文件
+- 分块上传：>512KB 文件自动分块，每块用 `X-Upload-Offset` 头部标记偏移，Go 端用 `sc.OpenFile(..., O_APPEND)` 追加写入；分块失败自动重试 3 次
+- 下载进度：前端用 XHR `onprogress` 显示进度条，Go 端设置 `Content-Length` 头使 response 可精确计算进度
 
 ## Next Steps
 - (待定)
@@ -58,15 +60,16 @@
 - `main.go`: 入口、路由、压缩、CSRF
 - `internal/sshterm/handler.go`: WebSocket ↔ SSH、dialSSH
 - `internal/sshterm/session.go`: SessionManager、SFTP 重连、preambleReader、TOFU
-- `internal/sshterm/sftp.go`: SFTP handlers、sanitizePath、上传限流
+- `internal/sshterm/sftp.go`: SFTP handlers、sanitizePath、上传限流、分块上传续写、Content-Length 下载
 - `internal/auth/auth.go`: 认证、加密、CSRF、速率限制、KeyHandler（含 maxBodyMB）
 - `internal/store/store.go`: SQLite 操作、加解密、服务器 CRUD、标签
 - `internal/store/handler.go`: 服务器 CRUD HTTP handlers
-- `static/index.html`: 完整前端（多会话标签栏、服务器列表新建终端、标签搜索/过滤、标签输入/展示、内嵌 SVG 图标、彩色方块文件类型、选中复制、上传前大小检查）
+- `static/index.html`: 完整前端（多会话标签栏、服务器列表新建终端、标签搜索/过滤、标签输入/展示、内嵌 SVG 图标、彩色方块文件类型、选中复制、上传前大小检查、大文件分块上传、XHR 下载进度条）
 - `static/lib/`: 前端依赖（xterm.js + codemirror）
 
 ## Key Bug Fixes
 - `connectToServer` 中缺少 `const empty = document.getElementById('empty-state')` 导致 ReferenceError
 - `HandleFSUpload` 中 `io.Copy` 错误被忽略，导致上传失败时返回 `{Success: true}`
 - 上传无 body 大小限制，`-maxbody` 仅作用于内联编辑器
+- 前端上传队列在多批上传时 `totalBytes`/`sentBytes` 不重置导致进度计算错乱
 - 前端上传队列在多批上传时 `totalBytes`/`sentBytes` 不重置导致进度计算错乱
