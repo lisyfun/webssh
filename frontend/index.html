@@ -25,7 +25,7 @@
   --file-panel-width: 320px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; }
+html { color-scheme: dark; } html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; }
 input, textarea, button { font-family: inherit; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -116,6 +116,10 @@ input, textarea, button { font-family: inherit; }
 .file-progress-track { height: 4px; background: var(--bg-primary); border-radius: 2px; overflow: hidden; }
 .file-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .2s; width: 0%; }
 .toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--bg-tertiary); color: var(--text-primary); padding: 6px 16px; border-radius: 6px; font-size: 13px; border: 1px solid var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 2000; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.context-menu { position: fixed; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 0; z-index: 3000; min-width: 140px; box-shadow: 0 4px 12px rgba(0,0,0,.3); display: none; }
+.context-menu .item { padding: 6px 16px; cursor: pointer; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.context-menu .item:hover { background: var(--bg-hover); }
+.context-menu .sep { height: 1px; background: var(--border-color); margin: 4px 8px; }
 .toast.show { opacity: 1; }
 .toast.error { border-color: var(--red); }
 .toast.success { border-color: var(--green); }
@@ -224,6 +228,10 @@ input, textarea, button { font-family: inherit; }
         </div>
         <div class="file-progress-track"><div class="file-progress-fill" id="progress-fill"></div></div>
       </div>
+    </div>
+    <div class="context-menu" id="context-menu">
+      <div class="item" id="ctx-copy-path">复制路径</div>
+      <div class="item" id="ctx-copy-name">复制文件名</div>
     </div>
   </div>
 
@@ -606,6 +614,20 @@ function initTerminal(sid) {
 
   term.open(container);
 
+  container.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    navigator.clipboard.readText().then(text => {
+      if (text) term.paste(text);
+    }).catch(() => {});
+  });
+
+  let fitTimer;
+  const ro = new ResizeObserver(() => {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(() => fitAddon.fit(), 80);
+  });
+  ro.observe(container);
+
   term.onSelectionChange(() => {
     const sel = term.getSelection();
     if (sel) navigator.clipboard.writeText(sel).catch(() => {});
@@ -618,7 +640,12 @@ function initTerminal(sid) {
     }
   });
 
-  fitAddon.fit();
+  let fitCount = 0;
+  function fitRetry() {
+    fitAddon.fit();
+    if (++fitCount < 5) setTimeout(fitRetry, 200);
+  }
+  fitRetry();
 
   term.onResize(({ cols, rows }) => {
     const ses = sessions[sid];
@@ -626,8 +653,6 @@ function initTerminal(sid) {
       App().TerminalResize(ses.sessionId, cols, rows).catch(() => {});
     }
   });
-
-  setTimeout(() => fitAddon.fit(), 100);
 
   sessions[sid].term = term;
   sessions[sid].fitAddon = fitAddon;
@@ -803,6 +828,27 @@ window.runtime.EventsOn("terminal:output", function(data) {
   } catch (_) {}
 });
 
+window.runtime.EventsOn("download:progress", function(fileName, written, total) {
+  const fillEl = document.getElementById('progress-fill');
+  const pctEl = document.getElementById('progress-pct');
+  const textEl = document.getElementById('progress-text');
+  if (total <= 0) return;
+  const pct = Math.min(100, Math.round((written / total) * 100));
+  pctEl.textContent = pct + '%';
+  fillEl.style.width = pct + '%';
+  textEl.textContent = `下载中 ${fileName}`;
+});
+
+window.runtime.EventsOn("download:complete", function(fileName) {
+  const progressEl = document.getElementById('file-progress');
+  const textEl = document.getElementById('progress-text');
+  downloadQueue--;
+  if (downloadQueue <= 0) {
+    progressEl.style.display = 'none';
+  }
+  showToast(`下载完成 ${fileName}`, 'success');
+});
+
 window.runtime.EventsOn("terminal:closed", function(sessionId) {
   for (const [sid, ses] of Object.entries(sessions)) {
     if (ses.sessionId === sessionId) {
@@ -909,6 +955,39 @@ async function loadFileList(dir) {
   }
 }
 
+function showContextMenu(x, y, fullPath) {
+  const menu = document.getElementById('context-menu');
+  menu.style.display = 'block';
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.dataset.path = fullPath;
+  menu.dataset.name = fullPath.split('/').pop();
+}
+
+function hideContextMenu() {
+  document.getElementById('context-menu').style.display = 'none';
+}
+
+document.addEventListener('click', hideContextMenu);
+
+document.getElementById('ctx-copy-path').addEventListener('click', () => {
+  const path = document.getElementById('context-menu').dataset.path;
+  if (path) {
+    navigator.clipboard.writeText(path).catch(() => {});
+    showToast('已复制路径', 'success');
+  }
+  hideContextMenu();
+});
+
+document.getElementById('ctx-copy-name').addEventListener('click', () => {
+  const name = document.getElementById('context-menu').dataset.name;
+  if (name) {
+    navigator.clipboard.writeText(name).catch(() => {});
+    showToast('已复制文件名', 'success');
+  }
+  hideContextMenu();
+});
+
 function renderBreadcrumb(p) {
   const el = document.getElementById('file-breadcrumb');
   const parts = p.split('/').filter(Boolean);
@@ -942,13 +1021,26 @@ function formatSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
 }
 
+let downloadQueue = 0;
+
 async function fileDownload(name) {
   const ses = getActiveSession();
   if (!ses) return;
+  const progressEl = document.getElementById('file-progress');
+  const fillEl = document.getElementById('progress-fill');
+  const textEl = document.getElementById('progress-text');
+  const pctEl = document.getElementById('progress-pct');
+  downloadQueue++;
+  textEl.textContent = `下载中 ${name}`;
+  pctEl.textContent = '0%';
+  fillEl.style.width = '0%';
+  progressEl.style.display = 'block';
   try {
     await App().SFTPDownloadDialog(ses.sessionId, ses.fsPath + '/' + name);
   } catch (err) {
+    downloadQueue--;
     showToast('下载失败: ' + err, 'error');
+    if (downloadQueue <= 0) progressEl.style.display = 'none';
   }
 }
 
@@ -1032,16 +1124,30 @@ async function uploadFiles(files) {
 
   progressEl.style.display = 'block';
 
+  const CHUNK_SIZE = 512 * 1024;
+
   let uploaded = 0;
   for (const f of arr) {
-    textEl.textContent = `上传中 ${uploaded+1}/${arr.length} ${f.name}`;
-    pctEl.textContent = '0%';
-    fillEl.style.width = '0%';
     try {
-      const u8 = new Uint8Array(await f.arrayBuffer());
-      let binary = '';
-      for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]);
-      await App().SFTPUpload(ses.sessionId, ses.fsPath, f.name, btoa(binary));
+      const totalChunks = Math.ceil(f.size / CHUNK_SIZE) || 1;
+      for (let c = 0; c < totalChunks; c++) {
+        const start = c * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, f.size);
+        const blob = f.slice(start, end);
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        textEl.textContent = `上传中 ${uploaded+1}/${arr.length} ${f.name} (${c+1}/${totalChunks})`;
+        pctEl.textContent = Math.round(((c + 1) / totalChunks) * 100) + '%';
+        fillEl.style.width = ((c + 1) / totalChunks * 100) + '%';
+
+        await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, c === 0);
+        await new Promise(r => setTimeout(r, 0));
+      }
       uploaded++;
     } catch (err) {
       showToast(`上传失败 ${f.name}: ${err}`, 'error');

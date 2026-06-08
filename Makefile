@@ -28,6 +28,24 @@ build-linux:
 		CGO_LDFLAGS="" \
 		go build -tags "desktop,production" -o $(BINARY)-linux .
 
+# 统信OS / Linux .deb 打包
+deb: build-linux
+	@echo "Building .deb package for UOS/Linux..."
+	# 复制二进制
+	cp $(BINARY)-linux build/debian/usr/bin/$(BINARY)
+	# 设置权限
+	chmod 755 build/debian/usr/bin/$(BINARY)
+	chmod 755 build/debian/DEBIAN/postinst
+	chmod 755 build/debian/DEBIAN/prerm
+	# 生成 deb 包
+	dpkg-deb --build build/debian ./$(BINARY)-uos-amd64.deb
+	@echo "Package created: $(BINARY)-uos-amd64.deb"
+	# 清理
+	rm -f build/debian/usr/bin/$(BINARY)
+
+build-uos: deb
+	@echo "UOS package built successfully"
+
 run: build
 	./$(BINARY)
 
@@ -85,6 +103,7 @@ clean:
 	rm -f $(BINARY)
 	rm -f $(BINARY).exe
 	rm -f $(BINARY)-linux
+	rm -f $(BINARY)-uos-amd64.deb
 	rm -f rsrc_windows_*.syso
 	rm -f frontend/favicon.ico
 	rm -rf winres/
@@ -92,4 +111,4 @@ clean:
 	rm -rf $(RELEASE_DIR)
 	rm -rf build/bin/
 
-.PHONY: build build-windows build-linux run package release universal vet clean
+.PHONY: build build-windows build-linux build-uos deb run package release universal vet clean

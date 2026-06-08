@@ -3,14 +3,20 @@ package main
 import (
 	"embed"
 	"flag"
+	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"syscall"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
+
+var lockFile string
 
 //go:embed all:frontend
 var assets embed.FS
@@ -37,7 +43,12 @@ func main() {
 		log.Fatal("-maxbody must be >= 0")
 	}
 
+	if runtime.GOOS == "linux" {
+		singleInstanceOrExit()
+	}
+
 	app := NewApp(*dbPath, *maxBody)
+	defer cleanupLock()
 
 	err := wails.Run(&options.App{
 		Title:             "WebSSH",
@@ -59,9 +70,32 @@ func main() {
 		},
 		Mac:     macOptions(),
 		Windows: windowsOptions(),
+		Linux:   linuxOptions(),
 	})
 
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func singleInstanceOrExit() {
+	lockFile = fmt.Sprintf("/tmp/webssh-%d.lock", os.Getuid())
+	data, err := os.ReadFile(lockFile)
+	if err == nil {
+		var pid int
+		if _, err := fmt.Sscanf(string(data), "%d", &pid); err == nil {
+			proc, err := os.FindProcess(pid)
+			if err == nil && proc.Signal(syscall.Signal(0)) == nil {
+				exec.Command("xdotool", "search", "--class", "WebSSH", "windowactivate").Run()
+				os.Exit(0)
+			}
+		}
+	}
+	os.WriteFile(lockFile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644)
+}
+
+func cleanupLock() {
+	if lockFile != "" {
+		os.Remove(lockFile)
 	}
 }

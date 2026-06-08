@@ -62,6 +62,10 @@ export function SFTPUpload(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SFTPUpload'](arg1, arg2, arg3, arg4);
 }
 
+export function SFTPUploadChunk(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SFTPUploadChunk'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function SFTPWrite(arg1, arg2, arg3) {
   return window['go']['main']['App']['SFTPWrite'](arg1, arg2, arg3);
 }

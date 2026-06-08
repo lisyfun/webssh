@@ -9,7 +9,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path"
+	gostatic "runtime"
 	"sync"
 	"time"
 
@@ -49,6 +51,16 @@ func NewApp(dbPath string, maxBodyMB int64) *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if gostatic.GOOS == "linux" {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			pid := os.Getpid()
+			exec.Command("sh", "-c", fmt.Sprintf(
+				`WID=$(xdotool search --pid %d 2>/dev/null | tail -1); [ -n "$WID" ] && xprop -id "$WID" -f _GTK_THEME_VARIANT 32a -set _GTK_THEME_VARIANT dark`,
+				pid,
+			)).Run()
+		}()
+	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -362,6 +374,25 @@ func (a *App) SFTPDownload(sessionID, filePath string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
+type downloadProgressWriter struct {
+	ctx      context.Context
+	dst      io.Writer
+	total    int64
+	written  int64
+	fileName string
+	lastTick time.Time
+}
+
+func (w *downloadProgressWriter) Write(p []byte) (int, error) {
+	n, err := w.dst.Write(p)
+	w.written += int64(n)
+	if time.Since(w.lastTick) > 100*time.Millisecond {
+		w.lastTick = time.Now()
+		runtime.EventsEmit(w.ctx, "download:progress", w.fileName, w.written, w.total)
+	}
+	return n, err
+}
+
 func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 	remotePath, err := sshterm.SanitizePath(remotePath)
 	if err != nil {
@@ -374,9 +405,11 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 		Title:           "保存文件 - " + fileName,
 	})
 	if err != nil {
+		runtime.EventsEmit(a.ctx, "download:complete", fileName)
 		return err
 	}
 	if savePath == "" {
+		runtime.EventsEmit(a.ctx, "download:complete", fileName)
 		return nil
 	}
 
@@ -385,6 +418,11 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 		return err
 	}
 	defer sc.Close()
+
+	stat, err := sc.Stat(remotePath)
+	if err != nil {
+		return fmt.Errorf("stat remote file failed: %w", err)
+	}
 
 	f, err := sc.Open(remotePath)
 	if err != nil {
@@ -398,11 +436,28 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 	}
 	defer dst.Close()
 
-	_, err = io.Copy(dst, f)
+	pw := &downloadProgressWriter{
+		ctx:      a.ctx,
+		dst:      dst,
+		total:    stat.Size(),
+		fileName: fileName,
+	}
+	_, err = io.Copy(pw, f)
+	if err == nil {
+		runtime.EventsEmit(a.ctx, "download:complete", fileName)
+	}
 	return err
 }
 
 func (a *App) SFTPUpload(sessionID, destPath, fileName string, data []byte) error {
+	return a.sftpUploadInternal(sessionID, destPath, fileName, data, true)
+}
+
+func (a *App) SFTPUploadChunk(sessionID, destPath, fileName string, data []byte, isFirst bool) error {
+	return a.sftpUploadInternal(sessionID, destPath, fileName, data, isFirst)
+}
+
+func (a *App) sftpUploadInternal(sessionID, destPath, fileName string, data []byte, create bool) error {
 	destPath, err := sshterm.SanitizePath(destPath)
 	if err != nil {
 		return err
@@ -420,16 +475,23 @@ func (a *App) SFTPUpload(sessionID, destPath, fileName string, data []byte) erro
 		return err
 	}
 
-	dst, err := sc.Create(remotePath)
+	var dst io.WriteCloser
+	if create {
+		dst, err = sc.Create(remotePath)
+	} else {
+		dst, err = sc.OpenFile(remotePath, os.O_WRONLY|os.O_APPEND)
+	}
 	if err != nil {
-		return fmt.Errorf("create remote file failed: %w", err)
+		return fmt.Errorf("open remote file failed: %w", err)
 	}
 	defer dst.Close()
 
 	_, err = dst.Write(data)
 	if err != nil {
 		dst.Close()
-		sc.Remove(remotePath)
+		if create {
+			sc.Remove(remotePath)
+		}
 		return fmt.Errorf("write failed: %w", err)
 	}
 	return nil

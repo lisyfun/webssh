@@ -33,6 +33,8 @@ export function SFTPRename(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SFTPUpload(arg1:string,arg2:string,arg3:string,arg4:Array<number>):Promise<void>;
 
+export function SFTPUploadChunk(arg1:string,arg2:string,arg3:string,arg4:Array<number>,arg5:boolean):Promise<void>;
+
 export function SFTPWrite(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function TerminalInput(arg1:string,arg2:string):Promise<void>;

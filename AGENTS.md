@@ -44,8 +44,27 @@
 ### In Progress
 - (无)
 
-### Blocked
-- `wails build` CLI fails with `internal error: package "fmt" without types` — Go 1.26 incompatibility with Wails v2.9.2; workaround: use `go build -tags "desktop,production"` directly
+### Done (UOS / Linux)
+- `options_linux.go`: Linux 专用选项存根（build tag: linux），与 darwin/windows 解耦
+- `build/linux/WebSSH.desktop`: 统信OS/Deepin 桌面快捷方式（中文名 + UOS 分类）
+- `build/debian/`: 完整的 .deb 打包目录：
+  - `DEBIAN/control`: 包元数据（依赖 libgtk-3, libwebkit2gtk-4.0 → 后精简为仅 libc6）
+  - `DEBIAN/postinst`: 安装后刷新桌面数据库、图标缓存、Deepin 启动器
+  - `DEBIAN/prerm`: 卸载前脚本
+  - `usr/share/icons/hicolor/`: 应用图标（48x48 / 256x256 / scalable）
+  - `usr/share/applications/WebSSH.desktop`: 桌面入口
+  - `usr/share/doc/webssh/copyright`: 版权信息
+- `build/build_uos.sh`: 统信OS 原生构建脚本（编译 + 打包 .deb 一步完成）
+- `build/Dockerfile.build`: Docker 交叉编译配置（macOS → Linux amd64 交叉编译）
+- `Makefile`: 增加 `build-uos`（统信OS 构建别名）、`deb`（生成 .deb 包）目标
+- `webssh-uos-amd64.deb`: 首次构建成功（ARM64/QEMU 超时 → 加 --platform=linux/amd64 重试通过）
+  - 二进制 x86-64 ELF，RPATH 设为 `$ORIGIN/../lib/webssh/lib`
+  - 247MB 库文件捆绑进 `/usr/lib/webssh/lib/`（GTK3, WebKit, ICU, GStreamer 等）
+  - .deb 压缩后 75MB
+  - 依赖仅为 `libc6 (>= 2.31)`，离线 UOS 可直接 `dpkg -i` 安装
+- `webssh-uos-amd64.deb` v2: 针对 UOS V20（glibc 2.28）降级构建
+  - 基础镜像改为 `debian:buster-slim`（archive.debian.org），手动安装 Go 1.26
+  - 依赖降为 `libc6 (>= 2.28)`，捆绑库 156MB（Buster 版），.deb 压缩后 48MB
 
 ## Key Decisions
 - 使用 Wails v2 构建原生桌面应用，无需 HTTP 服务器（支持 macOS/Windows/Linux）
@@ -60,11 +79,7 @@
 - `hostKeyCallback` 使用 TOFU（内存 sync.Map）
 - 标签以逗号分隔存 `tags` 字段；ALTER TABLE 迁移兼容旧库
 - sessions 以 session UUID 为 key（非 serverId），每个 session 持有 serverId 引用，支持同服务器多终端
-- macOS 构建需额外 `CGO_LDFLAGS="-framework UniformTypeIdentifiers"` 解决 Wails v2.9.2 在 Go 1.26 的链接问题
-- Windows 构建需 `mingw-w64` 交叉编译器，`-ldflags="-H=windowsgui"` 隐藏控制台窗口
-- Windows 深色标题栏通过 `windows.Options` 的 `Theme: windows.Dark` + `CustomTheme` 实现
-- Windows 应用图标由 `frontend/favicon.png` 生成 `.ico`，经 `go-winres` 嵌入 `.syso` 到二进制
-- 平台选项通过 build tag 隔离：`options_darwin.go` / `options_windows.go` / `options_default.go`
+- 平台选项通过 build tag 隔离：`options_darwin.go` / `options_windows.go` / `options_linux.go` / `options_default.go`
 
 ## Build
 - `make build`: 编译当前平台二进制
@@ -73,7 +88,9 @@
 - `make release`: 打包为 DMG 或 tar.gz（仅 macOS）
 - `make universal`: 编译 arm64 + amd64 通用二进制（仅 macOS）
 - `make build-windows`: 交叉编译 Windows 版（需 `brew install mingw-w64`）
-- `make build-linux`: 交叉编译 Linux 版
+- `make build-linux`: 交叉编译 Linux 版（macOS 上需 Docker 或交叉编译器）
+- `make build-uos`: 统信OS 构建别名（等价于 `make deb`）
+- `make deb`: 编译 Linux 二进制 + 构建 .deb 安装包
 - `make vet`: 代码检查
 - `make clean`: 清理构建产物
 
@@ -81,7 +98,8 @@
 - `main.go`: Wails 入口、flag 解析、wails.Run()、嵌入 `frontend/`
 - `options_darwin.go`: macOS 专用选项（`mac.Options`，build tag: darwin）
 - `options_windows.go`: Windows 专用选项（`windows.Options` + 深色标题栏，build tag: windows）
-- `options_default.go`: 其他平台存根（build tag: !darwin,!windows）
+- `options_linux.go`: Linux 专用选项存根（build tag: linux）
+- `options_default.go`: 其他平台存根（build tag: !darwin,!windows,!linux）
 - `app.go`: App struct + 所有绑定方法（服务器 CRUD、终端、SFTP）
 - `internal/sshterm/handler.go`: dialSSH（无 WebSocket）
 - `internal/sshterm/session.go`: SessionManager、SFTP 重连、preambleReader、TOFU
