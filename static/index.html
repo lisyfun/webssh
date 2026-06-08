@@ -587,6 +587,10 @@ async function encField(plain) {
   } catch (_) { return plain; }
 }
 
+function uuid() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+}
+
 function apiHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (csrfToken) h['X-CSRF-Token'] = csrfToken;
@@ -665,7 +669,7 @@ function selectServer(id) {
 function openNewTerminal(serverId) {
   const svr = servers.find(s => s.id === serverId);
   if (!svr) return;
-  const sid = crypto.randomUUID();
+  const sid = uuid();
   sessions[sid] = { serverId, connected: false, fsPath: '/', info: { host: svr.host, port: svr.port, user: svr.user } };
   activeSessionId = sid;
   renderServers();
@@ -776,7 +780,7 @@ function connectToServer(sid) {
   renderServers();
   updateStatus();
 
-  const sessionId = crypto.randomUUID();
+  const sessionId = uuid();
   ses.sessionId = sessionId;
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${location.host}__BASE_PATH__/ws`;
@@ -1020,7 +1024,7 @@ async function batchImport() {
     const port = parseInt(parts.length > 4 ? parts[2] : parts[1]) || 22;
     const user = parts.length > 4 ? parts[3] : parts[2];
     const password = parts.length > 4 ? parts[4] : parts[3];
-    list.push({ id: crypto.randomUUID(), name, host, port, user, authType: 'password', password, privateKey: '' });
+    list.push({ id: uuid(), name, host, port, user, authType: 'password', password, privateKey: '' });
   }
 
   if (list.length === 0) { showToast('未能解析任何有效数据', 'error'); return; }
@@ -1166,7 +1170,7 @@ async function saveServer() {
   if (useKey && !privateKey) { showToast('请粘贴私钥', 'error'); return; }
   if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
 
-  const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey, tags: document.getElementById('svr-tags').value.trim() };
+  const data = { id: editingId || uuid(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey, tags: document.getElementById('svr-tags').value.trim() };
   data.password = await encField(data.password);
   data.privateKey = await encField(data.privateKey);
 
@@ -1194,7 +1198,7 @@ async function saveServer() {
 async function copyServer(id) {
   const s = servers.find(x => x.id === id);
   if (!s) return;
-  const data = { ...s, id: crypto.randomUUID(), name: (s.name || s.host) + ' (副本)' };
+  const data = { ...s, id: uuid(), name: (s.name || s.host) + ' (副本)' };
   data.password = await encField(data.password);
   data.privateKey = await encField(data.privateKey);
   try {
