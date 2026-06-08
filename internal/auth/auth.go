@@ -676,19 +676,14 @@ h1{font-size:18px;font-weight:600;text-align:center;margin-bottom:6px;letter-spa
 .error{margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--danger-bg);border:1px solid rgba(255,123,114,0.2);color:var(--danger);font-size:12px;text-align:center;line-height:1.4}
 .error.hidden{display:none}
 
-.totp-hint{text-align:center;font-size:12px;color:var(--muted);margin-bottom:18px;padding:10px;background:rgba(74,140,255,0.06);border-radius:6px;border:1px solid rgba(74,140,255,0.1)}
-.totp-hint strong{color:var(--accent)}
-.totp-hint.hidden{display:none}
+
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">&gt;_</div>
   <h1>WebSSH</h1>
-  <div class="sub" id="card-sub">安全远程终端管理</div>
-  <div class="totp-hint ` + userPassShow + `">
-    已通过密码验证 &mdash; 请输入 <strong>认证器 App 中的 6 位动态码</strong>
-  </div>
+  <div class="sub" id="card-sub">` + map[bool]string{true: "请输入认证器中的 6 位动态码", false: "安全远程终端管理"}[showTOTP] + `</div>
   <form method="post" action="` + basePath + `/login">
     <div class="form-group ` + userPassShow + `">
       <label>用户名</label>
