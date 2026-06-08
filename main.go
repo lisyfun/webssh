@@ -79,19 +79,18 @@ func main() {
 			log.Printf("generated password: %s", password)
 		}
 	}
-	if password != "" {
-		if err := st.EnsureUser(context.Background(), *user, password); err != nil {
-			log.Fatal("failed to create user:", err)
-		}
-	}
 	if password == "" {
 		log.Printf("login user: %s (use existing password)", *user)
 	} else {
 		log.Printf("login user: %s", *user)
+		if err := st.EnsureUser(context.Background(), *user, password); err != nil {
+			log.Fatal("failed to create user:", err)
+		}
 	}
 
-	if err := st.EnsureUser(context.Background(), *user, password); err != nil {
-		log.Fatal("failed to create user:", err)
+	if *enable2FA {
+		st.DisableTOTP(context.Background(), *user)
+		log.Printf("双因素认证已重置，下次登录将引导扫码设置")
 	}
 
 	a := auth.New(st, *user, "", basePath, *maxBody, *enable2FA)
@@ -122,6 +121,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc(basePath+"/login", a.LoginHandler)
 	r.HandleFunc(basePath+"/logout", a.LogoutHandler)
+	r.HandleFunc(basePath+"/complete-2fa-setup", a.CompleteTOTPSetupHandler)
 	r.HandleFunc(basePath, func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, basePath+"/", http.StatusFound)
 	})
@@ -135,6 +135,7 @@ func main() {
 	s.HandleFunc("/api/2fa/setup", a.TOTPSetupHandler).Methods("GET")
 	s.HandleFunc("/api/2fa/enable", a.TOTPEnableHandler).Methods("POST")
 	s.HandleFunc("/api/2fa/disable", a.TOTPDisableHandler).Methods("POST")
+	s.HandleFunc("/api/2fa/reset", a.TOTPResetHandler).Methods("POST")
 
 	api := s.PathPrefix("/api").Subrouter()
 	api.Use(a.CSRFValidate)

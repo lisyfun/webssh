@@ -39,34 +39,45 @@ type UserStore interface {
 	DisableTOTP(ctx context.Context, username string) error
 }
 
-type Auth struct {
-	store     UserStore
+type pendingSetup struct {
 	username  string
-	password  string
-	basePath  string
-	tokens    map[string]tokenEntry
-	rateLimit map[string]*rateEntry
-	mu        sync.RWMutex
-	tokenTTL  time.Duration
-	maxLogins int
-	banTime   time.Duration
-	maxBodyMB int64
-	enable2FA bool
+	secret    string
+	uri       string
+	qr        string
+	setupPass string // one-time password hash to re-auth during setup
+	created   time.Time
+}
+
+type Auth struct {
+	store         UserStore
+	username      string
+	password      string
+	basePath      string
+	tokens        map[string]tokenEntry
+	rateLimit     map[string]*rateEntry
+	pendingSetups map[string]*pendingSetup
+	mu            sync.RWMutex
+	tokenTTL      time.Duration
+	maxLogins     int
+	banTime       time.Duration
+	maxBodyMB     int64
+	enable2FA     bool
 }
 
 func New(store UserStore, username, password, basePath string, maxBodyMB int64, enable2FA bool) *Auth {
 	a := &Auth{
-		store:     store,
-		username:  username,
-		password:  password,
-		basePath:  basePath,
-		tokens:    make(map[string]tokenEntry),
-		rateLimit: make(map[string]*rateEntry),
-		tokenTTL:  24 * time.Hour,
-		maxLogins: 5,
-		banTime:   15 * time.Minute,
-		maxBodyMB: maxBodyMB,
-		enable2FA: enable2FA,
+		store:         store,
+		username:      username,
+		password:      password,
+		basePath:      basePath,
+		tokens:        make(map[string]tokenEntry),
+		rateLimit:     make(map[string]*rateEntry),
+		pendingSetups: make(map[string]*pendingSetup),
+		tokenTTL:      24 * time.Hour,
+		maxLogins:     5,
+		banTime:       15 * time.Minute,
+		maxBodyMB:     maxBodyMB,
+		enable2FA:     enable2FA,
 	}
 	go a.cleanupLoop()
 	return a
@@ -280,43 +291,76 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if ok {
-			if a.enable2FA {
-				totpEnabled, _ := a.store.HasTOTPEnabled(context.Background(), user)
-				if totpEnabled {
-					if totpCode == "" {
-						w.Write([]byte(loginPage(a.basePath, "需要双因素认证码", true, user, pass)))
-						return
-					}
-					secret, err := a.store.GetTOTPSecret(context.Background(), user)
-					if err != nil || !totp.Validate(totpCode, secret) {
-						w.Write([]byte(loginPage(a.basePath, "双因素认证码无效", true, user, pass)))
-						return
-					}
-				}
-			}
-
-			token := generateToken()
-			encKey := make([]byte, 32)
-			io.ReadFull(rand.Reader, encKey)
-			a.mu.Lock()
-			a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
-			delete(a.rateLimit, ip)
-			a.mu.Unlock()
-
-			http.SetCookie(w, &http.Cookie{
-				Name:     "token",
-				Value:    token,
-				Path:     a.basePath + "/",
-				HttpOnly: true,
-				Secure:   r.TLS != nil,
-				SameSite: http.SameSiteStrictMode,
-			})
-			http.Redirect(w, r, a.basePath+"/", http.StatusFound)
+		if !ok {
+			w.Write([]byte(loginPage(a.basePath, "用户名或密码错误", false, "", "")))
 			return
 		}
 
-		w.Write([]byte(loginPage(a.basePath, "用户名或密码错误", false, "", "")))
+		// Password correct — handle 2FA
+		if a.enable2FA {
+			hasSecret, _ := a.store.HasTOTPEnabled(context.Background(), user)
+			if hasSecret {
+				// Already set up — verify TOTP code
+				if totpCode == "" {
+					w.Write([]byte(loginPage(a.basePath, "需要双因素认证码", true, user, pass)))
+					return
+				}
+				secret, err := a.store.GetTOTPSecret(context.Background(), user)
+				if err != nil || !totp.Validate(totpCode, secret) {
+					w.Write([]byte(loginPage(a.basePath, "双因素认证码无效", true, user, pass)))
+					return
+				}
+			} else {
+				// First-time setup — generate TOTP and show QR
+				key, err := totp.Generate(totp.GenerateOpts{
+					Issuer:      "WebSSH",
+					AccountName: user,
+				})
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				qr, err := qrcode.Encode(key.URL(), qrcode.Medium, 256)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				qrData := "data:image/png;base64," + base64.StdEncoding.EncodeToString(qr)
+
+				setupToken := generateToken()
+				a.mu.Lock()
+				a.pendingSetups[setupToken] = &pendingSetup{
+					username:  user,
+					secret:    key.Secret(),
+					uri:       key.URL(),
+					qr:        qrData,
+					created:   time.Now(),
+				}
+				a.mu.Unlock()
+
+				w.Write([]byte(setup2FAPage(a.basePath, setupToken, qrData, key.Secret())))
+				return
+			}
+		}
+
+		// Login success
+		token := generateToken()
+		encKey := make([]byte, 32)
+		io.ReadFull(rand.Reader, encKey)
+		a.mu.Lock()
+		a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
+		delete(a.rateLimit, ip)
+		a.mu.Unlock()
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    token,
+			Path:     a.basePath + "/",
+			HttpOnly: true,
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteStrictMode,
+		})
+		http.Redirect(w, r, a.basePath+"/", http.StatusFound)
 		return
 	}
 
@@ -423,24 +467,155 @@ func generateToken() string {
 	return hex.EncodeToString(b)
 }
 
+func (a *Auth) CompleteTOTPSetupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.ParseForm()
+	setupToken := r.FormValue("setup_token")
+	code := r.FormValue("code")
+
+	a.mu.Lock()
+	ps, ok := a.pendingSetups[setupToken]
+	if !ok || time.Since(ps.created) > 10*time.Minute {
+		delete(a.pendingSetups, setupToken)
+		a.mu.Unlock()
+		w.Write([]byte(setup2FAPage(a.basePath, setupToken, ps.qr, ps.secret)))
+		return
+	}
+	delete(a.pendingSetups, setupToken)
+	a.mu.Unlock()
+
+	if !totp.Validate(code, ps.secret) {
+		http.Error(w, "验证码无效，请返回重新登录", http.StatusBadRequest)
+		return
+	}
+
+	ctx := context.Background()
+	if err := a.store.SetTOTPSecret(ctx, ps.username, ps.secret); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ip := clientIP(r)
+	token := generateToken()
+	encKey := make([]byte, 32)
+	io.ReadFull(rand.Reader, encKey)
+	a.mu.Lock()
+	a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
+	a.mu.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name: "token", Value: token, Path: a.basePath + "/",
+		HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteStrictMode,
+	})
+	http.Redirect(w, r, a.basePath+"/", http.StatusFound)
+}
+
+func (a *Auth) TOTPResetHandler(w http.ResponseWriter, r *http.Request) {
+	// Logged-in user resets 2FA — verify password, generate new secret, clear old one
+	r.ParseForm()
+	pass := r.FormValue("pass")
+	ok := a.store.VerifyPassword(context.Background(), a.username, pass)
+	if !ok && (a.username != a.username || pass != a.password) {
+		// Also check in-memory password
+		if pass != a.password {
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": "密码错误"})
+			return
+		}
+	}
+	if !ok {
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": "密码错误"})
+		return
+	}
+
+	// Generate new secret
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer: "WebSSH", AccountName: a.username,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	qr, err := qrcode.Encode(key.URL(), qrcode.Medium, 256)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	qrData := "data:image/png;base64," + base64.StdEncoding.EncodeToString(qr)
+
+	// Clear old secret so next login triggers setup
+	a.store.DisableTOTP(context.Background(), a.username)
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"secret": key.Secret(),
+		"uri":    key.URL(),
+		"qr":     qrData,
+	})
+}
+
+func setup2FAPage(basePath, setupToken, qrData, secret string) string {
+	return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebSSH - 设置双因素认证</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; align-items: center; justify-content: center; }
+.box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 32px; width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); text-align: center; }
+.box h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.box .sub { font-size: 12px; color: #8b949e; margin-bottom: 20px; }
+.qr { width: 200px; height: 200px; background: #fff; border-radius: 4px; padding: 8px; margin: 0 auto 16px; display: block; }
+.secret-box { font-family: monospace; font-size: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px; margin: 0 auto 16px; word-break: break-all; color: #8b949e; max-width: 300px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #e6edf3; font-size: 14px; outline: none; text-align: center; letter-spacing: 4px; }
+.form-group input:focus { border-color: #4a8cff; }
+.btn { width: 100%; padding: 8px; border: none; border-radius: 4px; background: #4a8cff; color: #fff; font-size: 14px; cursor: pointer; }
+.btn:hover { background: #3a7ae8; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>设置双因素认证</h1>
+  <div class="sub">使用认证器 App（如 Google Authenticator）扫描二维码</div>
+  <img class="qr" src="` + qrData + `" alt="QR Code">
+  <div class="secret-box">` + secret + `</div>
+  <form method="post" action="` + basePath + `/complete-2fa-setup">
+    <input type="hidden" name="setup_token" value="` + setupToken + `">
+    <div class="form-group">
+      <label>输入认证器中的 6 位代码</label>
+      <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus>
+    </div>
+    <button class="btn" type="submit">验证并登录</button>
+  </form>
+</div>
+</body>
+</html>`
+}
+
 func loginPage(basePath, errMsg string, showTOTP bool, savedUser, savedPass string) string {
 	errStyle := "display:none"
 	if errMsg != "" {
 		errStyle = ""
 	}
 	totpStyle := "display:none"
+	userPassStyle := ""
 	totpAutofocus := ""
 	userAutofocus := "autofocus"
 	if showTOTP {
 		totpStyle = ""
+		userPassStyle = "display:none"
 		totpAutofocus = "autofocus"
 		userAutofocus = ""
 	}
 	userField := `<input type="text" name="user" ` + userAutofocus + `>`
 	passField := `<input type="password" name="pass">`
 	if showTOTP {
-		userField = `<input type="hidden" name="user" value="` + savedUser + `">` +
-			`<div style="font-size:13px;color:#8b949e;margin-bottom:4px">用户: ` + savedUser + `</div>`
+		userField = `<input type="hidden" name="user" value="` + savedUser + `">`
 		passField = `<input type="hidden" name="pass" value="` + savedPass + `">`
 	}
 	return `<!DOCTYPE html>
@@ -469,11 +644,11 @@ html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -ap
   <h1>WebSSH</h1>
   <div class="sub">请输入登录信息</div>
   <form method="post" action="` + basePath + `/login">
-    <div class="form-group">
+    <div class="form-group" style="` + userPassStyle + `">
       <label>用户名</label>
       ` + userField + `
     </div>
-    <div class="form-group">
+    <div class="form-group" style="` + userPassStyle + `">
       <label>密码</label>
       ` + passField + `
     </div>
