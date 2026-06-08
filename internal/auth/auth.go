@@ -561,59 +561,83 @@ func setup2FAPage(basePath, setupToken, qrData, secret string) string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebSSH - 设置双因素认证</title>
+<title>WebSSH - 双因素认证</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; align-items: center; justify-content: center; }
-.box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 32px; width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); text-align: center; }
-.box h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-.box .sub { font-size: 12px; color: #8b949e; margin-bottom: 20px; }
-.qr { width: 200px; height: 200px; background: #fff; border-radius: 4px; padding: 8px; margin: 0 auto 16px; display: block; }
-.secret-box { font-family: monospace; font-size: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px; margin: 0 auto 16px; word-break: break-all; color: #8b949e; max-width: 300px; }
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
-.form-group input { width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #e6edf3; font-size: 14px; outline: none; text-align: center; letter-spacing: 4px; }
-.form-group input:focus { border-color: #4a8cff; }
-.btn { width: 100%; padding: 8px; border: none; border-radius: 4px; background: #4a8cff; color: #fff; font-size: 14px; cursor: pointer; }
-.btn:hover { background: #3a7ae8; }
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --accent: #4a8cff; --accent-hover: #3a7ae8;
+  --danger: #ff7b72;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+body::before{content:"";position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 0%,rgba(74,140,255,0.06) 0%,transparent 70%);pointer-events:none}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:400px;box-shadow:0 4px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.03);text-align:center}
+.logo{width:44px;height:44px;margin:0 auto 16px;background:linear-gradient(135deg,#4a8cff,#58a6ff);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700}
+h1{font-size:18px;font-weight:600;margin-bottom:4px;letter-spacing:-0.2px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+
+.qr-wrap{background:#fff;border-radius:10px;padding:12px;display:inline-block;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.qr{width:180px;height:180px;display:block}
+
+.secret-box{font-family:"SF Mono","Fira Code","Consolas",monospace;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:0 auto 18px;word-break:break-all;color:#58a6ff;max-width:320px;letter-spacing:0.5px;user-select:all}
+.secret-box::before{content:"手动输入密钥: ";color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:0}
+
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:500}
+.form-group input{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:15px;outline:none;text-align:center;letter-spacing:5px;transition:border-color .2s,box-shadow .2s}
+.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,140,255,0.15)}
+.form-group input::placeholder{color:#484f58;letter-spacing:normal}
+
+.btn{width:100%;padding:10px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s,transform .1s}
+.btn:hover{background:var(--accent-hover)}
+.btn:active{transform:scale(0.98)}
+
+.tip{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6}
+.tip a{color:var(--accent);text-decoration:none}
+.tip a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
-<div class="box">
-  <h1>设置双因素认证</h1>
-  <div class="sub">使用认证器 App（如 Google Authenticator）扫描二维码</div>
-  <img class="qr" src="` + qrData + `" alt="QR Code">
+<div class="card">
+  <div class="logo">&gt;_</div>
+  <h1>双因素认证</h1>
+  <div class="sub">使用 Google Authenticator / Authy / Microsoft Authenticator 扫码绑定</div>
+  <div class="qr-wrap">
+    <img class="qr" src="` + qrData + `" alt="QR Code">
+  </div>
   <div class="secret-box">` + secret + `</div>
   <form method="post" action="` + basePath + `/complete-2fa-setup">
     <input type="hidden" name="setup_token" value="` + setupToken + `">
     <div class="form-group">
-      <label>输入认证器中的 6 位代码</label>
-      <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus>
+      <label>六位验证码</label>
+      <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus placeholder="000 000">
     </div>
     <button class="btn" type="submit">验证并登录</button>
   </form>
+  <div class="tip">首次绑定，扫码或手动输入密钥后输入 App 中的 6 位数字即可。</div>
 </div>
 </body>
 </html>`
 }
 
 func loginPage(basePath, errMsg string, showTOTP bool, savedUser, savedPass string) string {
-	errStyle := "display:none"
-	if errMsg != "" {
-		errStyle = ""
+	errShow := ""
+	if errMsg == "" {
+		errShow = "hidden"
 	}
-	totpStyle := "display:none"
-	userPassStyle := ""
+	totpShow := "hidden"
+	userPassShow := ""
 	totpAutofocus := ""
 	userAutofocus := "autofocus"
 	if showTOTP {
-		totpStyle = ""
-		userPassStyle = "display:none"
+		totpShow = ""
+		userPassShow = "hidden"
 		totpAutofocus = "autofocus"
 		userAutofocus = ""
 	}
-	userField := `<input type="text" name="user" ` + userAutofocus + `>`
-	passField := `<input type="password" name="pass">`
+	userField := `<input type="text" name="user" placeholder="admin" ` + userAutofocus + ` autocomplete="username">`
+	passField := `<input type="password" name="pass" placeholder="········" autocomplete="current-password">`
 	if showTOTP {
 		userField = `<input type="hidden" name="user" value="` + savedUser + `">`
 		passField = `<input type="hidden" name="pass" value="` + savedPass + `">`
@@ -623,41 +647,63 @@ func loginPage(basePath, errMsg string, showTOTP bool, savedUser, savedPass stri
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebSSH - 登录</title>
+<title>WebSSH</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; align-items: center; justify-content: center; }
-.login-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 32px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-.login-box h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-.login-box .sub { font-size: 12px; color: #8b949e; margin-bottom: 24px; }
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
-.form-group input { width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #e6edf3; font-size: 14px; outline: none; }
-.form-group input:focus { border-color: #4a8cff; }
-.btn { width: 100%; padding: 8px; border: none; border-radius: 4px; background: #4a8cff; color: #fff; font-size: 14px; cursor: pointer; }
-.btn:hover { background: #3a7ae8; }
-.error { color: #ff7b72; font-size: 12px; margin-top: 8px; text-align: center; }
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --accent: #4a8cff; --accent-hover: #3a7ae8;
+  --danger: #ff7b72; --danger-bg: rgba(255,123,114,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+body::before{content:"";position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 0%,rgba(74,140,255,0.06) 0%,transparent 70%);pointer-events:none}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.03)}
+.logo{width:44px;height:44px;margin:0 auto 20px;background:linear-gradient(135deg,#4a8cff,#58a6ff);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700}
+h1{font-size:18px;font-weight:600;text-align:center;margin-bottom:6px;letter-spacing:-0.2px}
+.sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:28px}
+
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:500}
+.form-group input{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,140,255,0.15)}
+.form-group input::placeholder{color:#484f58}
+
+.btn{width:100%;padding:10px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s,transform .1s;margin-top:4px}
+.btn:hover{background:var(--accent-hover)}
+.btn:active{transform:scale(0.98)}
+
+.error{margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--danger-bg);border:1px solid rgba(255,123,114,0.2);color:var(--danger);font-size:12px;text-align:center;line-height:1.4}
+.error.hidden{display:none}
+
+.totp-hint{text-align:center;font-size:12px;color:var(--muted);margin-bottom:18px;padding:10px;background:rgba(74,140,255,0.06);border-radius:6px;border:1px solid rgba(74,140,255,0.1)}
+.totp-hint strong{color:var(--accent)}
+.totp-hint.hidden{display:none}
 </style>
 </head>
 <body>
-<div class="login-box">
+<div class="card">
+  <div class="logo">&gt;_</div>
   <h1>WebSSH</h1>
-  <div class="sub">请输入登录信息</div>
+  <div class="sub" id="card-sub">安全远程终端管理</div>
+  <div class="totp-hint ` + userPassShow + `">
+    已通过密码验证 &mdash; 请输入 <strong>认证器 App 中的 6 位动态码</strong>
+  </div>
   <form method="post" action="` + basePath + `/login">
-    <div class="form-group" style="` + userPassStyle + `">
+    <div class="form-group ` + userPassShow + `">
       <label>用户名</label>
       ` + userField + `
     </div>
-    <div class="form-group" style="` + userPassStyle + `">
+    <div class="form-group ` + userPassShow + `">
       <label>密码</label>
       ` + passField + `
     </div>
-    <div class="form-group" style="` + totpStyle + `">
+    <div class="form-group ` + totpShow + `">
       <label>双因素认证码</label>
-      <input type="text" name="totp_code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" ` + totpAutofocus + `>
+      <input type="text" name="totp_code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" ` + totpAutofocus + ` placeholder="000 000">
     </div>
-    <button class="btn" type="submit">登录</button>
-    <div class="error" style="` + errStyle + `">` + errMsg + `</div>
+    <button class="btn" type="submit">` + map[bool]string{true: "验证并登录", false: "登录"}[showTOTP] + `</button>
+    <div class="error ` + errShow + `">` + errMsg + `</div>
   </form>
 </div>
 </body>
