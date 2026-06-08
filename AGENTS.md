@@ -15,6 +15,7 @@
 - 敏感字段（password/privateKey）API 传输时使用每会话 AES-256-GCM 加密
 - CSRF 保护所有写 API（POST/PUT/DELETE）
 - 静态资源运行时压缩（HTML + JS）
+- 2FA 启动时自动重置 TOTP secret，每次重启后需重新扫码绑定（无前端管理按钮）
 
 ## Progress
 ### Done
@@ -72,4 +73,7 @@
 - `HandleFSUpload` 中 `io.Copy` 错误被忽略，导致上传失败时返回 `{Success: true}`
 - 上传无 body 大小限制，`-maxbody` 仅作用于内联编辑器
 - 前端上传队列在多批上传时 `totalBytes`/`sentBytes` 不重置导致进度计算错乱
-- 前端上传队列在多批上传时 `totalBytes`/`sentBytes` 不重置导致进度计算错乱
+- `main.go` 重复 `EnsureUser` 调用，未传 `-pass` 时用空密码 bcrypt 覆盖数据库
+- TOTP 验证页面显示用户名/密码文字，不应暴露已认证凭据
+- 重启后 TOTP 验证码失效：启动时自动清除 `totp_secret`
+- `fa-overlay` 与 `font-popup` 同为 `z-index:1000`，安全弹窗盖在字体设置上方
