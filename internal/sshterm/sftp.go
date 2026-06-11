@@ -73,28 +73,27 @@ func HandleFSList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
-	if err != nil {
-		jsonError(w, "sftp init failed: "+err.Error())
-		return
-	}
-	defer sc.Close()
-
-	entries, err := sc.ReadDir(reqPath)
+	var files []FileEntry
+	err = s.withSFTP(func(sc *sftp.Client) error {
+		entries, err := sc.ReadDir(reqPath)
+		if err != nil {
+			return err
+		}
+		files = make([]FileEntry, 0, len(entries))
+		for _, e := range entries {
+			files = append(files, FileEntry{
+				Name:    e.Name(),
+				Size:    e.Size(),
+				Mode:    e.Mode().String(),
+				IsDir:   e.IsDir(),
+				ModTime: e.ModTime().Format(time.RFC3339),
+			})
+		}
+		return nil
+	})
 	if err != nil {
 		jsonError(w, err.Error())
 		return
-	}
-
-	files := make([]FileEntry, 0, len(entries))
-	for _, e := range entries {
-		files = append(files, FileEntry{
-			Name:    e.Name(),
-			Size:    e.Size(),
-			Mode:    e.Mode().String(),
-			IsDir:   e.IsDir(),
-			ModTime: e.ModTime().Format(time.RFC3339),
-		})
 	}
 
 	json.NewEncoder(w).Encode(ListResponse{Success: true, Data: files})
@@ -120,12 +119,11 @@ func HandleFSDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
+	sc, err := s.SFTP()
 	if err != nil {
 		http.Error(w, "sftp init failed", http.StatusInternalServerError)
 		return
 	}
-	defer sc.Close()
 
 	stat, err := sc.Stat(filePath)
 	if err != nil {
@@ -166,12 +164,11 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
+	sc, err := s.SFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
 	}
-	defer sc.Close()
 
 	if offsetStr := r.Header.Get("X-Upload-Offset"); offsetStr != "" {
 		offset, err := strconv.ParseInt(offsetStr, 10, 64)
@@ -197,6 +194,15 @@ func HandleFSUpload(w http.ResponseWriter, r *http.Request) {
 		if offset == 0 {
 			dst, err = sc.Create(remotePath)
 		} else {
+			info, statErr := sc.Stat(remotePath)
+			if statErr != nil {
+				jsonError(w, "stat remote file failed: "+statErr.Error())
+				return
+			}
+			if info.Size() != offset {
+				jsonError(w, "upload offset mismatch")
+				return
+			}
 			dst, err = sc.OpenFile(remotePath, os.O_WRONLY|os.O_APPEND)
 		}
 		if err != nil {
@@ -280,25 +286,16 @@ func HandleFSRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
-	if err != nil {
-		jsonError(w, "sftp init failed: "+err.Error())
-		return
-	}
-	defer sc.Close()
-
-	info, err := sc.Stat(reqPath)
-	if err != nil {
-		jsonError(w, err.Error())
-		return
-	}
-
-	if info.IsDir() {
-		err = removeDir(sc, reqPath)
-	} else {
-		err = sc.Remove(reqPath)
-	}
-
+	err = s.withSFTP(func(sc *sftp.Client) error {
+		info, err := sc.Stat(reqPath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return removeDir(sc, reqPath)
+		}
+		return sc.Remove(reqPath)
+	})
 	if err != nil {
 		jsonError(w, err.Error())
 		return
@@ -337,14 +334,9 @@ func HandleFSRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
-	if err != nil {
-		jsonError(w, "sftp init failed: "+err.Error())
-		return
-	}
-	defer sc.Close()
-
-	err = sc.Rename(oldPath, newPath)
+	err = s.withSFTP(func(sc *sftp.Client) error {
+		return sc.Rename(oldPath, newPath)
+	})
 	if err != nil {
 		jsonError(w, err.Error())
 		return
@@ -377,14 +369,9 @@ func HandleFSMkdir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
-	if err != nil {
-		jsonError(w, "sftp init failed: "+err.Error())
-		return
-	}
-	defer sc.Close()
-
-	err = sc.Mkdir(reqPath)
+	err = s.withSFTP(func(sc *sftp.Client) error {
+		return sc.Mkdir(reqPath)
+	})
 	if err != nil {
 		jsonError(w, err.Error())
 		return
@@ -412,12 +399,11 @@ func HandleFSRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
+	sc, err := s.SFTP()
 	if err != nil {
 		http.Error(w, "sftp init failed", http.StatusInternalServerError)
 		return
 	}
-	defer sc.Close()
 
 	f, err := sc.Open(filePath)
 	if err != nil {
@@ -450,12 +436,11 @@ func HandleFSWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc, err := s.DialSFTP()
+	sc, err := s.SFTP()
 	if err != nil {
 		jsonError(w, "sftp init failed: "+err.Error())
 		return
 	}
-	defer sc.Close()
 
 	var bodyReader io.Reader = r.Body
 	if MaxWriteBodySize > 0 {

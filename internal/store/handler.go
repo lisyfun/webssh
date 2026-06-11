@@ -21,6 +21,14 @@ func jsonResp(w http.ResponseWriter, v interface{}) {
 	json.NewEncoder(w).Encode(v)
 }
 
+func publicServer(svr Server) Server {
+	svr.HasPassword = svr.Password != "" || svr.HasPassword
+	svr.HasPrivateKey = svr.PrivateKey != "" || svr.HasPrivateKey
+	svr.Password = ""
+	svr.PrivateKey = ""
+	return svr
+}
+
 func HandleListServers(st *Store, w http.ResponseWriter, r *http.Request) {
 	servers, err := st.ListServers(context.Background())
 	if err != nil {
@@ -47,12 +55,26 @@ func HandleCreateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r
 		svr.Password = decrypt(r, svr.Password)
 		svr.PrivateKey = decrypt(r, svr.PrivateKey)
 	}
+	if svr.AuthType == "key" {
+		if svr.PrivateKey == "" {
+			jsonResp(w, ServerResponse{Success: false, Error: "private key is required"})
+			return
+		}
+		svr.Password = ""
+	} else {
+		svr.AuthType = "password"
+		if svr.Password == "" {
+			jsonResp(w, ServerResponse{Success: false, Error: "password is required"})
+			return
+		}
+		svr.PrivateKey = ""
+	}
 
 	if err := st.CreateServer(context.Background(), &svr); err != nil {
 		jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
 		return
 	}
-	jsonResp(w, ServerResponse{Success: true, Data: svr})
+	jsonResp(w, ServerResponse{Success: true, Data: publicServer(svr)})
 }
 
 func HandleUpdateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r *http.Request) {
@@ -78,11 +100,28 @@ func HandleUpdateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r
 		svr.PrivateKey = decrypt(r, svr.PrivateKey)
 	}
 
+	existing, err := st.GetServer(context.Background(), id)
+	if err != nil {
+		jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
+		return
+	}
+	if svr.AuthType == "key" {
+		if svr.PrivateKey == "" {
+			svr.PrivateKey = existing.PrivateKey
+		}
+		svr.Password = ""
+	} else {
+		if svr.Password == "" {
+			svr.Password = existing.Password
+		}
+		svr.PrivateKey = ""
+	}
+
 	if err := st.UpdateServer(context.Background(), &svr); err != nil {
 		jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
 		return
 	}
-	jsonResp(w, ServerResponse{Success: true, Data: svr})
+	jsonResp(w, ServerResponse{Success: true, Data: publicServer(svr)})
 }
 
 func HandleDeleteServer(st *Store, w http.ResponseWriter, r *http.Request) {

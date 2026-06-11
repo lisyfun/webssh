@@ -17,17 +17,19 @@ import (
 )
 
 type Server struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Host       string `json:"host"`
-	Port       int    `json:"port"`
-	User       string `json:"user"`
-	AuthType   string `json:"authType"`
-	Password   string `json:"password,omitempty"`
-	PrivateKey string `json:"privateKey,omitempty"`
-	Tags       string `json:"tags,omitempty"`
-	CreatedAt  string `json:"createdAt"`
-	UpdatedAt  string `json:"updatedAt"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Host          string `json:"host"`
+	Port          int    `json:"port"`
+	User          string `json:"user"`
+	AuthType      string `json:"authType"`
+	Password      string `json:"password,omitempty"`
+	PrivateKey    string `json:"privateKey,omitempty"`
+	HasPassword   bool   `json:"hasPassword,omitempty"`
+	HasPrivateKey bool   `json:"hasPrivateKey,omitempty"`
+	Tags          string `json:"tags,omitempty"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
 }
 
 type Store struct {
@@ -113,7 +115,9 @@ func (s *Store) initEncryptionKey() error {
 	}
 
 	key := make([]byte, 32)
-	io.ReadFull(rand.Reader, key)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return err
+	}
 	enc := base64.StdEncoding.EncodeToString(key)
 	_, err = s.db.Exec("INSERT INTO config (key, value) VALUES ('encryption_key', ?)", enc)
 	if err != nil {
@@ -132,7 +136,9 @@ func (s *Store) encrypt(plaintext string) string {
 		return ""
 	}
 	nonce := make([]byte, s.ae.NonceSize())
-	io.ReadFull(rand.Reader, nonce)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return ""
+	}
 	ciphertext := s.ae.Seal(nonce, nonce, []byte(plaintext), nil)
 	return base64.StdEncoding.EncodeToString(ciphertext)
 }
@@ -268,8 +274,8 @@ func (s *Store) ListServers(ctx context.Context) ([]Server, error) {
 		if err := rows.Scan(&svr.ID, &svr.Name, &svr.Host, &svr.Port, &svr.User, &svr.AuthType, &passwordEnc, &privateKeyEnc, &svr.Tags, &svr.CreatedAt, &svr.UpdatedAt); err != nil {
 			return nil, err
 		}
-		svr.Password = s.decrypt(passwordEnc)
-		svr.PrivateKey = s.decrypt(privateKeyEnc)
+		svr.HasPassword = passwordEnc != ""
+		svr.HasPrivateKey = privateKeyEnc != ""
 		servers = append(servers, svr)
 	}
 	return servers, nil
@@ -286,6 +292,8 @@ func (s *Store) GetServer(ctx context.Context, id string) (*Server, error) {
 	}
 	svr.Password = s.decrypt(passwordEnc)
 	svr.PrivateKey = s.decrypt(privateKeyEnc)
+	svr.HasPassword = passwordEnc != ""
+	svr.HasPrivateKey = privateKeyEnc != ""
 	return &svr, nil
 }
 

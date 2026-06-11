@@ -260,6 +260,9 @@ input, textarea, button { font-family: inherit; }
 .modal .auth-toggle { display: flex; gap: 1px; margin-bottom: 12px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; }
 .modal .auth-toggle button { flex: 1; padding: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; }
 .modal .auth-toggle button.active { background: var(--accent); color: #fff; }
+.modal .form-group label .key-file-btn { margin-left: 8px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-secondary); font-size: 11px; cursor: pointer; }
+.modal .form-group label .key-file-btn:hover { background: var(--bg-hover); color: var(--text); }
+.modal .form-group label .key-fname { margin-left: 8px; font-size: 11px; color: var(--accent); }
 .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .modal .modal-actions button { padding: 6px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; }
 .modal .modal-actions .btn-primary { background: var(--accent); color: #fff; }
@@ -325,6 +328,7 @@ input, textarea, button { font-family: inherit; }
       <div class="sidebar-header">
         <span>服务器</span>
         <div style="display:flex;gap:2px">
+          <button class="add-btn" onclick="showSSHConfigImport()" title="导入 SSH 配置"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></button>
           <button class="add-btn" onclick="showBatchImport()" title="批量导入"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
           <button class="add-btn" onclick="showAddServer()" title="添加服务器">+</button>
         </div>
@@ -415,8 +419,9 @@ input, textarea, button { font-family: inherit; }
       <input type="password" id="svr-password" placeholder="输入密码">
     </div>
     <div class="form-group" id="m-key-group" style="display:none">
-      <label>私钥</label>
-      <textarea id="svr-key" placeholder="粘贴私钥内容"></textarea>
+      <label>私钥 <button type="button" class="key-file-btn" onclick="document.getElementById('svr-key-file').click()">选择文件</button><span id="svr-key-fname" class="key-fname"></span></label>
+      <input type="file" id="svr-key-file" style="display:none" onchange="loadKeyFile(this)">
+      <textarea id="svr-key" placeholder="粘贴私钥内容，或点击「选择文件」读取"></textarea>
     </div>
     <div class="form-group">
       <label>标签 <span style="color:var(--text-muted);font-size:11px">(逗号分隔)</span></label>
@@ -460,6 +465,30 @@ input, textarea, button { font-family: inherit; }
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn-cancel" onclick="hideMkdir()">取消</button>
       <button class="btn-primary" onclick="doMkdir()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- SSH Config Import Modal -->
+<div class="modal-overlay" id="sshconfig-overlay" style="display:none">
+  <div class="modal" style="width:520px">
+    <h2>导入 SSH 配置</h2>
+    <div class="form-group">
+      <label>选择 .ssh 目录 <button type="button" class="key-file-btn" onclick="document.getElementById('sshconfig-dir').click()">选择目录</button><span id="sshconfig-fname" class="key-fname"></span></label>
+      <label style="color:var(--text-muted);font-size:11px;margin-top:2px">解析 config 中的 Host 条目；IdentityFile 引用的私钥会一并读取并加密入库</label>
+      <input type="file" id="sshconfig-dir" webkitdirectory directory multiple style="display:none" onchange="parseSSHConfig(this)">
+      <input type="file" id="sshconfig-file" style="display:none" onchange="parseSSHConfig(this)">
+      <div style="margin-top:6px;font-size:11px;color:var(--text-muted)">
+        无私钥？可<button type="button" class="key-file-btn" onclick="document.getElementById('sshconfig-file').click()">仅选 config 文件</button>
+      </div>
+    </div>
+    <div class="form-group" id="sshconfig-preview-group" style="display:none">
+      <label>将导入以下 <span id="sshconfig-count">0</span> 个主机</label>
+      <div id="sshconfig-preview" style="max-height:200px;overflow:auto;font-size:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;padding:8px"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideSSHConfigImport()">取消</button>
+      <button class="btn-primary" onclick="importSSHConfig()" id="sshconfig-import-btn" disabled>导入</button>
     </div>
   </div>
 </div>
@@ -604,20 +633,6 @@ async function api(url, opts) {
   const j = await r.json();
   if (!j.success) throw new Error(j.error || 'request failed');
   return j;
-}
-
-async function encField(plain) {
-  if (!sessionKey || !plain) return plain;
-  try {
-    const keyBytes = new Uint8Array(sessionKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
-    const combined = new Uint8Array(iv.length + new Uint8Array(enc).length);
-    combined.set(iv);
-    combined.set(new Uint8Array(enc), iv.length);
-    return btoa(String.fromCharCode(...combined));
-  } catch (_) { return plain; }
 }
 
 // ---- Server List ----
@@ -792,14 +807,8 @@ function connectToServer(sid) {
   ws.onopen = async () => {
     const authMsg = {
       sessionId: ses.sessionId,
-      host: svr.host,
-      port: svr.port,
-      username: svr.user,
-      password: svr.authType === 'key' ? '' : (svr.password || ''),
-      privateKey: svr.authType === 'key' ? (svr.privateKey || '') : '',
+      serverId: svr.id,
     };
-    authMsg.password = await encField(authMsg.password);
-    authMsg.privateKey = await encField(authMsg.privateKey);
     ws.send(JSON.stringify(authMsg));
     // 每 30s 发 keepalive，防止 WS 被 NAT/防火墙超时断开
     ses._ka = setInterval(() => {
@@ -970,6 +979,9 @@ function showAddServer() {
   document.getElementById('svr-user').value = 'root';
   document.getElementById('svr-password').value = '';
   document.getElementById('svr-key').value = '';
+  document.getElementById('svr-password').placeholder = '输入密码';
+  document.getElementById('svr-key').placeholder = '粘贴私钥内容，或点击「选择文件」读取';
+  document.getElementById('svr-key-fname').textContent = '';
   document.getElementById('svr-tags').value = '';
   modalSwitchAuth('password');
   document.getElementById('modal-overlay').style.display = 'flex';
@@ -984,12 +996,15 @@ function editServer(id) {
   document.getElementById('svr-host').value = s.host || '';
   document.getElementById('svr-port').value = s.port || 22;
   document.getElementById('svr-user').value = s.user || 'root';
+  document.getElementById('svr-key-fname').textContent = '';
   modalSwitchAuth(s.authType || 'password');
   if (s.authType === 'key') {
-    document.getElementById('svr-key').value = s.privateKey || '';
+    document.getElementById('svr-key').value = '';
+    document.getElementById('svr-key').placeholder = s.hasPrivateKey ? '留空保留已有私钥' : '粘贴私钥内容，或点击「选择文件」读取';
     document.getElementById('svr-password').value = '';
   } else {
-    document.getElementById('svr-password').value = s.password || '';
+    document.getElementById('svr-password').value = '';
+    document.getElementById('svr-password').placeholder = s.hasPassword ? '留空保留已有密码' : '输入密码';
     document.getElementById('svr-key').value = '';
   }
   document.getElementById('svr-tags').value = s.tags || '';
@@ -1007,6 +1022,167 @@ function showBatchImport() {
 
 function hideBatchImport() {
   document.getElementById('batch-import-overlay').style.display = 'none';
+}
+
+// ---- SSH config import ----
+let sshConfigParsed = [];
+
+function showSSHConfigImport() {
+  sshConfigParsed = [];
+  document.getElementById('sshconfig-dir').value = '';
+  document.getElementById('sshconfig-file').value = '';
+  document.getElementById('sshconfig-fname').textContent = '';
+  document.getElementById('sshconfig-preview-group').style.display = 'none';
+  document.getElementById('sshconfig-preview').innerHTML = '';
+  document.getElementById('sshconfig-count').textContent = '0';
+  document.getElementById('sshconfig-import-btn').disabled = true;
+  document.getElementById('sshconfig-overlay').style.display = 'flex';
+}
+
+function hideSSHConfigImport() {
+  document.getElementById('sshconfig-overlay').style.display = 'none';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Parse an OpenSSH config text into host entries.
+function parseSSHConfigText(text) {
+  const hosts = [];
+  let cur = null;
+  for (let raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line || line[0] === '#') continue;
+    const m = line.match(/^(\S+)\s+(.*)$/);
+    if (!m) continue;
+    const key = m[1].toLowerCase();
+    const val = m[2].trim();
+    if (key === 'host') {
+      // A Host line may list multiple patterns; take the first non-wildcard as the name.
+      const patterns = val.split(/\s+/);
+      const name = patterns.find(p => !/[*?]/.test(p)) || patterns[0];
+      cur = { alias: name, hostName: '', user: '', port: 22, identityFile: '' };
+      // Skip pure-wildcard blocks (e.g. "Host *") — they're defaults, not real hosts.
+      if (patterns.every(p => /[*?]/.test(p))) { cur = null; continue; }
+      hosts.push(cur);
+    } else if (!cur) {
+      continue;
+    } else if (key === 'hostname') {
+      cur.hostName = val;
+    } else if (key === 'user') {
+      cur.user = val;
+    } else if (key === 'port') {
+      cur.port = parseInt(val) || 22;
+    } else if (key === 'identityfile') {
+      cur.identityFile = val.replace(/^["']|["']$/g, '');
+    }
+  }
+  return hosts;
+}
+
+async function parseSSHConfig(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+
+  // Locate the config file and index every uploaded file by basename for key lookup.
+  const byBase = {};
+  let configFile = null;
+  for (const f of files) {
+    const rel = f.webkitRelativePath || f.name;
+    const base = rel.split('/').pop();
+    byBase[base] = f;
+    if (base === 'config') configFile = f;
+  }
+  if (!configFile) {
+    // Single-file selection: treat the chosen file as the config itself.
+    if (files.length === 1) configFile = files[0];
+    else { showToast('未找到 config 文件', 'error'); return; }
+  }
+
+  const text = await configFile.text();
+  const hosts = parseSSHConfigText(text);
+  if (!hosts.length) { showToast('config 中未解析到主机', 'error'); return; }
+
+  const result = [];
+  for (const h of hosts) {
+    const entry = {
+      name: h.alias,
+      host: h.hostName || h.alias,
+      port: h.port,
+      user: h.user || 'root',
+      authType: 'password',
+      password: '',
+      privateKey: '',
+      keyName: '',
+    };
+    if (h.identityFile) {
+      const keyBase = h.identityFile.split('/').pop();
+      const kf = byBase[keyBase];
+      if (kf && kf !== configFile) {
+        try {
+          entry.privateKey = (await kf.text()).trim();
+          entry.authType = 'key';
+          entry.keyName = keyBase;
+        } catch (e) { /* unreadable key, leave as password */ }
+      } else {
+        entry.keyName = keyBase + ' (未找到)';
+      }
+    }
+    result.push(entry);
+  }
+
+  sshConfigParsed = result;
+  document.getElementById('sshconfig-fname').textContent =
+    (configFile.webkitRelativePath || configFile.name).split('/')[0] || configFile.name;
+  renderSSHConfigPreview();
+}
+
+function renderSSHConfigPreview() {
+  const box = document.getElementById('sshconfig-preview');
+  box.innerHTML = sshConfigParsed.map(h => {
+    const auth = h.authType === 'key'
+      ? `<span style="color:var(--accent)">🔑 ${escapeHtml(h.keyName)}</span>`
+      : (h.keyName ? `<span style="color:var(--danger)">${escapeHtml(h.keyName)}</span>` : '<span style="color:var(--text-muted)">需手动补充凭证</span>');
+    return `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
+      <strong>${escapeHtml(h.name)}</strong>
+      <span style="color:var(--text-muted)"> — ${escapeHtml(h.user)}@${escapeHtml(h.host)}:${h.port}</span>
+      ${auth}
+    </div>`;
+  }).join('');
+  document.getElementById('sshconfig-count').textContent = sshConfigParsed.length;
+  document.getElementById('sshconfig-preview-group').style.display = 'block';
+  document.getElementById('sshconfig-import-btn').disabled = sshConfigParsed.length === 0;
+}
+
+async function importSSHConfig() {
+  if (!sshConfigParsed.length) { showToast('没有可导入的主机', 'error'); return; }
+  const list = sshConfigParsed.map(h => ({
+    id: uuid(),
+    name: h.name,
+    host: h.host,
+    port: h.port,
+    user: h.user,
+    authType: h.authType,
+    password: '',
+    privateKey: h.privateKey || '',
+  }));
+  for (const s of list) {
+    s.password = await encField(s.password);
+    s.privateKey = await encField(s.privateKey);
+  }
+  try {
+    await api('__BASE_PATH__/api/servers/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ servers: list }),
+    });
+    showToast(`成功导入 ${list.length} 个服务器`, 'success');
+    hideSSHConfigImport();
+    await fetchServers();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 }
 
 async function batchImport() {
@@ -1069,9 +1245,9 @@ function changePassword() {
   if (newPass.length < 4) { showToast('新密码至少4位', 'error'); return; }
   if (newPass !== confirmPass) { showToast('两次输入不一致', 'error'); return; }
 
-  fetch('__BASE_PATH__/change-password', {
+  fetch('__BASE_PATH__/api/change-password', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken || '' },
     body: `old_pass=${encodeURIComponent(oldPass)}&new_pass=${encodeURIComponent(newPass)}`,
   }).then(r => r.json()).then(data => {
     if (data.ok) {
@@ -1156,6 +1332,20 @@ function modalSwitchAuth(mode) {
   document.getElementById('m-key-group').style.display = mode === 'key' ? 'block' : 'none';
 }
 
+function loadKeyFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 64 * 1024) { showToast('私钥文件过大', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('svr-key').value = String(reader.result || '').trim();
+    document.getElementById('svr-key-fname').textContent = file.name;
+  };
+  reader.onerror = () => showToast('读取文件失败', 'error');
+  reader.readAsText(file);
+  input.value = '';
+}
+
 async function saveServer() {
   const name = document.getElementById('svr-name').value.trim();
   const host = document.getElementById('svr-host').value.trim();
@@ -1167,8 +1357,9 @@ async function saveServer() {
 
   if (!host) { showToast('请输入主机地址', 'error'); return; }
   if (!user) { showToast('请输入用户名', 'error'); return; }
-  if (useKey && !privateKey) { showToast('请粘贴私钥', 'error'); return; }
-  if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
+  const current = editingId ? servers.find(x => x.id === editingId) : null;
+  if (useKey && !privateKey && !(current && current.authType === 'key' && current.hasPrivateKey)) { showToast('请粘贴私钥', 'error'); return; }
+  if (!useKey && !password && !(current && current.authType !== 'key' && current.hasPassword)) { showToast('请输入密码', 'error'); return; }
 
   const data = { id: editingId || uuid(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey, tags: document.getElementById('svr-tags').value.trim() };
   data.password = await encField(data.password);
@@ -1198,19 +1389,20 @@ async function saveServer() {
 async function copyServer(id) {
   const s = servers.find(x => x.id === id);
   if (!s) return;
-  const data = { ...s, id: uuid(), name: (s.name || s.host) + ' (副本)' };
-  data.password = await encField(data.password);
-  data.privateKey = await encField(data.privateKey);
-  try {
-    await api('__BASE_PATH__/api/servers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    await fetchServers();
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
+  editingId = null;
+  document.getElementById('modal-title').textContent = '复制服务器';
+  document.getElementById('svr-name').value = (s.name || s.host) + ' (副本)';
+  document.getElementById('svr-host').value = s.host || '';
+  document.getElementById('svr-port').value = s.port || 22;
+  document.getElementById('svr-user').value = s.user || 'root';
+  document.getElementById('svr-tags').value = s.tags || '';
+  modalSwitchAuth(s.authType || 'password');
+  document.getElementById('svr-password').value = '';
+  document.getElementById('svr-key').value = '';
+  document.getElementById('svr-password').placeholder = '复制时需重新输入密码';
+  document.getElementById('svr-key').placeholder = '复制时需重新粘贴私钥，或点击「选择文件」读取';
+  document.getElementById('svr-key-fname').textContent = '';
+  document.getElementById('modal-overlay').style.display = 'flex';
 }
 
 async function deleteServer(id) {
@@ -1784,7 +1976,8 @@ function escHtml(s) {
 }
 
 function escJsStr(s) {
-  return s.replace(/'/g, "\\'").replace(/"/g, '\\"');
+  if (!s) return '';
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
 }
 
 // ---- Init ----

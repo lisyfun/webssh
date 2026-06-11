@@ -20,7 +20,7 @@
 ## Progress
 ### Done
 - `main.go`: HTTP 入口，路由注册（WS、静态资源、SFTP API、登录/登出、密码修改、内联编辑器 `/read`/`/write`）；flags: `-addr`, `-user`, `-pass`, `-cert`/`-key`, `-url`, `-maxbody`, `-db`；store 初始化、用户确保、运行时压缩、CSRF 中间件
-- `internal/sshterm/handler.go`: WebSocket SSH 中继（双向二进制、resize JSON）；PROMPT_COMMAND OSC 7 注入；接受 `DecryptFunc` 解密连接参数；`dialSSH` 同时支持密码和私钥认证
+- `internal/sshterm/handler.go`: WebSocket SSH 中继（双向二进制、resize JSON）；多 shell OSC 7 CWD 注入（bash/zsh/fish 探测 `$SHELL` 后下发对应语法的 hook）；接受 `DecryptFunc` 解密连接参数；`dialSSH` 支持密码（password + keyboard-interactive）和私钥认证，放宽 Cipher/KEX/HostKey 算法兼容老设备
 - `internal/sshterm/session.go`: `SessionManager`，`DialSFTP()` 三级回退，`preambleReader`，`hostKeyCallback` TOFU
 - `internal/sshterm/sftp.go`: SFTP REST handlers（list/download/upload/remove/rename/mkdir/read/write）；**`sanitizePath()` 拒绝所有 `..` 遍历**；`HandleFSUpload` 添加 `MaxBytesReader` 限制 + `io.Copy` error 检查 + 失败自动清理远端残缺文件；`HandleFSDownload` 设置 `Content-Length` 头支持前端进度条；`HandleFSUpload` 支持 `X-Upload-Offset`/`X-Upload-Name` 头部实现分块上传续写
 - `internal/auth/auth.go`: 用户认证、bcrypt 密码校验、每会话 AES-256-GCM 密钥、`KeyHandler` 返回 `{key, csrf, maxBodyMB}`、`CSRFValidate` 中间件、`DecryptField`/`DecryptWithKey`、速率限制（5 次/15 分钟封禁）、token 过期（24h）、密码修改
@@ -47,6 +47,15 @@
 - 自动生成密码仅首次创建用户时生成；后续启动检测到已有用户则直接使用
 - Three-stage SFTP fallback: subsystem → exec sftp-server → 新 SSH 连接
 - `hostKeyCallback` 使用 TOFU（内存 sync.Map）
+- `dialSSH` 认证与算法兼容性（修复「命令行能连、webssh 连不上」）：
+  - 密码认证同时提供 `password` + `keyboard-interactive`（用同一密码自动应答），覆盖只开 PAM/KbdInteractive 的服务器
+  - 密码+私钥都填时先试私钥再试密码（OpenSSH 顺序）
+  - 显式放宽 Cipher（加 `aes128-cbc`/`3des-cbc`）、KEX（加 `group14-sha1`/`group1-sha1`/`group-exchange-sha1`）、HostKey（加 `ssh-rsa`），兼容老交换机/嵌入式设备；弱算法排在列表末尾，仅在现代算法不可用时协商，不降级现代服务器
+  - 加密私钥（带 passphrase）返回明确中文提示，暂不支持
+- CWD 跟踪用多 shell OSC 7 注入（修复原 bash-only 方案在 zsh 失效、fish 报错）：
+  - 连接后 `echo $SHELL` 探测登录 shell，按类型下发对应 hook —— bash/sh/ksh 用 `export PROMPT_COMMAND`、zsh 用 `precmd_functions`、fish 用 `--on-event fish_prompt` 函数
+  - OSC 7 只输出 `file://$PWD`（去掉 `$HOSTNAME`，前端解析本就忽略 host）
+  - 探测失败回落 bash 形式（与旧行为一致，无回归）
 - 标签以逗号分隔存 `tags` 字段；ALTER TABLE 迁移兼容旧库
 - sessions 以 session UUID 为 key（非 serverId），每个 session 持有 serverId 引用，支持同服务器多终端
 - 上传使用 `MaxBytesReader` 限制 body 大小，`io.Copy` 错误不再忽略，失败自动 `sc.Remove` 清理残缺文件

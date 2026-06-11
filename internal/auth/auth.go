@@ -40,22 +40,26 @@ type UserStore interface {
 }
 
 type pendingSetup struct {
-	username  string
-	secret    string
-	uri       string
-	qr        string
-	setupPass string // one-time password hash to re-auth during setup
-	created   time.Time
+	username string
+	secret   string
+	uri      string
+	qr       string
+	created  time.Time
+}
+
+type pendingLogin struct {
+	username string
+	created  time.Time
 }
 
 type Auth struct {
 	store         UserStore
 	username      string
-	password      string
 	basePath      string
 	tokens        map[string]tokenEntry
 	rateLimit     map[string]*rateEntry
 	pendingSetups map[string]*pendingSetup
+	pendingLogins map[string]*pendingLogin
 	mu            sync.RWMutex
 	tokenTTL      time.Duration
 	maxLogins     int
@@ -64,15 +68,15 @@ type Auth struct {
 	enable2FA     bool
 }
 
-func New(store UserStore, username, password, basePath string, maxBodyMB int64, enable2FA bool) *Auth {
+func New(store UserStore, username, basePath string, maxBodyMB int64, enable2FA bool) *Auth {
 	a := &Auth{
 		store:         store,
 		username:      username,
-		password:      password,
 		basePath:      basePath,
 		tokens:        make(map[string]tokenEntry),
 		rateLimit:     make(map[string]*rateEntry),
 		pendingSetups: make(map[string]*pendingSetup),
+		pendingLogins: make(map[string]*pendingLogin),
 		tokenTTL:      24 * time.Hour,
 		maxLogins:     5,
 		banTime:       15 * time.Minute,
@@ -199,6 +203,16 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Bind the session token to the IP it was issued to, so a stolen
+		// token cannot be replayed from another address.
+		if entry.ip != clientIP(r) {
+			a.mu.Lock()
+			delete(a.tokens, cookie.Value)
+			a.mu.Unlock()
+			redirectLogin(w, r, a.basePath)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -216,10 +230,11 @@ func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 
 	ref := r.Header.Get("Referer")
 	if ref == "" || !sameOrigin(r, ref) {
-		w.Write([]byte(`{"ok":false,"msg":"非法请求来源"}`))
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": "非法请求来源"})
 		return
 	}
 
@@ -228,21 +243,17 @@ func (a *Auth) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	newPass := r.FormValue("new_pass")
 
 	if len(newPass) < 4 {
-		w.Write([]byte(`{"ok":false,"msg":"新密码至少4位"}`))
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": "新密码至少4位"})
 		return
 	}
 
 	err := a.store.ChangePassword(context.Background(), a.username, oldPass, newPass)
 	if err != nil {
-		w.Write([]byte(`{"ok":false,"msg":"` + err.Error() + `"}`))
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": err.Error()})
 		return
 	}
 
-	a.mu.Lock()
-	a.password = newPass
-	a.mu.Unlock()
-
-	w.Write([]byte(`{"ok":true,"msg":"密码已修改"}`))
+	json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "msg": "密码已修改"})
 }
 
 func sameOrigin(r *http.Request, ref string) bool {
@@ -265,7 +276,7 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 				re.firstTry = time.Now()
 			} else if re.count >= a.maxLogins {
 				a.mu.Unlock()
-				w.Write([]byte(loginPage(a.basePath, "登录尝试过多，请15分钟后再试", false, "", "")))
+				w.Write([]byte(loginPage(a.basePath, "登录尝试过多，请15分钟后再试", false, "")))
 				return
 			}
 		} else {
@@ -278,21 +289,38 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		user := r.FormValue("user")
 		pass := r.FormValue("pass")
 		totpCode := r.FormValue("totp_code")
+		loginToken := r.FormValue("login_token")
 
-		ok := false
-		if user == a.username && pass == a.password {
-			ok = true
-		} else {
-			ok = a.store.VerifyPassword(context.Background(), user, pass)
-			if ok {
+		if a.enable2FA && loginToken != "" {
+			a.mu.RLock()
+			pl, ok := a.pendingLogins[loginToken]
+			a.mu.RUnlock()
+			if !ok || time.Since(pl.created) > 10*time.Minute {
 				a.mu.Lock()
-				a.password = pass
+				delete(a.pendingLogins, loginToken)
 				a.mu.Unlock()
+				w.Write([]byte(loginPage(a.basePath, "双因素认证会话已过期，请重新登录", false, "")))
+				return
 			}
+			if totpCode == "" {
+				w.Write([]byte(loginPage(a.basePath, "需要双因素认证码", true, loginToken)))
+				return
+			}
+			secret, err := a.store.GetTOTPSecret(context.Background(), pl.username)
+			if err != nil || !totp.Validate(totpCode, secret) {
+				w.Write([]byte(loginPage(a.basePath, "双因素认证码无效", true, loginToken)))
+				return
+			}
+			a.mu.Lock()
+			delete(a.pendingLogins, loginToken)
+			delete(a.rateLimit, ip)
+			a.mu.Unlock()
+			a.establishSession(w, r, ip)
+			return
 		}
 
-		if !ok {
-			w.Write([]byte(loginPage(a.basePath, "用户名或密码错误", false, "", "")))
+		if user != a.username || !a.store.VerifyPassword(context.Background(), user, pass) {
+			w.Write([]byte(loginPage(a.basePath, "用户名或密码错误", false, "")))
 			return
 		}
 
@@ -300,71 +328,74 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		if a.enable2FA {
 			hasSecret, _ := a.store.HasTOTPEnabled(context.Background(), user)
 			if hasSecret {
-				// Already set up — verify TOTP code
-				if totpCode == "" {
-					w.Write([]byte(loginPage(a.basePath, "需要双因素认证码", true, user, pass)))
-					return
-				}
-				secret, err := a.store.GetTOTPSecret(context.Background(), user)
-				if err != nil || !totp.Validate(totpCode, secret) {
-					w.Write([]byte(loginPage(a.basePath, "双因素认证码无效", true, user, pass)))
-					return
-				}
-			} else {
-				// First-time setup — generate TOTP and show QR
-				key, err := totp.Generate(totp.GenerateOpts{
-					Issuer:      "WebSSH",
-					AccountName: user,
-				})
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				qr, err := qrcode.Encode(key.URL(), qrcode.Medium, 256)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				qrData := "data:image/png;base64," + base64.StdEncoding.EncodeToString(qr)
-
-				setupToken := generateToken()
+				loginToken := generateToken()
 				a.mu.Lock()
-				a.pendingSetups[setupToken] = &pendingSetup{
-					username:  user,
-					secret:    key.Secret(),
-					uri:       key.URL(),
-					qr:        qrData,
-					created:   time.Now(),
-				}
+				a.pendingLogins[loginToken] = &pendingLogin{username: user, created: time.Now()}
 				a.mu.Unlock()
-
-				w.Write([]byte(setup2FAPage(a.basePath, setupToken, qrData, key.Secret())))
+				w.Write([]byte(loginPage(a.basePath, "需要双因素认证码", true, loginToken)))
 				return
 			}
+
+			key, err := totp.Generate(totp.GenerateOpts{
+				Issuer:      "WebSSH",
+				AccountName: user,
+			})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			qr, err := qrcode.Encode(key.URL(), qrcode.Medium, 256)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			qrData := "data:image/png;base64," + base64.StdEncoding.EncodeToString(qr)
+
+			setupToken := generateToken()
+			a.mu.Lock()
+			a.pendingSetups[setupToken] = &pendingSetup{
+				username: user,
+				secret:   key.Secret(),
+				uri:      key.URL(),
+				qr:       qrData,
+				created:  time.Now(),
+			}
+			a.mu.Unlock()
+
+			w.Write([]byte(setup2FAPage(a.basePath, setupToken, qrData, key.Secret())))
+			return
 		}
 
-		// Login success
-		token := generateToken()
-		encKey := make([]byte, 32)
-		io.ReadFull(rand.Reader, encKey)
 		a.mu.Lock()
-		a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
 		delete(a.rateLimit, ip)
 		a.mu.Unlock()
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "token",
-			Value:    token,
-			Path:     a.basePath + "/",
-			HttpOnly: true,
-			Secure:   r.TLS != nil,
-			SameSite: http.SameSiteStrictMode,
-		})
-		http.Redirect(w, r, a.basePath+"/", http.StatusFound)
+		a.establishSession(w, r, ip)
 		return
 	}
 
-	w.Write([]byte(loginPage(a.basePath, "", false, "", "")))
+	w.Write([]byte(loginPage(a.basePath, "", false, "")))
+}
+
+func (a *Auth) establishSession(w http.ResponseWriter, r *http.Request, ip string) {
+	token := generateToken()
+	encKey := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, encKey); err != nil {
+		http.Error(w, "failed to initialize session", http.StatusInternalServerError)
+		return
+	}
+	a.mu.Lock()
+	a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
+	a.mu.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     a.basePath + "/",
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+	http.Redirect(w, r, a.basePath+"/", http.StatusFound)
 }
 
 func (a *Auth) LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -463,7 +494,9 @@ func redirectLogin(w http.ResponseWriter, r *http.Request, basePath string) {
 
 func generateToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
 	return hex.EncodeToString(b)
 }
 
@@ -478,19 +511,26 @@ func (a *Auth) CompleteTOTPSetupHandler(w http.ResponseWriter, r *http.Request) 
 
 	a.mu.Lock()
 	ps, ok := a.pendingSetups[setupToken]
-	if !ok || time.Since(ps.created) > 10*time.Minute {
-		delete(a.pendingSetups, setupToken)
+	if !ok {
 		a.mu.Unlock()
-		w.Write([]byte(setup2FAPage(a.basePath, setupToken, ps.qr, ps.secret)))
+		http.Error(w, "双因素认证设置会话无效，请重新登录", http.StatusBadRequest)
 		return
 	}
-	delete(a.pendingSetups, setupToken)
+	if time.Since(ps.created) > 10*time.Minute {
+		delete(a.pendingSetups, setupToken)
+		a.mu.Unlock()
+		http.Error(w, "双因素认证设置会话已过期，请重新登录", http.StatusBadRequest)
+		return
+	}
 	a.mu.Unlock()
 
 	if !totp.Validate(code, ps.secret) {
-		http.Error(w, "验证码无效，请返回重新登录", http.StatusBadRequest)
+		w.Write([]byte(setup2FAPage(a.basePath, setupToken, ps.qr, ps.secret, "验证码无效，请重试")))
 		return
 	}
+	a.mu.Lock()
+	delete(a.pendingSetups, setupToken)
+	a.mu.Unlock()
 
 	ctx := context.Background()
 	if err := a.store.SetTOTPSecret(ctx, ps.username, ps.secret); err != nil {
@@ -498,34 +538,14 @@ func (a *Auth) CompleteTOTPSetupHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ip := clientIP(r)
-	token := generateToken()
-	encKey := make([]byte, 32)
-	io.ReadFull(rand.Reader, encKey)
-	a.mu.Lock()
-	a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
-	a.mu.Unlock()
-
-	http.SetCookie(w, &http.Cookie{
-		Name: "token", Value: token, Path: a.basePath + "/",
-		HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteStrictMode,
-	})
-	http.Redirect(w, r, a.basePath+"/", http.StatusFound)
+	a.establishSession(w, r, clientIP(r))
 }
 
 func (a *Auth) TOTPResetHandler(w http.ResponseWriter, r *http.Request) {
 	// Logged-in user resets 2FA — verify password, generate new secret, clear old one
 	r.ParseForm()
 	pass := r.FormValue("pass")
-	ok := a.store.VerifyPassword(context.Background(), a.username, pass)
-	if !ok && (a.username != a.username || pass != a.password) {
-		// Also check in-memory password
-		if pass != a.password {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": "密码错误"})
-			return
-		}
-	}
-	if !ok {
+	if !a.store.VerifyPassword(context.Background(), a.username, pass) {
 		json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "msg": "密码错误"})
 		return
 	}
@@ -555,7 +575,13 @@ func (a *Auth) TOTPResetHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func setup2FAPage(basePath, setupToken, qrData, secret string) string {
+func setup2FAPage(basePath, setupToken, qrData, secret string, errMsg ...string) string {
+	errText := ""
+	errClass := "hidden"
+	if len(errMsg) > 0 && errMsg[0] != "" {
+		errText = errMsg[0]
+		errClass = ""
+	}
 	return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -593,10 +619,12 @@ h1{font-size:18px;font-weight:600;margin-bottom:4px;letter-spacing:-0.2px}
 .btn:hover{background:var(--accent-hover)}
 .btn:active{transform:scale(0.98)}
 
-.tip{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6}
-.tip a{color:var(--accent);text-decoration:none}
-.tip a:hover{text-decoration:underline}
-</style>
+	.tip{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6}
+	.tip a{color:var(--accent);text-decoration:none}
+	.tip a:hover{text-decoration:underline}
+	.error{margin-top:14px;padding:8px 12px;border-radius:6px;background:rgba(255,123,114,0.08);border:1px solid rgba(255,123,114,0.2);color:var(--danger);font-size:12px}
+	.error.hidden{display:none}
+	</style>
 </head>
 <body>
 <div class="card">
@@ -612,16 +640,17 @@ h1{font-size:18px;font-weight:600;margin-bottom:4px;letter-spacing:-0.2px}
     <div class="form-group">
       <label>六位验证码</label>
       <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus placeholder="000 000">
-    </div>
-    <button class="btn" type="submit">验证并登录</button>
-  </form>
+	    </div>
+	    <button class="btn" type="submit">验证并登录</button>
+	    <div class="error ` + errClass + `">` + errText + `</div>
+	  </form>
   <div class="tip">首次绑定，扫码或手动输入密钥后输入 App 中的 6 位数字即可。</div>
 </div>
 </body>
 </html>`
 }
 
-func loginPage(basePath, errMsg string, showTOTP bool, savedUser, savedPass string) string {
+func loginPage(basePath, errMsg string, showTOTP bool, loginToken string) string {
 	errShow := ""
 	if errMsg == "" {
 		errShow = "hidden"
@@ -639,8 +668,8 @@ func loginPage(basePath, errMsg string, showTOTP bool, savedUser, savedPass stri
 	userField := `<input type="text" name="user" placeholder="admin" ` + userAutofocus + ` autocomplete="username">`
 	passField := `<input type="password" name="pass" placeholder="········" autocomplete="current-password">`
 	if showTOTP {
-		userField = `<input type="hidden" name="user" value="` + savedUser + `">`
-		passField = `<input type="hidden" name="pass" value="` + savedPass + `">`
+		userField = `<input type="hidden" name="login_token" value="` + loginToken + `">`
+		passField = ``
 	}
 	return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -718,6 +747,16 @@ func (a *Auth) cleanupLoop() {
 		for k, v := range a.rateLimit {
 			if now.Sub(v.firstTry) > a.banTime {
 				delete(a.rateLimit, k)
+			}
+		}
+		for k, v := range a.pendingSetups {
+			if now.Sub(v.created) > 10*time.Minute {
+				delete(a.pendingSetups, k)
+			}
+		}
+		for k, v := range a.pendingLogins {
+			if now.Sub(v.created) > 10*time.Minute {
+				delete(a.pendingLogins, k)
 			}
 		}
 		a.mu.Unlock()
