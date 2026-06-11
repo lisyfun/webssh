@@ -2,10 +2,12 @@ package sshterm
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +52,78 @@ type Session struct {
 	Username     string
 	Stdin        io.WriteCloser
 	SSHSession   *ssh.Session
+
+	sftpMu     sync.Mutex
+	sftpClient *sftp.Client
+}
+
+// SFTP returns a per-session SFTP client, reused across file-browser
+// requests to avoid paying the subsystem handshake on every call.
+// The client is built lazily on first use.
+func (s *Session) SFTP() (*sftp.Client, error) {
+	s.sftpMu.Lock()
+	defer s.sftpMu.Unlock()
+	if s.sftpClient != nil {
+		return s.sftpClient, nil
+	}
+	sc, err := s.DialSFTP()
+	if err != nil {
+		return nil, err
+	}
+	s.sftpClient = sc
+	return sc, nil
+}
+
+// invalidateSFTP closes and drops the cached SFTP client so the next
+// SFTP call rebuilds it. Call this when an operation fails due to a
+// dead connection.
+func (s *Session) invalidateSFTP() {
+	s.sftpMu.Lock()
+	defer s.sftpMu.Unlock()
+	if s.sftpClient != nil {
+		s.sftpClient.Close()
+		s.sftpClient = nil
+	}
+}
+
+// isConnError reports whether err indicates the underlying SFTP/SSH
+// connection is dead (as opposed to a normal filesystem error like
+// "file not found"), meaning the cached client should be rebuilt.
+func isConnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	msg := err.Error()
+	for _, s := range []string{"EOF", "connection lost", "broken pipe", "use of closed", "connection reset"} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// WithSFTP runs fn with the session's cached SFTP client, rebuilding the
+// client once and retrying if the operation fails due to a dropped
+// connection. Use only for non-streaming operations that are safe to
+// retry.
+func (s *Session) WithSFTP(fn func(*sftp.Client) error) error {
+	sc, err := s.SFTP()
+	if err != nil {
+		return err
+	}
+	err = fn(sc)
+	if isConnError(err) {
+		s.invalidateSFTP()
+		sc, err2 := s.SFTP()
+		if err2 != nil {
+			return err2
+		}
+		err = fn(sc)
+	}
+	return err
 }
 
 var sftpServerPaths = []string{
@@ -198,9 +272,9 @@ func newSFTPClient(pr io.Reader, pw io.WriteCloser) (*sftp.Client, error) {
 // header (4-byte uint32 length <= 32768). This handles shell rc files
 // that output text to stdout during SFTP initialization.
 type preambleReader struct {
-	rd    io.Reader
-	buf   []byte
-	ready bool
+	rd        io.Reader
+	buf       []byte
+	ready     bool
 	discarded int
 }
 
@@ -280,6 +354,7 @@ func (sm *SessionManager) Remove(id string) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	if s, ok := sm.sessions[id]; ok {
+		s.invalidateSFTP()
 		s.Client.Close()
 		delete(sm.sessions, id)
 	}

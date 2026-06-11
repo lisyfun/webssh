@@ -24,9 +24,9 @@ import (
 )
 
 type Terminal struct {
-	Client    *ssh.Client
+	Client     *ssh.Client
 	SSHSession *ssh.Session
-	Stdin     io.WriteCloser
+	Stdin      io.WriteCloser
 }
 
 type App struct {
@@ -186,7 +186,10 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 		return "", fmt.Errorf("stderr pipe failed: %w", err)
 	}
 
-	session.Setenv("PROMPT_COMMAND", `printf "\033]7;file://$HOSTNAME$PWD\033\\"`)
+	// Detect the remote login shell so we can inject the correct
+	// CWD-reporting hook below (bash/zsh/fish each need different syntax).
+	shell := sshterm.DetectShell(client)
+	cwdSnippet := sshterm.CWDReportSnippet(shell)
 
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,
@@ -214,9 +217,9 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 	// Store terminal state
 	a.mu.Lock()
 	a.terminals[sessionID] = &Terminal{
-		Client:    client,
+		Client:     client,
 		SSHSession: session,
-		Stdin:     stdin,
+		Stdin:      stdin,
 	}
 	a.mu.Unlock()
 
@@ -238,7 +241,7 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 				first = false
 				go func() {
 					time.Sleep(200 * time.Millisecond)
-					stdin.Write([]byte("export PROMPT_COMMAND='printf \"\\033]7;file://$HOSTNAME$PWD\\033\\\\\"'\n"))
+					stdin.Write([]byte(cwdSnippet))
 				}()
 			}
 		}
@@ -322,7 +325,7 @@ func (a *App) getSFTPClient(sessionID string) (*sftp.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
-	sc, err := s.DialSFTP()
+	sc, err := s.SFTP()
 	if err != nil {
 		return nil, fmt.Errorf("sftp init failed: %w", err)
 	}
@@ -339,7 +342,6 @@ func (a *App) SFTPList(sessionID, reqPath string) ([]sshterm.FileEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer sc.Close()
 
 	entries, err := sc.ReadDir(reqPath)
 	if err != nil {
@@ -363,7 +365,6 @@ func (a *App) SFTPDownload(sessionID, filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer sc.Close()
 
 	f, err := sc.Open(filePath)
 	if err != nil {
@@ -417,7 +418,6 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 	if err != nil {
 		return err
 	}
-	defer sc.Close()
 
 	stat, err := sc.Stat(remotePath)
 	if err != nil {
@@ -467,7 +467,6 @@ func (a *App) sftpUploadInternal(sessionID, destPath, fileName string, data []by
 	if err != nil {
 		return err
 	}
-	defer sc.Close()
 
 	remotePath := path.Join(destPath, fileName)
 	remotePath, err = sshterm.SanitizePath(remotePath)
@@ -507,7 +506,6 @@ func (a *App) SFTPRemove(sessionID, filePath string) error {
 	if err != nil {
 		return err
 	}
-	defer sc.Close()
 
 	info, err := sc.Stat(filePath)
 	if err != nil {
@@ -534,7 +532,6 @@ func (a *App) SFTPRename(sessionID, oldPath, newPath string) error {
 	if err != nil {
 		return err
 	}
-	defer sc.Close()
 
 	return sc.Rename(oldPath, newPath)
 }
@@ -549,7 +546,6 @@ func (a *App) SFTPMkdir(sessionID, dirPath string) error {
 	if err != nil {
 		return err
 	}
-	defer sc.Close()
 
 	return sc.Mkdir(dirPath)
 }
@@ -564,7 +560,6 @@ func (a *App) SFTPRead(sessionID, filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer sc.Close()
 
 	f, err := sc.Open(filePath)
 	if err != nil {
@@ -589,7 +584,6 @@ func (a *App) SFTPWrite(sessionID, filePath, content string) error {
 	if err != nil {
 		return err
 	}
-	defer sc.Close()
 
 	dst, err := sc.Create(filePath)
 	if err != nil {
