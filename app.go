@@ -320,16 +320,15 @@ func (a *App) cleanupSession(sessionID string) {
 
 // ---- SFTP ----
 
-func (a *App) getSFTPClient(sessionID string) (*sftp.Client, error) {
+// getSession returns the session for the given ID. Callers obtain the cached
+// SFTP client from it: session.SFTP() for streaming download/upload,
+// session.WithSFTP(...) for non-streaming ops that are safe to retry.
+func (a *App) getSession(sessionID string) (*sshterm.Session, error) {
 	s, err := sshterm.Manager.Get(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
-	sc, err := s.SFTP()
-	if err != nil {
-		return nil, fmt.Errorf("sftp init failed: %w", err)
-	}
-	return sc, nil
+	return s, nil
 }
 
 func (a *App) SFTPList(sessionID, reqPath string) ([]sshterm.FileEntry, error) {
@@ -338,41 +337,27 @@ func (a *App) SFTPList(sessionID, reqPath string) ([]sshterm.FileEntry, error) {
 		return nil, err
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	entries, err := sc.ReadDir(reqPath)
+	var files []sshterm.FileEntry
+	err = s.WithSFTP(func(sc *sftp.Client) error {
+		entries, err := sc.ReadDir(reqPath)
+		if err != nil {
+			return err
+		}
+		files = make([]sshterm.FileEntry, 0, len(entries))
+		for _, e := range entries {
+			files = append(files, sshterm.FormatFileEntry(e))
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-
-	files := make([]sshterm.FileEntry, 0, len(entries))
-	for _, e := range entries {
-		files = append(files, sshterm.FormatFileEntry(e))
 	}
 	return files, nil
-}
-
-func (a *App) SFTPDownload(sessionID, filePath string) ([]byte, error) {
-	filePath, err := sshterm.SanitizePath(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	sc, err := a.getSFTPClient(sessionID)
-	if err != nil {
-		return nil, err
-	}
-
-	f, err := sc.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	return io.ReadAll(f)
 }
 
 type downloadProgressWriter struct {
@@ -405,18 +390,23 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 		DefaultFilename: fileName,
 		Title:           "保存文件 - " + fileName,
 	})
-	if err != nil {
-		runtime.EventsEmit(a.ctx, "download:complete", fileName)
+	if err != nil || savePath == "" {
+		// User cancelled or dialog failed — not a real download error.
+		runtime.EventsEmit(a.ctx, "download:complete", map[string]interface{}{
+			"fileName": fileName, "success": false, "cancelled": true,
+		})
 		return err
-	}
-	if savePath == "" {
-		runtime.EventsEmit(a.ctx, "download:complete", fileName)
-		return nil
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return err
+	}
+	// Streaming read uses the cached client directly (not WithSFTP, which is
+	// for retryable non-streaming ops).
+	sc, err := s.SFTP()
+	if err != nil {
+		return fmt.Errorf("sftp init failed: %w", err)
 	}
 
 	stat, err := sc.Stat(remotePath)
@@ -443,41 +433,72 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 		fileName: fileName,
 	}
 	_, err = io.Copy(pw, f)
-	if err == nil {
-		runtime.EventsEmit(a.ctx, "download:complete", fileName)
+	if err != nil {
+		runtime.EventsEmit(a.ctx, "download:complete", map[string]interface{}{
+			"fileName": fileName, "success": false, "error": err.Error(),
+		})
+		return err
 	}
-	return err
+	runtime.EventsEmit(a.ctx, "download:complete", map[string]interface{}{
+		"fileName": fileName, "success": true,
+	})
+	return nil
 }
+
+// MaxChunkSize caps a single upload chunk payload. The frontend uses 512 KB
+// chunks; this is a generous safety ceiling against a malformed call.
+const MaxChunkSize = 4 << 20 // 4 MB
 
 func (a *App) SFTPUpload(sessionID, destPath, fileName string, data []byte) error {
-	return a.sftpUploadInternal(sessionID, destPath, fileName, data, true)
+	return a.sftpUploadInternal(sessionID, destPath, fileName, data, 0, true)
 }
 
-func (a *App) SFTPUploadChunk(sessionID, destPath, fileName string, data []byte, isFirst bool) error {
-	return a.sftpUploadInternal(sessionID, destPath, fileName, data, isFirst)
+// SFTPUploadChunk appends a chunk at the given offset. offset==0 (first chunk)
+// truncates/creates the file; subsequent chunks are validated against the
+// current remote size to catch out-of-order or duplicated chunks.
+func (a *App) SFTPUploadChunk(sessionID, destPath, fileName string, data []byte, offset int64) error {
+	return a.sftpUploadInternal(sessionID, destPath, fileName, data, offset, offset == 0)
 }
 
-func (a *App) sftpUploadInternal(sessionID, destPath, fileName string, data []byte, create bool) error {
+func (a *App) sftpUploadInternal(sessionID, destPath, fileName string, data []byte, offset int64, create bool) error {
+	if len(data) > MaxChunkSize {
+		return fmt.Errorf("chunk too large (%d > %d bytes)", len(data), MaxChunkSize)
+	}
+
 	destPath, err := sshterm.SanitizePath(destPath)
 	if err != nil {
 		return err
 	}
-
-	sc, err := a.getSFTPClient(sessionID)
-	if err != nil {
-		return err
-	}
-
 	remotePath := path.Join(destPath, fileName)
 	remotePath, err = sshterm.SanitizePath(remotePath)
 	if err != nil {
 		return err
 	}
 
+	s, err := a.getSession(sessionID)
+	if err != nil {
+		return err
+	}
+	// Streaming write uses the cached client directly.
+	sc, err := s.SFTP()
+	if err != nil {
+		return fmt.Errorf("sftp init failed: %w", err)
+	}
+
 	var dst io.WriteCloser
 	if create {
 		dst, err = sc.Create(remotePath)
 	} else {
+		// Verify the remote size matches the expected offset before appending,
+		// so a dropped/duplicated/out-of-order chunk fails loudly instead of
+		// silently corrupting the file.
+		info, statErr := sc.Stat(remotePath)
+		if statErr != nil {
+			return fmt.Errorf("stat remote file failed: %w", statErr)
+		}
+		if info.Size() != offset {
+			return fmt.Errorf("upload offset mismatch (remote %d, expected %d)", info.Size(), offset)
+		}
 		dst, err = sc.OpenFile(remotePath, os.O_WRONLY|os.O_APPEND)
 	}
 	if err != nil {
@@ -485,11 +506,10 @@ func (a *App) sftpUploadInternal(sessionID, destPath, fileName string, data []by
 	}
 	defer dst.Close()
 
-	_, err = dst.Write(data)
-	if err != nil {
+	if _, err = dst.Write(data); err != nil {
 		dst.Close()
 		if create {
-			sc.Remove(remotePath)
+			sc.Remove(remotePath) // clean up the partial file we just created
 		}
 		return fmt.Errorf("write failed: %w", err)
 	}
@@ -502,20 +522,21 @@ func (a *App) SFTPRemove(sessionID, filePath string) error {
 		return err
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return err
 	}
 
-	info, err := sc.Stat(filePath)
-	if err != nil {
-		return err
-	}
-
-	if info.IsDir() {
-		return sshterm.RemoveDir(sc, filePath)
-	}
-	return sc.Remove(filePath)
+	return s.WithSFTP(func(sc *sftp.Client) error {
+		info, err := sc.Stat(filePath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return sshterm.RemoveDir(sc, filePath)
+		}
+		return sc.Remove(filePath)
+	})
 }
 
 func (a *App) SFTPRename(sessionID, oldPath, newPath string) error {
@@ -528,12 +549,14 @@ func (a *App) SFTPRename(sessionID, oldPath, newPath string) error {
 		return err
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return err
 	}
 
-	return sc.Rename(oldPath, newPath)
+	return s.WithSFTP(func(sc *sftp.Client) error {
+		return sc.Rename(oldPath, newPath)
+	})
 }
 
 func (a *App) SFTPMkdir(sessionID, dirPath string) error {
@@ -542,12 +565,14 @@ func (a *App) SFTPMkdir(sessionID, dirPath string) error {
 		return err
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return err
 	}
 
-	return sc.Mkdir(dirPath)
+	return s.WithSFTP(func(sc *sftp.Client) error {
+		return sc.Mkdir(dirPath)
+	})
 }
 
 func (a *App) SFTPRead(sessionID, filePath string) (string, error) {
@@ -556,44 +581,56 @@ func (a *App) SFTPRead(sessionID, filePath string) (string, error) {
 		return "", err
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return "", err
 	}
 
-	f, err := sc.Open(filePath)
+	var content string
+	err = s.WithSFTP(func(sc *sftp.Client) error {
+		f, err := sc.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		data, err := io.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		content = string(data)
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
-
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return content, nil
 }
 
 func (a *App) SFTPWrite(sessionID, filePath, content string) error {
+	// Enforce the -maxbody limit on inline-editor saves.
+	if a.maxBodyMB > 0 && int64(len(content)) > a.maxBodyMB<<20 {
+		return fmt.Errorf("内容超过大小限制 (%d 字节 > %d MB)", len(content), a.maxBodyMB)
+	}
+
 	filePath, err := sshterm.SanitizePath(filePath)
 	if err != nil {
 		return err
 	}
 
-	sc, err := a.getSFTPClient(sessionID)
+	s, err := a.getSession(sessionID)
 	if err != nil {
 		return err
 	}
 
-	dst, err := sc.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("create remote file failed: %w", err)
-	}
-	defer dst.Close()
-
-	_, err = dst.Write([]byte(content))
-	if err != nil {
-		return fmt.Errorf("write remote file failed: %w", err)
-	}
-	return nil
+	return s.WithSFTP(func(sc *sftp.Client) error {
+		dst, err := sc.Create(filePath)
+		if err != nil {
+			return fmt.Errorf("create remote file failed: %w", err)
+		}
+		defer dst.Close()
+		if _, err := dst.Write([]byte(content)); err != nil {
+			return fmt.Errorf("write remote file failed: %w", err)
+		}
+		return nil
+	})
 }

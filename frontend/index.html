@@ -839,14 +839,20 @@ window.runtime.EventsOn("download:progress", function(fileName, written, total) 
   textEl.textContent = `下载中 ${fileName}`;
 });
 
-window.runtime.EventsOn("download:complete", function(fileName) {
+window.runtime.EventsOn("download:complete", function(info) {
   const progressEl = document.getElementById('file-progress');
-  const textEl = document.getElementById('progress-text');
   downloadQueue--;
   if (downloadQueue <= 0) {
     progressEl.style.display = 'none';
   }
-  showToast(`下载完成 ${fileName}`, 'success');
+  const fileName = (info && info.fileName) || '';
+  if (info && info.success) {
+    showToast(`下载完成 ${fileName}`, 'success');
+  } else if (info && info.cancelled) {
+    // user cancelled the save dialog — no toast
+  } else {
+    showToast(`下载失败 ${fileName}${info && info.error ? ': ' + info.error : ''}`, 'error');
+  }
 });
 
 window.runtime.EventsOn("terminal:closed", function(sessionId) {
@@ -1145,7 +1151,7 @@ async function uploadFiles(files) {
         pctEl.textContent = Math.round(((c + 1) / totalChunks) * 100) + '%';
         fillEl.style.width = ((c + 1) / totalChunks * 100) + '%';
 
-        await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, c === 0);
+        await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, start);
         await new Promise(r => setTimeout(r, 0));
       }
       uploaded++;

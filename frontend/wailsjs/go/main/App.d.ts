@@ -17,8 +17,6 @@ export function ListServers():Promise<Array<store.Server>>;
 
 export function ListSessions():Promise<Array<string>>;
 
-export function SFTPDownload(arg1:string,arg2:string):Promise<Array<number>>;
-
 export function SFTPDownloadDialog(arg1:string,arg2:string):Promise<void>;
 
 export function SFTPList(arg1:string,arg2:string):Promise<Array<sshterm.FileEntry>>;
@@ -33,7 +31,7 @@ export function SFTPRename(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SFTPUpload(arg1:string,arg2:string,arg3:string,arg4:Array<number>):Promise<void>;
 
-export function SFTPUploadChunk(arg1:string,arg2:string,arg3:string,arg4:Array<number>,arg5:boolean):Promise<void>;
+export function SFTPUploadChunk(arg1:string,arg2:string,arg3:string,arg4:Array<number>,arg5:number):Promise<void>;
 
 export function SFTPWrite(arg1:string,arg2:string,arg3:string):Promise<void>;
 
