@@ -85,6 +85,11 @@ func (s *Store) migrate() error {
 			password_hash TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS host_keys (
+			addr TEXT PRIMARY KEY,
+			key_b64 TEXT NOT NULL,
+			created_at TEXT NOT NULL
 		)
 	`)
 	if err != nil {
@@ -278,5 +283,30 @@ func (s *Store) UpdateServer(ctx context.Context, svr *Server) error {
 
 func (s *Store) DeleteServer(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM servers WHERE id=?", id)
+	return err
+}
+
+// ---- Host key operations (TOFU persistence) ----
+
+// LoadHostKey returns the stored SSH host key for addr (base64 of the
+// wire-format public key), or "" if none is recorded.
+func (s *Store) LoadHostKey(addr string) (string, error) {
+	var keyB64 string
+	err := s.db.QueryRow("SELECT key_b64 FROM host_keys WHERE addr=?", addr).Scan(&keyB64)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return keyB64, nil
+}
+
+// StoreHostKey records the SSH host key for addr on first contact (TOFU).
+func (s *Store) StoreHostKey(addr, keyB64 string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(
+		"INSERT OR IGNORE INTO host_keys (addr, key_b64, created_at) VALUES (?, ?, ?)",
+		addr, keyB64, now)
 	return err
 }

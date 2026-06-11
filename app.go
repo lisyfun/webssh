@@ -27,6 +27,7 @@ type Terminal struct {
 	Client     *ssh.Client
 	SSHSession *ssh.Session
 	Stdin      io.WriteCloser
+	done       chan struct{} // closed on cleanup to stop the keepalive goroutine
 }
 
 type App struct {
@@ -42,6 +43,8 @@ func NewApp(dbPath string, maxBodyMB int64) *App {
 	if err != nil {
 		log.Fatal("failed to init store:", err)
 	}
+	// Persist TOFU host keys so trust survives restarts.
+	sshterm.SetHostKeyPersister(st)
 	return &App{
 		store:     st,
 		terminals: make(map[string]*Terminal),
@@ -66,6 +69,9 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(ctx context.Context) {
 	a.mu.Lock()
 	for id, t := range a.terminals {
+		if t.done != nil {
+			close(t.done)
+		}
 		t.SSHSession.Close()
 		t.Client.Close()
 		delete(a.terminals, id)
@@ -148,17 +154,6 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 		return "", fmt.Errorf("SSH dial failed: %w", err)
 	}
 
-	// SSH keepalive
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			if _, _, err := client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
-				return
-			}
-		}
-	}()
-
 	session, err := client.NewSession()
 	if err != nil {
 		client.Close()
@@ -215,13 +210,32 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 	sshterm.Manager.Create(sessionID, client, config, host, port, username)
 
 	// Store terminal state
+	done := make(chan struct{})
 	a.mu.Lock()
 	a.terminals[sessionID] = &Terminal{
 		Client:     client,
 		SSHSession: session,
 		Stdin:      stdin,
+		done:       done,
 	}
 	a.mu.Unlock()
+
+	// SSH keepalive — stops cleanly when the session is closed (done closed)
+	// or the connection drops (SendRequest errors).
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if _, _, err := client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+					return
+				}
+			}
+		}
+	}()
 
 	// Read stdout → emit terminal:output events
 	go func() {
@@ -312,6 +326,9 @@ func (a *App) cleanupSession(sessionID string) {
 	}
 	a.mu.Unlock()
 	if ok {
+		if t.done != nil {
+			close(t.done)
+		}
 		t.SSHSession.Close()
 		t.Client.Close()
 		sshterm.Manager.Remove(sessionID)

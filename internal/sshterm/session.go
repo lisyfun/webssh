@@ -1,6 +1,7 @@
 package sshterm
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -16,28 +17,68 @@ import (
 )
 
 // hostKeyStore implements Trust On First Use (TOFU) for SSH host keys.
-// On first connection to a host, the key is accepted and stored in memory.
-// On subsequent connections, the key is verified against the stored key.
+// On first connection to a host, the key is accepted and recorded; on
+// subsequent connections, the key is verified against the recorded one.
 // A mismatch is rejected (potential MITM attack).
 //
-// Keys are scoped to the process lifetime and keyed by "host:port".
-// This is significantly better than InsecureIgnoreHostKey.
+// Keys are held in an in-memory cache and, when a persister is registered
+// (see SetHostKeyPersister), also written through to durable storage so the
+// trust survives application restarts.
 var hostKeyStore sync.Map
+
+// HostKeyPersister durably stores TOFU host keys across restarts. addr is
+// "host:port"; keyB64 is base64 of the wire-format public key.
+type HostKeyPersister interface {
+	LoadHostKey(addr string) (string, error)
+	StoreHostKey(addr, keyB64 string) error
+}
+
+var hostKeyPersister HostKeyPersister
+
+// SetHostKeyPersister registers durable storage for TOFU host keys. Call once
+// at startup before any connections are made.
+func SetHostKeyPersister(p HostKeyPersister) {
+	hostKeyPersister = p
+}
 
 func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	addr := net.JoinHostPort(hostname, "22")
 	if _, port, err := net.SplitHostPort(hostname); err == nil && port != "" {
 		addr = hostname
 	}
-	stored, loaded := hostKeyStore.LoadOrStore(addr, key)
-	if !loaded {
-		log.Printf("TOFU: accepted host key for %s (%s)", addr, ssh.FingerprintSHA256(key))
-		return nil
+	keyB64 := base64.StdEncoding.EncodeToString(key.Marshal())
+
+	// 1. Memory cache (fast path, also covers the no-persister case).
+	if stored, loaded := hostKeyStore.Load(addr); loaded {
+		return verifyHostKey(addr, stored.(string), keyB64)
 	}
-	storedKey := stored.(ssh.PublicKey)
-	if ssh.FingerprintSHA256(storedKey) != ssh.FingerprintSHA256(key) {
-		return fmt.Errorf("host key mismatch for %s (expected %s, got %s)",
-			addr, ssh.FingerprintSHA256(storedKey), ssh.FingerprintSHA256(key))
+
+	// 2. Durable store, if configured — promote into the cache on hit.
+	if hostKeyPersister != nil {
+		if storedB64, err := hostKeyPersister.LoadHostKey(addr); err == nil && storedB64 != "" {
+			hostKeyStore.Store(addr, storedB64)
+			return verifyHostKey(addr, storedB64, keyB64)
+		}
+	}
+
+	// 3. First contact (TOFU): accept and record in both cache and store.
+	// LoadOrStore guards against a concurrent first-connect to the same host.
+	if existing, loaded := hostKeyStore.LoadOrStore(addr, keyB64); loaded {
+		return verifyHostKey(addr, existing.(string), keyB64)
+	}
+	log.Printf("TOFU: accepted host key for %s (%s)", addr, ssh.FingerprintSHA256(key))
+	if hostKeyPersister != nil {
+		if err := hostKeyPersister.StoreHostKey(addr, keyB64); err != nil {
+			log.Printf("warning: failed to persist host key for %s: %v", addr, err)
+		}
+	}
+	return nil
+}
+
+func verifyHostKey(addr, storedB64, gotB64 string) error {
+	if storedB64 != gotB64 {
+		return fmt.Errorf("host key mismatch for %s (possible MITM); "+
+			"remove the saved key to re-trust this host", addr)
 	}
 	return nil
 }
