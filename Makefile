@@ -10,25 +10,15 @@ CGO_LDFLAGS = -framework UniformTypeIdentifiers
 endif
 
 build:
-	CGO_ENABLED=1 CGO_LDFLAGS="$(CGO_LDFLAGS)" go build -tags "desktop,production" -o $(BINARY) .
+	go build -ldflags="-s -w" -o $(BINARY) .
 
-icons-windows: frontend/favicon.png
-	convert frontend/favicon.png -define icon:auto-resize=256,64,48,32,16 frontend/favicon.ico
-	go run ./tools/gen_windows_icon.go
-
-build-windows: icons-windows
-	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
-		CC=x86_64-w64-mingw32-gcc \
-		CXX=x86_64-w64-mingw32-g++ \
-		CGO_LDFLAGS="" \
-		go build -tags "desktop,production" -ldflags="-H=windowsgui" -o $(BINARY).exe .
+build-windows:
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(BINARY).exe .
 
 build-linux:
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-		CGO_LDFLAGS="" \
-		go build -tags "desktop,production" -o $(BINARY)-linux .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BINARY)-linux .
 
-# 统信OS / Linux .deb 打包
+# 统信OS 20 (Debian 10) .deb 打包（需要本机 Linux + GTK/WebKit dev libs）
 deb: build-linux
 	@echo "Building .deb package for UOS/Linux..."
 	# 复制二进制
@@ -42,6 +32,11 @@ deb: build-linux
 	@echo "Package created: $(BINARY)-uos-amd64.deb"
 	# 清理
 	rm -f build/debian/usr/bin/$(BINARY)
+
+# 统信OS .deb + 离线依赖包（使用 Docker，无需 Linux 机器）
+uos-docker:
+	@echo "Building UOS .deb with Docker (works on macOS/Linux)..."
+	bash build/build_uos_docker.sh
 
 build-uos: deb
 	@echo "UOS package built successfully"
