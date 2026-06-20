@@ -14,12 +14,32 @@ export function Connect(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['Connect'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function ConnectServer(arg1) {
+  return window['go']['main']['App']['ConnectServer'](arg1);
+}
+
+export function ConnectServerWithPassphrase(arg1, arg2) {
+  return window['go']['main']['App']['ConnectServerWithPassphrase'](arg1, arg2);
+}
+
+export function CopyServer(arg1) {
+  return window['go']['main']['App']['CopyServer'](arg1);
+}
+
 export function CreateServer(arg1) {
   return window['go']['main']['App']['CreateServer'](arg1);
 }
 
 export function DeleteServer(arg1) {
   return window['go']['main']['App']['DeleteServer'](arg1);
+}
+
+export function DeleteHostKey(arg1) {
+  return window['go']['main']['App']['DeleteHostKey'](arg1);
+}
+
+export function ListHostKeys() {
+  return window['go']['main']['App']['ListHostKeys']();
 }
 
 export function ListServers() {
@@ -50,6 +70,10 @@ export function SFTPRemove(arg1, arg2) {
   return window['go']['main']['App']['SFTPRemove'](arg1, arg2);
 }
 
+export function SFTPStat(arg1, arg2) {
+  return window['go']['main']['App']['SFTPStat'](arg1, arg2);
+}
+
 export function SFTPRename(arg1, arg2, arg3) {
   return window['go']['main']['App']['SFTPRename'](arg1, arg2, arg3);
 }
@@ -76,4 +100,8 @@ export function TerminalResize(arg1, arg2, arg3) {
 
 export function UpdateServer(arg1) {
   return window['go']['main']['App']['UpdateServer'](arg1);
+}
+
+export function UpdateServerPreserveSecrets(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateServerPreserveSecrets'](arg1, arg2, arg3);
 }

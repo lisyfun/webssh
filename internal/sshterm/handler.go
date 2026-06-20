@@ -15,6 +15,7 @@ type ConnectParams struct {
 	Username   string
 	Password   string
 	PrivateKey string
+	Passphrase string
 }
 
 func DialSSH(params *ConnectParams) (*ssh.Client, *ssh.ClientConfig, error) {
@@ -53,10 +54,16 @@ func DialSSH(params *ConnectParams) (*ssh.Client, *ssh.ClientConfig, error) {
 
 	var methods []ssh.AuthMethod
 	if params.PrivateKey != "" {
-		signer, err := ssh.ParsePrivateKey([]byte(params.PrivateKey))
+		var signer ssh.Signer
+		var err error
+		if params.Passphrase != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(params.PrivateKey), []byte(params.Passphrase))
+		} else {
+			signer, err = ssh.ParsePrivateKey([]byte(params.PrivateKey))
+		}
 		if err != nil {
 			if _, ok := err.(*ssh.PassphraseMissingError); ok {
-				return nil, nil, fmt.Errorf("私钥已加密（带密码短语），暂不支持，请使用未加密的私钥")
+				return nil, nil, fmt.Errorf("私钥已加密，请输入密码短语")
 			}
 			return nil, nil, fmt.Errorf("parse private key: %w", err)
 		}

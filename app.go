@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path"
 	gostatic "runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ type Terminal struct {
 	SSHSession *ssh.Session
 	Stdin      io.WriteCloser
 	done       chan struct{} // closed on cleanup to stop the keepalive goroutine
+	doneOnce   sync.Once
 }
 
 type App struct {
@@ -36,6 +38,26 @@ type App struct {
 	terminals map[string]*Terminal
 	mu        sync.Mutex
 	maxBodyMB int64
+}
+
+type ServerView struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Host          string `json:"host"`
+	Port          int    `json:"port"`
+	User          string `json:"user"`
+	AuthType      string `json:"authType"`
+	HasPassword   bool   `json:"hasPassword"`
+	HasPrivateKey bool   `json:"hasPrivateKey"`
+	Tags          string `json:"tags,omitempty"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+}
+
+type FileStat struct {
+	Exists bool  `json:"exists"`
+	Size   int64 `json:"size"`
+	IsDir  bool  `json:"isDir"`
 }
 
 func NewApp(dbPath string, maxBodyMB int64) *App {
@@ -70,7 +92,7 @@ func (a *App) shutdown(ctx context.Context) {
 	a.mu.Lock()
 	for id, t := range a.terminals {
 		if t.done != nil {
-			close(t.done)
+			t.doneOnce.Do(func() { close(t.done) })
 		}
 		t.SSHSession.Close()
 		t.Client.Close()
@@ -88,8 +110,32 @@ func generateID() string {
 
 // ---- Server CRUD ----
 
-func (a *App) ListServers() ([]store.Server, error) {
-	return a.store.ListServers(context.Background())
+func toServerView(s store.Server) ServerView {
+	return ServerView{
+		ID:            s.ID,
+		Name:          s.Name,
+		Host:          s.Host,
+		Port:          s.Port,
+		User:          s.User,
+		AuthType:      s.AuthType,
+		HasPassword:   s.Password != "",
+		HasPrivateKey: s.PrivateKey != "",
+		Tags:          s.Tags,
+		CreatedAt:     s.CreatedAt,
+		UpdatedAt:     s.UpdatedAt,
+	}
+}
+
+func (a *App) ListServers() ([]ServerView, error) {
+	servers, err := a.store.ListServers(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	views := make([]ServerView, 0, len(servers))
+	for _, svr := range servers {
+		views = append(views, toServerView(svr))
+	}
+	return views, nil
 }
 
 func (a *App) CreateServer(svr store.Server) error {
@@ -99,6 +145,9 @@ func (a *App) CreateServer(svr store.Server) error {
 	if svr.Port == 0 {
 		svr.Port = 22
 	}
+	if err := validateServerSecrets(svr); err != nil {
+		return err
+	}
 	return a.store.CreateServer(context.Background(), &svr)
 }
 
@@ -106,7 +155,58 @@ func (a *App) UpdateServer(svr store.Server) error {
 	if svr.Port == 0 {
 		svr.Port = 22
 	}
+	if err := validateServerSecrets(svr); err != nil {
+		return err
+	}
 	return a.store.UpdateServer(context.Background(), &svr)
+}
+
+func (a *App) UpdateServerPreserveSecrets(svr store.Server, preservePassword, preservePrivateKey bool) error {
+	if svr.Port == 0 {
+		svr.Port = 22
+	}
+	existing, err := a.store.GetServer(context.Background(), svr.ID)
+	if err != nil {
+		return err
+	}
+	if preservePassword {
+		svr.Password = existing.Password
+	}
+	if preservePrivateKey {
+		svr.PrivateKey = existing.PrivateKey
+	}
+	if err := validateServerSecrets(svr); err != nil {
+		return err
+	}
+	return a.store.UpdateServer(context.Background(), &svr)
+}
+
+func (a *App) CopyServer(id string) error {
+	svr, err := a.store.GetServer(context.Background(), id)
+	if err != nil {
+		return err
+	}
+	svr.ID = generateID()
+	if svr.Name == "" {
+		svr.Name = svr.Host + " (副本)"
+	} else {
+		svr.Name += " (副本)"
+	}
+	return a.store.CreateServer(context.Background(), svr)
+}
+
+func validateServerSecrets(svr store.Server) error {
+	switch svr.AuthType {
+	case "key":
+		if svr.PrivateKey == "" {
+			return fmt.Errorf("请提供私钥")
+		}
+	default:
+		if svr.Password == "" {
+			return fmt.Errorf("请提供密码")
+		}
+	}
+	return nil
 }
 
 func (a *App) DeleteServer(id string) error {
@@ -128,6 +228,9 @@ func (a *App) BatchImport(servers []store.Server) error {
 		if svr.ID == "" {
 			svr.ID = generateID()
 		}
+		if err := validateServerSecrets(*svr); err != nil {
+			return fmt.Errorf("import %s failed: %w", svr.Host, err)
+		}
 		if err := a.store.CreateServer(context.Background(), svr); err != nil {
 			return fmt.Errorf("import failed: %w", err)
 		}
@@ -137,13 +240,30 @@ func (a *App) BatchImport(servers []store.Server) error {
 
 // ---- Terminal (SSH) ----
 
+func (a *App) ConnectServer(serverID string) (string, error) {
+	return a.ConnectServerWithPassphrase(serverID, "")
+}
+
+func (a *App) ConnectServerWithPassphrase(serverID, passphrase string) (string, error) {
+	svr, err := a.store.GetServer(context.Background(), serverID)
+	if err != nil {
+		return "", fmt.Errorf("load server failed: %w", err)
+	}
+	return a.connect(svr.Host, svr.Port, svr.User, svr.Password, svr.PrivateKey, passphrase)
+}
+
 func (a *App) Connect(host string, port int, username, password, privateKey string) (string, error) {
+	return a.connect(host, port, username, password, privateKey, "")
+}
+
+func (a *App) connect(host string, port int, username, password, privateKey, passphrase string) (string, error) {
 	params := &sshterm.ConnectParams{
 		Host:       host,
 		Port:       port,
 		Username:   username,
 		Password:   password,
 		PrivateKey: privateKey,
+		Passphrase: passphrase,
 	}
 	if params.Port == 0 {
 		params.Port = 22
@@ -231,6 +351,8 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 				return
 			case <-ticker.C:
 				if _, _, err := client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+					a.cleanupSession(sessionID)
+					runtime.EventsEmit(a.ctx, "terminal:closed", sessionID)
 					return
 				}
 			}
@@ -282,6 +404,34 @@ func (a *App) Connect(host string, port int, username, password, privateKey stri
 	return sessionID, nil
 }
 
+func (a *App) ListHostKeys() ([]store.HostKey, error) {
+	keys, err := a.store.ListHostKeys()
+	if err != nil {
+		return nil, err
+	}
+	for i := range keys {
+		data, err := base64.StdEncoding.DecodeString(keys[i].KeyB64)
+		if err != nil {
+			continue
+		}
+		pub, err := ssh.ParsePublicKey(data)
+		if err != nil {
+			continue
+		}
+		keys[i].Fingerprint = ssh.FingerprintSHA256(pub)
+		keys[i].KeyB64 = ""
+	}
+	return keys, nil
+}
+
+func (a *App) DeleteHostKey(addr string) error {
+	if err := a.store.DeleteHostKey(addr); err != nil {
+		return err
+	}
+	sshterm.ForgetHostKey(addr)
+	return nil
+}
+
 func (a *App) TerminalInput(sessionID string, data string) error {
 	a.mu.Lock()
 	t, ok := a.terminals[sessionID]
@@ -327,7 +477,7 @@ func (a *App) cleanupSession(sessionID string) {
 	a.mu.Unlock()
 	if ok {
 		if t.done != nil {
-			close(t.done)
+			t.doneOnce.Do(func() { close(t.done) })
 		}
 		t.SSHSession.Close()
 		t.Client.Close()
@@ -375,6 +525,38 @@ func (a *App) SFTPList(sessionID, reqPath string) ([]sshterm.FileEntry, error) {
 		return nil, err
 	}
 	return files, nil
+}
+
+func (a *App) SFTPStat(sessionID, filePath string) (FileStat, error) {
+	filePath, err := sshterm.SanitizePath(filePath)
+	if err != nil {
+		return FileStat{}, err
+	}
+	s, err := a.getSession(sessionID)
+	if err != nil {
+		return FileStat{}, err
+	}
+	var stat FileStat
+	err = s.WithSFTP(func(sc *sftp.Client) error {
+		info, err := sc.Stat(filePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				stat.Exists = false
+				return nil
+			}
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "not exist") || strings.Contains(msg, "no such file") {
+				stat.Exists = false
+				return nil
+			}
+			return err
+		}
+		stat.Exists = true
+		stat.Size = info.Size()
+		stat.IsDir = info.IsDir()
+		return nil
+	})
+	return stat, err
 }
 
 type downloadProgressWriter struct {
@@ -605,6 +787,16 @@ func (a *App) SFTPRead(sessionID, filePath string) (string, error) {
 
 	var content string
 	err = s.WithSFTP(func(sc *sftp.Client) error {
+		info, err := sc.Stat(filePath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return fmt.Errorf("不能编辑目录")
+		}
+		if a.maxBodyMB > 0 && info.Size() > a.maxBodyMB<<20 {
+			return fmt.Errorf("文件超过内联编辑大小限制 (%d 字节 > %d MB)", info.Size(), a.maxBodyMB)
+		}
 		f, err := sc.Open(filePath)
 		if err != nil {
 			return err
@@ -614,6 +806,9 @@ func (a *App) SFTPRead(sessionID, filePath string) (string, error) {
 		if err != nil {
 			return err
 		}
+		if looksBinary(data) {
+			return fmt.Errorf("疑似二进制文件，已阻止内联编辑")
+		}
 		content = string(data)
 		return nil
 	})
@@ -621,6 +816,26 @@ func (a *App) SFTPRead(sessionID, filePath string) (string, error) {
 		return "", err
 	}
 	return content, nil
+}
+
+func looksBinary(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	sample := data
+	if len(sample) > 8192 {
+		sample = sample[:8192]
+	}
+	controls := 0
+	for _, b := range sample {
+		if b == 0 {
+			return true
+		}
+		if b < 32 && !strings.ContainsRune("\t\r\n\b\f", rune(b)) {
+			controls++
+		}
+	}
+	return controls > len(sample)/20
 }
 
 func (a *App) SFTPWrite(sessionID, filePath, content string) error {
@@ -640,13 +855,29 @@ func (a *App) SFTPWrite(sessionID, filePath, content string) error {
 	}
 
 	return s.WithSFTP(func(sc *sftp.Client) error {
-		dst, err := sc.Create(filePath)
+		tmpPath := fmt.Sprintf("%s.webssh-tmp-%s", filePath, generateID())
+		dst, err := sc.Create(tmpPath)
 		if err != nil {
 			return fmt.Errorf("create remote file failed: %w", err)
 		}
-		defer dst.Close()
 		if _, err := dst.Write([]byte(content)); err != nil {
+			dst.Close()
+			sc.Remove(tmpPath)
 			return fmt.Errorf("write remote file failed: %w", err)
+		}
+		if err := dst.Close(); err != nil {
+			sc.Remove(tmpPath)
+			return fmt.Errorf("close remote file failed: %w", err)
+		}
+		if err := sc.Rename(tmpPath, filePath); err != nil {
+			if removeErr := sc.Remove(filePath); removeErr != nil {
+				sc.Remove(tmpPath)
+				return fmt.Errorf("replace remote file failed: %w", err)
+			}
+			if renameErr := sc.Rename(tmpPath, filePath); renameErr != nil {
+				sc.Remove(tmpPath)
+				return fmt.Errorf("replace remote file failed: %w", renameErr)
+			}
 		}
 		return nil
 	})

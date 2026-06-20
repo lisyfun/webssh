@@ -30,6 +30,13 @@ type Server struct {
 	UpdatedAt  string `json:"updatedAt"`
 }
 
+type HostKey struct {
+	Addr        string `json:"addr"`
+	KeyB64      string `json:"keyB64"`
+	Fingerprint string `json:"fingerprint"`
+	CreatedAt   string `json:"createdAt"`
+}
+
 type Store struct {
 	db *sql.DB
 	ae cipher.AEAD
@@ -308,5 +315,28 @@ func (s *Store) StoreHostKey(addr, keyB64 string) error {
 	_, err := s.db.Exec(
 		"INSERT OR IGNORE INTO host_keys (addr, key_b64, created_at) VALUES (?, ?, ?)",
 		addr, keyB64, now)
+	return err
+}
+
+func (s *Store) ListHostKeys() ([]HostKey, error) {
+	rows, err := s.db.Query("SELECT addr, key_b64, created_at FROM host_keys ORDER BY addr")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keys []HostKey
+	for rows.Next() {
+		var key HostKey
+		if err := rows.Scan(&key.Addr, &key.KeyB64, &key.CreatedAt); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
+func (s *Store) DeleteHostKey(addr string) error {
+	_, err := s.db.Exec("DELETE FROM host_keys WHERE addr=?", addr)
 	return err
 }

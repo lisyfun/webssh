@@ -71,6 +71,7 @@ input, textarea, button { font-family: inherit; }
 .tab-list::-webkit-scrollbar { display: none; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; flex-shrink: 0; }
 .tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); }
+.tab.unread .tab-name::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 .tab .tab-host { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
 .tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
 .tab-close:hover { color: var(--text-primary); }
@@ -181,6 +182,7 @@ input, textarea, button { font-family: inherit; }
         <span>服务器</span>
         <div style="display:flex;gap:2px">
           <button class="add-btn" onclick="showBatchImport()" title="批量导入"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+          <button class="add-btn" onclick="showHostKeys()" title="主机密钥">#</button>
           <button class="add-btn" onclick="showAddServer()" title="添加服务器">+</button>
         </div>
       </div>
@@ -225,13 +227,12 @@ input, textarea, button { font-family: inherit; }
         <div class="file-progress-label">
           <span class="file-name" id="progress-text">上传中...</span>
           <span class="pct" id="progress-pct">0%</span>
+          <button id="progress-cancel" onclick="cancelUpload()" style="display:none;margin-left:8px;background:none;border:none;color:var(--red);cursor:pointer;font-size:11px">取消</button>
         </div>
         <div class="file-progress-track"><div class="file-progress-fill" id="progress-fill"></div></div>
       </div>
     </div>
     <div class="context-menu" id="context-menu">
-      <div class="item" id="ctx-copy-path">复制路径</div>
-      <div class="item" id="ctx-copy-name">复制文件名</div>
     </div>
   </div>
 
@@ -296,6 +297,41 @@ input, textarea, button { font-family: inherit; }
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideConfirm()">取消</button>
       <button class="btn-primary" id="confirm-ok-btn">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Passphrase Modal -->
+<div class="modal-overlay" id="passphrase-overlay" style="display:none">
+  <div class="modal confirm-modal">
+    <p id="passphrase-msg">私钥密码短语:</p>
+    <input type="password" id="passphrase-input" style="width:100%;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:14px;margin-top:8px;outline:none" onkeydown="if(event.key==='Enter')submitPassphrase()">
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-cancel" onclick="cancelPassphrase()">取消</button>
+      <button class="btn-primary" onclick="submitPassphrase()">连接</button>
+    </div>
+  </div>
+</div>
+
+<!-- Resume Upload Modal -->
+<div class="modal-overlay" id="resume-overlay" style="display:none">
+  <div class="modal confirm-modal">
+    <p id="resume-msg"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="answerResumeUpload('cancel')">取消</button>
+      <button class="btn-cancel" onclick="answerResumeUpload('restart')">重新上传</button>
+      <button class="btn-primary" onclick="answerResumeUpload('resume')">续传</button>
+    </div>
+  </div>
+</div>
+
+<!-- Host Keys Modal -->
+<div class="modal-overlay" id="hostkeys-overlay" style="display:none">
+  <div class="modal" style="width:620px">
+    <h2>已信任主机密钥</h2>
+    <div id="hostkeys-list" style="max-height:360px;overflow:auto;border:1px solid var(--border-color);border-radius:4px"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideHostKeys()">关闭</button>
     </div>
   </div>
 </div>
@@ -372,6 +408,9 @@ let activeSessionId = null;
 let filePanelOpen = false;
 let maxUploadMB = 0;
 let _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
+let activeUpload = null;
+let passphraseWaiter = null;
+let resumeWaiter = null;
 let activeEditorFile = null;
 let activeEditorCM = null;
 var _renaming = '';
@@ -438,6 +477,7 @@ function openNewTerminal(serverId) {
 
 function switchSession(sid) {
   if (!sessions[sid]) return;
+  sessions[sid].unread = false;
   activeSessionId = sid;
   renderServers();
   renderTabs();
@@ -484,9 +524,11 @@ function renderTabs() {
     const name = svr ? (svr.name || svr.host) : '?';
     const host = svr ? `${svr.user}@${svr.host}:${svr.port}` : '?';
     const active = sid === activeSessionId ? ' active' : '';
-    return `<div class="tab${active}" onclick="switchSession('${sid}')">
+    const unread = ses.unread && sid !== activeSessionId ? ' unread' : '';
+    return `<div class="tab${active}${unread}" onclick="switchSession('${sid}')">
       <span class="tab-name">${escHtml(name)}</span>
       <span class="tab-host">${escHtml(host)}</span>
+      ${ses.connected || ses.connecting ? '' : `<button class="tab-close" onclick="event.stopPropagation();reconnectSession('${sid}')" title="重新连接">&#x21bb;</button>`}
       <button class="tab-close" onclick="event.stopPropagation();closeSession('${sid}')">&times;</button>
     </div>`;
   }).join('');
@@ -539,7 +581,7 @@ async function connectToServer(sid) {
   updateStatus();
 
   try {
-    const sessionId = await App().Connect(svr.host, svr.port || 22, svr.user, svr.password || '', svr.privateKey || '');
+    const sessionId = await connectServerWithPassphraseIfNeeded(svr.id, '');
     ses.sessionId = sessionId;
     ses.connecting = false;
     ses.connected = true;
@@ -556,6 +598,41 @@ async function connectToServer(sid) {
     renderServers();
     updateStatus();
   }
+}
+
+async function connectServerWithPassphraseIfNeeded(serverId, passphrase) {
+  try {
+    return passphrase ? await App().ConnectServerWithPassphrase(serverId, passphrase) : await App().ConnectServer(serverId);
+  } catch (err) {
+    const msg = String(err && (err.message || err));
+    if (msg.includes('私钥已加密') || msg.toLowerCase().includes('passphrase')) {
+      const pp = await askPassphrase('私钥已加密，请输入密码短语:');
+      if (!pp) throw err;
+      return App().ConnectServerWithPassphrase(serverId, pp);
+    }
+    throw err;
+  }
+}
+
+function reconnectSession(sid) {
+  const ses = sessions[sid];
+  if (!ses || ses.connecting) return;
+  if (ses.term) {
+    ses.term.dispose();
+    ses.term = null;
+    ses.fitAddon = null;
+  }
+  const container = document.getElementById(`term-${sid}`);
+  if (container) container.remove();
+  ses.connected = false;
+  ses.connecting = true;
+  ses.sessionId = null;
+  ses.unread = false;
+  activeSessionId = sid;
+  renderServers();
+  renderTabs();
+  setActiveSession(sid);
+  connectToServer(sid);
 }
 
 function initTerminal(sid) {
@@ -616,9 +693,14 @@ function initTerminal(sid) {
 
   container.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    navigator.clipboard.readText().then(text => {
-      if (text) term.paste(text);
-    }).catch(() => {});
+    e.stopPropagation();
+    showContextMenu(e.clientX, e.clientY, [
+      { label: '复制', action: () => copyTerminalSelection(sid) },
+      { label: '粘贴', action: () => pasteTerminalClipboard(sid) },
+      { label: '清屏', action: () => term.clear() },
+      { sep: true },
+      { label: '重新连接', action: () => reconnectSession(sid) },
+    ]);
   });
 
   let fitTimer;
@@ -681,7 +763,9 @@ function showAddServer() {
   document.getElementById('svr-port').value = '22';
   document.getElementById('svr-user').value = 'root';
   document.getElementById('svr-password').value = '';
+  document.getElementById('svr-password').placeholder = '输入密码';
   document.getElementById('svr-key').value = '';
+  document.getElementById('svr-key').placeholder = '粘贴私钥';
   document.getElementById('svr-tags').value = '';
   modalSwitchAuth('password');
   document.getElementById('modal-overlay').style.display = 'flex';
@@ -698,10 +782,12 @@ function editServer(id) {
   document.getElementById('svr-user').value = s.user || 'root';
   modalSwitchAuth(s.authType || 'password');
   if (s.authType === 'key') {
-    document.getElementById('svr-key').value = s.privateKey || '';
+    document.getElementById('svr-key').value = '';
+    document.getElementById('svr-key').placeholder = s.hasPrivateKey ? '留空则保留原私钥' : '粘贴私钥';
     document.getElementById('svr-password').value = '';
   } else {
-    document.getElementById('svr-password').value = s.password || '';
+    document.getElementById('svr-password').value = '';
+    document.getElementById('svr-password').placeholder = s.hasPassword ? '留空则保留原密码' : '输入密码';
     document.getElementById('svr-key').value = '';
   }
   document.getElementById('svr-tags').value = s.tags || '';
@@ -733,14 +819,17 @@ async function saveServer() {
 
   if (!host) { showToast('请输入主机地址', 'error'); return; }
   if (!user) { showToast('请输入用户名', 'error'); return; }
-  if (useKey && !privateKey) { showToast('请粘贴私钥', 'error'); return; }
-  if (!useKey && !password) { showToast('请输入密码', 'error'); return; }
+  const old = editingId ? servers.find(x => x.id === editingId) : null;
+  const canPreserveKey = !!(old && old.authType === 'key' && old.hasPrivateKey);
+  const canPreservePassword = !!(old && old.authType !== 'key' && old.hasPassword);
+  if (useKey && !privateKey && !canPreserveKey) { showToast('请粘贴私钥', 'error'); return; }
+  if (!useKey && !password && !canPreservePassword) { showToast('请输入密码', 'error'); return; }
 
   const data = { id: editingId || crypto.randomUUID(), name, host, port, user, authType: useKey ? 'key' : 'password', password, privateKey, tags: document.getElementById('svr-tags').value.trim() };
 
   try {
     if (editingId) {
-      await App().UpdateServer(data);
+      await App().UpdateServerPreserveSecrets(data, !useKey && !password && canPreservePassword, useKey && !privateKey && canPreserveKey);
     } else {
       await App().CreateServer(data);
     }
@@ -755,7 +844,7 @@ async function copyServer(id) {
   const s = servers.find(x => x.id === id);
   if (!s) return;
   try {
-    await App().CreateServer({ ...s, id: null, name: (s.name || s.host) + ' (副本)' });
+    await App().CopyServer(id);
     await fetchServers();
   } catch (e) {
     showToast(e.message, 'error');
@@ -818,13 +907,80 @@ function showConfirm(msg, onOk) {
 
 function hideConfirm() { document.getElementById('confirm-overlay').style.display = 'none'; }
 
+function askPassphrase(msg) {
+  document.getElementById('passphrase-msg').textContent = msg;
+  document.getElementById('passphrase-input').value = '';
+  document.getElementById('passphrase-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('passphrase-input').focus(), 80);
+  return new Promise(resolve => { passphraseWaiter = resolve; });
+}
+
+function submitPassphrase() {
+  const value = document.getElementById('passphrase-input').value;
+  document.getElementById('passphrase-overlay').style.display = 'none';
+  if (passphraseWaiter) passphraseWaiter(value);
+  passphraseWaiter = null;
+}
+
+function cancelPassphrase() {
+  document.getElementById('passphrase-overlay').style.display = 'none';
+  if (passphraseWaiter) passphraseWaiter('');
+  passphraseWaiter = null;
+}
+
+async function showHostKeys() {
+  const overlay = document.getElementById('hostkeys-overlay');
+  const list = document.getElementById('hostkeys-list');
+  overlay.style.display = 'flex';
+  list.innerHTML = '<div class="file-loading">加载中...</div>';
+  try {
+    const keys = await App().ListHostKeys();
+    if (!keys || !keys.length) {
+      list.innerHTML = '<div class="file-loading">暂无已信任主机密钥</div>';
+      return;
+    }
+    list.innerHTML = keys.map(k => `<div class="file-item" style="cursor:default">
+      <span class="name">
+        <div style="font-weight:500">${escHtml(k.addr)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escHtml(k.fingerprint || '')}</div>
+      </span>
+      <span class="mtime">${escHtml((k.createdAt || '').split('T')[0])}</span>
+      <span class="file-actions" style="opacity:1">
+        <button class="del" onclick="deleteHostKey('${escJsStr(k.addr)}')" title="删除信任">&times;</button>
+      </span>
+    </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="file-loading">加载失败: ${escHtml(e.message || e)}</div>`;
+  }
+}
+
+function hideHostKeys() { document.getElementById('hostkeys-overlay').style.display = 'none'; }
+
+function deleteHostKey(addr) {
+  showConfirm(`删除 ${addr} 的已信任主机密钥？下次连接会重新信任新密钥。`, async () => {
+    try {
+      await App().DeleteHostKey(addr);
+      showToast('已删除主机密钥', 'success');
+      showHostKeys();
+    } catch (e) {
+      showToast(e.message || e, 'error');
+    }
+  });
+}
+
 // ---- Events from Go ----
 window.runtime.EventsOn("terminal:output", function(data) {
-  const ses = sessions[activeSessionId];
-  if (!ses || !ses.term || data.sessionId !== ses.sessionId) return;
+  const entry = Object.entries(sessions).find(([, ses]) => ses.sessionId === data.sessionId);
+  if (!entry) return;
+  const [sid, ses] = entry;
+  if (!ses.term) return;
   try {
     const bytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0));
     ses.term.write(bytes);
+    if (sid !== activeSessionId) {
+      ses.unread = true;
+      renderTabs();
+    }
   } catch (_) {}
 });
 
@@ -942,7 +1098,7 @@ async function loadFileList(dir) {
       const icon = f.isDir ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' : getFileIcon(f.name);
       const size = f.isDir ? '-' : formatSize(f.size);
       const mtime = f.modTime ? f.modTime.split('T')[0] : '';
-      return `<div class="file-item" onclick="${f.isDir ? `loadFileList('${escJsStr(ses.fsPath+'/'+f.name)}')` : ''}">
+      return `<div class="file-item" onclick="${f.isDir ? `loadFileList('${escJsStr(ses.fsPath+'/'+f.name)}')` : ''}" oncontextmenu="event.preventDefault();event.stopPropagation();showFileContextMenu(event.clientX,event.clientY,'${escJsStr(f.name)}',${f.isDir})">
         <span class="icon">${icon}</span>
         <span class="name">${escHtml(f.name)}</span>
         <span class="size">${size}</span>
@@ -961,38 +1117,95 @@ async function loadFileList(dir) {
   }
 }
 
-function showContextMenu(x, y, fullPath) {
+function showContextMenu(x, y, items) {
   const menu = document.getElementById('context-menu');
+  menu.innerHTML = items.map((item, i) => item.sep
+    ? '<div class="sep"></div>'
+    : `<div class="item" data-idx="${i}">${escHtml(item.label)}</div>`
+  ).join('');
+  menu.querySelectorAll('.item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const item = items[Number(el.dataset.idx)];
+      hideContextMenu();
+      if (item && item.action) item.action();
+    });
+  });
   menu.style.display = 'block';
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
-  menu.dataset.path = fullPath;
-  menu.dataset.name = fullPath.split('/').pop();
+  const pad = 6;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = Math.min(x, window.innerWidth - rect.width - pad) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - rect.height - pad) + 'px';
 }
 
 function hideContextMenu() {
   document.getElementById('context-menu').style.display = 'none';
 }
 
+function currentRemotePath(name) {
+  const ses = getActiveSession();
+  if (!ses) return name || '';
+  return name ? ses.fsPath + '/' + name : ses.fsPath;
+}
+
+function copyText(text, toast) {
+  navigator.clipboard.writeText(text).then(() => {
+    if (toast) showToast(toast, 'success');
+  }).catch(() => showToast('复制失败', 'error'));
+}
+
+function showFileContextMenu(x, y, name, isDir) {
+  const items = [];
+  if (isDir) {
+    items.push({ label: '打开', action: () => loadFileList(currentRemotePath(name)) });
+  } else {
+    items.push({ label: '下载', action: () => fileDownload(name) });
+    items.push({ label: '编辑', action: () => openEditor(name) });
+  }
+  items.push(
+    { sep: true },
+    { label: '重命名', action: () => fileRename(name) },
+    { label: '删除', action: () => fileDelete(name) },
+    { sep: true },
+    { label: '复制路径', action: () => copyText(currentRemotePath(name), '已复制路径') },
+    { label: '复制文件名', action: () => copyText(name, '已复制文件名') },
+    { label: '刷新', action: () => loadFileList() },
+  );
+  showContextMenu(x, y, items);
+}
+
+function showFilePanelContextMenu(x, y) {
+  const ses = getActiveSession();
+  const connected = !!(ses && ses.connected);
+  const items = [
+    { label: '刷新', action: () => loadFileList() },
+    { label: '上传文件', action: () => connected ? fileUpload() : showToast('请先连接服务器', 'error') },
+    { label: '新建目录', action: () => connected ? fileMkdir() : showToast('请先连接服务器', 'error') },
+    { sep: true },
+    { label: '复制当前路径', action: () => copyText(currentRemotePath(''), '已复制路径') },
+  ];
+  showContextMenu(x, y, items);
+}
+
+function copyTerminalSelection(sid) {
+  const ses = sessions[sid];
+  const text = ses && ses.term ? ses.term.getSelection() : '';
+  if (!text) { showToast('没有选中文本'); return; }
+  copyText(text, '已复制');
+}
+
+function pasteTerminalClipboard(sid) {
+  const ses = sessions[sid];
+  if (!ses || !ses.term) return;
+  navigator.clipboard.readText().then(text => {
+    if (text) ses.term.paste(text);
+  }).catch(() => showToast('读取剪贴板失败', 'error'));
+}
+
 document.addEventListener('click', hideContextMenu);
-
-document.getElementById('ctx-copy-path').addEventListener('click', () => {
-  const path = document.getElementById('context-menu').dataset.path;
-  if (path) {
-    navigator.clipboard.writeText(path).catch(() => {});
-    showToast('已复制路径', 'success');
-  }
-  hideContextMenu();
-});
-
-document.getElementById('ctx-copy-name').addEventListener('click', () => {
-  const name = document.getElementById('context-menu').dataset.name;
-  if (name) {
-    navigator.clipboard.writeText(name).catch(() => {});
-    showToast('已复制文件名', 'success');
-  }
-  hideContextMenu();
-});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideContextMenu(); });
 
 function renderBreadcrumb(p) {
   const el = document.getElementById('file-breadcrumb');
@@ -1127,19 +1340,39 @@ async function uploadFiles(files) {
   const fillEl = document.getElementById('progress-fill');
   const textEl = document.getElementById('progress-text');
   const pctEl = document.getElementById('progress-pct');
+  const cancelEl = document.getElementById('progress-cancel');
 
   progressEl.style.display = 'block';
+  cancelEl.style.display = 'inline';
 
   const CHUNK_SIZE = 512 * 1024;
 
   let uploaded = 0;
+  let cancelled = false;
+  const totalBytes = arr.reduce((sum, f) => sum + f.size, 0);
+  let sentBytes = 0;
+  activeUpload = { cancelled: false };
   for (const f of arr) {
     try {
-      const totalChunks = Math.ceil(f.size / CHUNK_SIZE) || 1;
-      for (let c = 0; c < totalChunks; c++) {
-        const start = c * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, f.size);
-        const blob = f.slice(start, end);
+      if (activeUpload.cancelled) throw new Error('已取消');
+      let startOffset = 0;
+      const remotePath = ses.fsPath + '/' + f.name;
+      const stat = await App().SFTPStat(ses.sessionId, remotePath);
+      if (stat && stat.exists && !stat.isDir && stat.size > 0) {
+        if (stat.size < f.size) {
+          const answer = await askResumeUpload(`${f.name} 已存在 ${formatSize(stat.size)} / ${formatSize(f.size)}，是否续传？`);
+          if (answer === 'cancel') throw new Error('已取消');
+          if (answer === 'resume') startOffset = stat.size;
+        } else {
+          const answer = await askResumeUpload(`${f.name} 已存在完整或更大的远端文件，是否重新上传？`);
+          if (answer !== 'restart') throw new Error('已取消');
+        }
+      }
+      sentBytes += startOffset;
+      for (let offset = startOffset; offset < f.size;) {
+        if (activeUpload.cancelled) throw new Error('已取消');
+        const end = Math.min(offset + CHUNK_SIZE, f.size);
+        const blob = f.slice(offset, end);
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -1147,27 +1380,56 @@ async function uploadFiles(files) {
           reader.readAsDataURL(blob);
         });
 
-        textEl.textContent = `上传中 ${uploaded+1}/${arr.length} ${f.name} (${c+1}/${totalChunks})`;
-        pctEl.textContent = Math.round(((c + 1) / totalChunks) * 100) + '%';
-        fillEl.style.width = ((c + 1) / totalChunks * 100) + '%';
+        const nextSent = sentBytes + (end - offset);
+        const pct = totalBytes ? Math.min(100, Math.round((nextSent / totalBytes) * 100)) : 100;
+        textEl.textContent = `上传中 ${uploaded+1}/${arr.length} ${f.name}`;
+        pctEl.textContent = pct + '%';
+        fillEl.style.width = pct + '%';
 
-        await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, start);
+        await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, offset);
+        sentBytes = nextSent;
+        offset = end;
         await new Promise(r => setTimeout(r, 0));
       }
       uploaded++;
     } catch (err) {
-      showToast(`上传失败 ${f.name}: ${err}`, 'error');
+      cancelled = String(err).includes('已取消');
+      showToast(`${cancelled ? '上传已取消' : `上传失败 ${f.name}: ${err}`}`, cancelled ? '' : 'error');
+      break;
     }
   }
-  progressEl.style.display = uploaded === arr.length ? 'none' : 'block';
+  cancelEl.style.display = 'none';
+  activeUpload = null;
+  progressEl.style.display = (uploaded === arr.length || cancelled) ? 'none' : 'block';
   if (uploaded === arr.length) showToast(`成功上传 ${uploaded} 个文件`, 'success');
   loadFileList();
 }
 
+function cancelUpload() {
+  if (activeUpload) activeUpload.cancelled = true;
+}
+
+function askResumeUpload(msg) {
+  document.getElementById('resume-msg').textContent = msg;
+  document.getElementById('resume-overlay').style.display = 'flex';
+  return new Promise(resolve => { resumeWaiter = resolve; });
+}
+
+function answerResumeUpload(answer) {
+  document.getElementById('resume-overlay').style.display = 'none';
+  if (resumeWaiter) resumeWaiter(answer);
+  resumeWaiter = null;
+}
+
 async function fileDelete(name) {
-  showConfirm(`确认删除 "${name}"？`, async () => {
-    const ses = getActiveSession();
-    if (!ses) return;
+  const ses = getActiveSession();
+  if (!ses) return;
+  let warning = `确认删除 "${name}"？`;
+  try {
+    const stat = await App().SFTPStat(ses.sessionId, ses.fsPath + '/' + name);
+    if (stat && stat.isDir) warning = `确认递归删除目录 "${name}"？目录内所有文件都会被删除。`;
+  } catch (_) {}
+  showConfirm(warning, async () => {
     try {
       await App().SFTPRemove(ses.sessionId, ses.fsPath + '/' + name);
       loadFileList();
@@ -1274,6 +1536,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const fileList = document.getElementById('file-list');
   let dragCounter = 0;
+  fileList.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showFilePanelContextMenu(e.clientX, e.clientY);
+  });
   fileList.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; fileList.classList.add('drag-over'); });
   fileList.addEventListener('dragover', (e) => { e.preventDefault(); });
   fileList.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter <= 0) { dragCounter = 0; fileList.classList.remove('drag-over'); } });
