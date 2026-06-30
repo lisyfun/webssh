@@ -43,7 +43,7 @@ jobs:
       - name: Generate bindings
         run: wails generate module
       - name: Build for Linux
-        run: wails build -clean -ldflags "-s -w"
+        run: wails build -clean -ldflags "-s -w" -tags webkit2_41
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -64,7 +64,7 @@ jobs:
       - name: Generate bindings
         run: wails generate module
       - name: Build for macOS
-        run: wails build -clean -ldflags "-s -w"
+        run: wails build -clean -ldflags "-s -w" -tags webkit2_41
       - name: Package .app
         run: make package
       - name: Upload .app
@@ -89,7 +89,7 @@ jobs:
         run: wails generate module
         shell: bash
       - name: Build for Windows
-        run: wails build -clean -ldflags "-s -w"
+        run: wails build -clean -ldflags "-s -w" -tags webkit2_41
         shell: bash
       - name: Upload binary
         uses: actions/upload-artifact@v4
