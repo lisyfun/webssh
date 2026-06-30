@@ -3,9 +3,14 @@
 package main
 
 import (
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
+
+func linuxOptions() *linux.Options {
+	return nil
+}
 
 func macOptions() *mac.Options {
 	return nil
