@@ -295,21 +295,69 @@ input, textarea, button { font-family: inherit; }
 .editor-modal .CodeMirror-focused .CodeMirror-selected { background: #264f78; }
 .CodeMirror { background: #0d1117; color: #e6edf3; }
 
-/* Font Settings Popup */
+/* Settings Popup */
+.settings-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+}
 .font-popup {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  z-index: 1000; width: 380px;
+  z-index: 1000; width: 420px; max-height: 85vh; overflow-y: auto;
   background: var(--bg-secondary); border: 1px solid var(--border-color);
-  border-radius: 8px; padding: 20px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.4);
 }
-.font-popup h2 { font-size: 15px; margin-bottom: 16px; }
-.font-popup .form-group { margin-bottom: 10px; }
-.font-popup .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 3px; }
-.font-popup .form-group input { width: 100%; padding: 6px 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; }
-.font-popup .form-group input:focus { border-color: var(--accent); }
-.font-popup .form-row { display: flex; gap: 8px; }
+.font-popup .popup-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 0;
+}
+.font-popup .popup-header h2 {
+  font-size: 15px; font-weight: 600; margin: 0;
+  display: flex; align-items: center; gap: 6px;
+}
+.font-popup .popup-header .close-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px; border-radius: 4px;
+  display: flex; align-items: center; transition: color .15s;
+}
+.font-popup .popup-header .close-btn:hover { color: var(--text-primary); }
+.font-popup .popup-body { padding: 16px 20px 20px; }
+.font-popup .section { margin-bottom: 18px; }
+.font-popup .section:last-child { margin-bottom: 0; }
+.font-popup .section-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;
+}
+.font-popup .form-group { margin-bottom: 12px; }
+.font-popup .form-group:last-child { margin-bottom: 0; }
+.font-popup .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; }
+.font-popup .form-group input { width: 100%; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.font-popup .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,140,255,0.12); }
+.font-popup .form-row { display: flex; gap: 10px; }
 .font-popup .form-row .form-group { flex: 1; }
+.font-popup .form-row .form-group.half { flex: 0 0 70px; }
+.font-popup .size-group { display: flex; align-items: center; gap: 4px; }
+.font-popup .size-group input { text-align: center; width: 56px; }
+.font-popup .size-btn {
+  padding: 6px 10px; background: var(--bg-tertiary);
+  color: var(--text-secondary); border: 1px solid var(--border-color);
+  border-radius: 6px; cursor: pointer; font-size: 15px; line-height: 1;
+  transition: background .15s, color .15s;
+}
+.font-popup .size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.font-popup .size-btn:active { transform: scale(0.95); }
+.font-popup .actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding-top: 16px; border-top: 1px solid var(--border-color); margin-top: 6px;
+}
+.font-popup .actions button {
+  padding: 7px 18px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none; transition: background .15s, transform .1s;
+}
+.font-popup .actions button:active { transform: scale(0.97); }
+.font-popup .actions .btn-cancel { background: var(--bg-tertiary); color: var(--text-secondary); }
+.font-popup .actions .btn-cancel:hover { background: var(--bg-hover); color: var(--text-primary); }
+.font-popup .actions .btn-apply { background: var(--accent); color: #fff; }
+.font-popup .actions .btn-apply:hover { background: var(--accent-hover); }
 
 /* Theme picker cards */
 .theme-picker { display: flex; flex-direction: column; gap: 6px; }
@@ -586,38 +634,50 @@ input, textarea, button { font-family: inherit; }
 <input type="file" id="file-input" style="display:none" multiple onchange="fileUploadDo(this)">
 <div class="toast" id="toast"></div>
 
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settings-overlay" style="display:none" onclick="hideFontSettings()"></div>
+
 <!-- Terminal Settings Popup -->
 <div id="font-popup" class="font-popup" style="display:none">
-  <h2>终端设置</h2>
-  <div class="form-group">
-    <label>字体</label>
-    <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
+  <div class="popup-header">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> 终端设置</h2>
+    <button class="close-btn" onclick="hideFontSettings()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
-  <div class="form-row">
-    <div class="form-group">
-      <label>字号</label>
-      <div style="display:flex;gap:4px">
-        <button onclick="adjFontSize(-1)" style="padding:4px 10px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-size:14px">−</button>
-        <input type="number" id="font-size" min="8" max="36" step="1" style="text-align:center;width:60px">
-        <button onclick="adjFontSize(1)" style="padding:4px 10px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-size:14px">+</button>
+  <div class="popup-body">
+    <div class="section">
+      <div class="section-label">字体</div>
+      <div class="form-group">
+        <label>字体系列</label>
+        <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>大小</label>
+          <div class="size-group">
+            <button class="size-btn" onclick="adjFontSize(-1)">−</button>
+            <input type="number" id="font-size" min="8" max="36" step="1">
+            <button class="size-btn" onclick="adjFontSize(1)">+</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>行高</label>
+          <input type="number" id="line-height" min="0.5" max="3" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>字距</label>
+          <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
+        </div>
       </div>
     </div>
-    <div class="form-group">
-      <label>行高</label>
-      <input type="number" id="line-height" min="0.5" max="3" step="0.1">
-    </div>
-    <div class="form-group">
-      <label>字距</label>
-      <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
-    </div>
-    <div class="form-group">
-      <label>主题</label>
+    <div class="section">
+      <div class="section-label">主题</div>
       <div class="theme-picker" id="theme-picker"></div>
     </div>
+    <div class="actions">
+      <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
+      <button class="btn-apply" onclick="saveFontSettings()">应用</button>
+    </div>
   </div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-    <button onclick="hideFontSettings()" style="padding:5px 14px;border-radius:4px;font-size:13px;cursor:pointer;border:none;background:var(--bg-tertiary);color:var(--text-secondary)">取消</button>
-    <button onclick="saveFontSettings()" style="padding:5px 14px;border-radius:4px;font-size:13px;cursor:pointer;border:none;background:var(--accent);color:#fff">应用</button>
 <script src="lib/xterm.min.js"></script>
 <script src="lib/xterm-addon-fit.min.js"></script>
 <script src="lib/codemirror.min.js"></script>
@@ -1513,10 +1573,12 @@ function showFontSettings() {
   document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
   renderThemePicker(fontSettings.theme || 'github-dark');
   document.getElementById('font-popup').style.display = 'block';
+  document.getElementById('settings-overlay').style.display = 'block';
 }
 
 function hideFontSettings() {
   document.getElementById('font-popup').style.display = 'none';
+  document.getElementById('settings-overlay').style.display = 'none';
 }
 
 function adjFontSize(delta) {
