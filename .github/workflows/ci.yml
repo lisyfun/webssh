@@ -23,7 +23,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev dpkg-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev
       - run: go vet ./...
 
   build-linux:
@@ -40,7 +40,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev dpkg-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev
       - name: Generate bindings
         run: wails generate module
       - name: Build for Linux
