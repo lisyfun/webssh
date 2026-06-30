@@ -1596,7 +1596,7 @@ function loadFileList(dir) {
         const editable = !f.isDir && f.editable;
         return `<div class="file-item" onclick="${f.isDir ? `loadFileList('${escJsStr(ses.fsPath+'/'+f.name)}')` : ''}">
           <span class="icon">${icon}</span>
-          <span class="name">${escHtml(f.name)}</span>
+          <span class="name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
           <span class="size">${size}</span>
           <span class="mtime">${mtime}</span>
           <span class="file-actions">
