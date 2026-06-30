@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [feat/wails-gui]
-    tags: ['v*']
+    tags: ['gui-v*']
   pull_request:
     branches: [feat/wails-gui]
 
@@ -27,7 +27,7 @@ jobs:
       - run: go vet ./...
 
   build-linux:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: check
     runs-on: ubuntu-latest
     steps:
@@ -52,7 +52,7 @@ jobs:
           path: build/bin/webssh
 
   build-macos:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: check
     runs-on: macos-latest
     steps:
@@ -75,7 +75,7 @@ jobs:
           path: WebSSH.app/
 
   build-windows:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: check
     runs-on: windows-latest
     steps:
@@ -99,7 +99,7 @@ jobs:
           path: build/bin/webssh.exe
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
