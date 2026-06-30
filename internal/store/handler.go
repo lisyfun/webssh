@@ -14,7 +14,7 @@ type ServerResponse struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-type DecryptFunc func(r *http.Request, value string) string
+type DecryptFunc func(r *http.Request, value string) (string, error)
 
 func jsonResp(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -52,8 +52,15 @@ func HandleCreateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r
 		svr.Port = 22
 	}
 	if decrypt != nil {
-		svr.Password = decrypt(r, svr.Password)
-		svr.PrivateKey = decrypt(r, svr.PrivateKey)
+		var err error
+		if svr.Password, err = decrypt(r, svr.Password); err != nil {
+			jsonResp(w, ServerResponse{Success: false, Error: "invalid encrypted password"})
+			return
+		}
+		if svr.PrivateKey, err = decrypt(r, svr.PrivateKey); err != nil {
+			jsonResp(w, ServerResponse{Success: false, Error: "invalid encrypted private key"})
+			return
+		}
 	}
 	if svr.AuthType == "key" {
 		if svr.PrivateKey == "" {
@@ -96,8 +103,15 @@ func HandleUpdateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r
 		svr.Port = 22
 	}
 	if decrypt != nil {
-		svr.Password = decrypt(r, svr.Password)
-		svr.PrivateKey = decrypt(r, svr.PrivateKey)
+		var err error
+		if svr.Password, err = decrypt(r, svr.Password); err != nil {
+			jsonResp(w, ServerResponse{Success: false, Error: "invalid encrypted password"})
+			return
+		}
+		if svr.PrivateKey, err = decrypt(r, svr.PrivateKey); err != nil {
+			jsonResp(w, ServerResponse{Success: false, Error: "invalid encrypted private key"})
+			return
+		}
 	}
 
 	existing, err := st.GetServer(context.Background(), id)
@@ -157,8 +171,15 @@ func HandleBatchImport(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r 
 			svr.User = "root"
 		}
 		if decrypt != nil {
-			svr.Password = decrypt(r, svr.Password)
-			svr.PrivateKey = decrypt(r, svr.PrivateKey)
+			var err error
+			if svr.Password, err = decrypt(r, svr.Password); err != nil {
+				jsonResp(w, ServerResponse{Success: false, Error: "invalid encrypted password"})
+				return
+			}
+			if svr.PrivateKey, err = decrypt(r, svr.PrivateKey); err != nil {
+				jsonResp(w, ServerResponse{Success: false, Error: "invalid encrypted private key"})
+				return
+			}
 		}
 		if err := st.CreateServer(context.Background(), svr); err != nil {
 			jsonResp(w, ServerResponse{Success: false, Error: "import failed: " + err.Error()})

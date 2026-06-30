@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/rand"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"io/fs"
 	"log"
@@ -24,6 +26,7 @@ import (
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/html"
 	"github.com/tdewolff/minify/v2/js"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -74,6 +77,7 @@ func main() {
 		log.Fatal("failed to init store:", err)
 	}
 	defer st.Close()
+	sshterm.SetHostKeyPersister(st)
 
 	password := *pass
 	if password == "" {
@@ -118,8 +122,8 @@ func main() {
 	indexContent := bytes.ReplaceAll(indexBytes, []byte("__BASE_PATH__"), []byte(basePath))
 	log.Printf("index.html: %d bytes (%d minified)", len(indexBytes), len(indexContent))
 
-	decryptField := func(r *http.Request, s string) string {
-		return a.DecryptField(r, s)
+	decryptField := func(r *http.Request, s string) (string, error) {
+		return a.DecryptFieldStrict(r, s)
 	}
 	resolveServer := func(id string) (*sshterm.ConnectParams, error) {
 		svr, err := st.GetServer(context.Background(), id)
@@ -138,6 +142,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc(basePath+"/login", a.LoginHandler)
+	r.HandleFunc(basePath+"/login/2fa", a.TOTPLoginHandler)
 	r.HandleFunc(basePath+"/logout", a.LogoutHandler)
 	r.HandleFunc(basePath+"/complete-2fa-setup", a.CompleteTOTPSetupHandler)
 	r.HandleFunc(basePath, func(w http.ResponseWriter, r *http.Request) {
@@ -149,10 +154,6 @@ func main() {
 	s.HandleFunc("/ws", sshterm.HandleWebSocketWithResolver(resolveServer, decryptField))
 	s.HandleFunc("/api/key", a.KeyHandler).Methods("GET")
 	s.HandleFunc("/api/2fa/status", a.TOTPStatusHandler).Methods("GET")
-	s.HandleFunc("/api/2fa/setup", a.TOTPSetupHandler).Methods("GET")
-	s.HandleFunc("/api/2fa/enable", a.TOTPEnableHandler).Methods("POST")
-	s.HandleFunc("/api/2fa/disable", a.TOTPDisableHandler).Methods("POST")
-	s.HandleFunc("/api/2fa/reset", a.TOTPResetHandler).Methods("POST")
 
 	api := s.PathPrefix("/api").Subrouter()
 	api.Use(a.CSRFValidate)
@@ -180,6 +181,37 @@ func main() {
 		store.HandleBatchImport(st, decryptField, w, r)
 	}).Methods("POST")
 	api.HandleFunc("/change-password", a.ChangePasswordHandler).Methods("POST")
+	api.HandleFunc("/host-keys", func(w http.ResponseWriter, r *http.Request) {
+		keys, err := st.ListHostKeys()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for i := range keys {
+			data, err := base64.StdEncoding.DecodeString(keys[i].KeyB64)
+			if err != nil {
+				continue
+			}
+			pub, err := ssh.ParsePublicKey(data)
+			if err != nil {
+				continue
+			}
+			keys[i].Fingerprint = ssh.FingerprintSHA256(pub)
+			keys[i].KeyB64 = ""
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": keys})
+	}).Methods("GET")
+	api.HandleFunc("/host-keys/{addr}", func(w http.ResponseWriter, r *http.Request) {
+		addr := mux.Vars(r)["addr"]
+		if err := st.DeleteHostKey(addr); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sshterm.ForgetHostKey(addr)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	}).Methods("DELETE")
 
 	fsAPI := api.PathPrefix("/fs/{id}").Subrouter()
 	fsAPI.HandleFunc("/list", sshterm.HandleFSList).Methods("GET")

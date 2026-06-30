@@ -1,6 +1,7 @@
 package sshterm
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -24,22 +25,74 @@ import (
 // This is significantly better than InsecureIgnoreHostKey.
 var hostKeyStore sync.Map
 
+type HostKeyPersister interface {
+	LoadHostKey(addr string) (string, error)
+	StoreHostKey(addr, keyB64 string) error
+}
+
+var hostKeyPersister HostKeyPersister
+
+func SetHostKeyPersister(p HostKeyPersister) {
+	hostKeyPersister = p
+}
+
+func ForgetHostKey(addr string) {
+	hostKeyStore.Delete(addr)
+}
+
 func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	addr := net.JoinHostPort(hostname, "22")
 	if _, port, err := net.SplitHostPort(hostname); err == nil && port != "" {
 		addr = hostname
 	}
-	stored, loaded := hostKeyStore.LoadOrStore(addr, key)
-	if !loaded {
-		log.Printf("TOFU: accepted host key for %s (%s)", addr, ssh.FingerprintSHA256(key))
-		return nil
+	keyB64 := base64.StdEncoding.EncodeToString(key.Marshal())
+
+	if stored, loaded := hostKeyStore.Load(addr); loaded {
+		return verifyHostKey(addr, stored.(string), keyB64)
 	}
-	storedKey := stored.(ssh.PublicKey)
-	if ssh.FingerprintSHA256(storedKey) != ssh.FingerprintSHA256(key) {
-		return fmt.Errorf("host key mismatch for %s (expected %s, got %s)",
-			addr, ssh.FingerprintSHA256(storedKey), ssh.FingerprintSHA256(key))
+
+	if hostKeyPersister != nil {
+		if storedB64, err := hostKeyPersister.LoadHostKey(addr); err == nil && storedB64 != "" {
+			hostKeyStore.Store(addr, storedB64)
+			return verifyHostKey(addr, storedB64, keyB64)
+		}
+	}
+
+	if stored, loaded := hostKeyStore.LoadOrStore(addr, keyB64); loaded {
+		return verifyHostKey(addr, stored.(string), keyB64)
+	}
+	if hostKeyPersister != nil {
+		if err := hostKeyPersister.StoreHostKey(addr, keyB64); err != nil {
+			log.Printf("warning: failed to persist host key for %s: %v", addr, err)
+		}
+	}
+	log.Printf("TOFU: accepted host key for %s (%s)", addr, ssh.FingerprintSHA256(key))
+	return nil
+}
+
+func verifyHostKey(addr, storedB64, gotB64 string) error {
+	if storedB64 != gotB64 {
+		storedKey, _ := parsePublicKeyB64(storedB64)
+		gotKey, _ := parsePublicKeyB64(gotB64)
+		expected := storedB64
+		if storedKey != nil {
+			expected = ssh.FingerprintSHA256(storedKey)
+		}
+		got := gotB64
+		if gotKey != nil {
+			got = ssh.FingerprintSHA256(gotKey)
+		}
+		return fmt.Errorf("host key mismatch for %s (expected %s, got %s)", addr, expected, got)
 	}
 	return nil
+}
+
+func parsePublicKeyB64(keyB64 string) (ssh.PublicKey, error) {
+	data, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.ParsePublicKey(data)
 }
 
 type Session struct {
@@ -132,6 +185,8 @@ var sftpServerPaths = []string{
 	"/usr/libexec/openssh/sftp-server",
 }
 
+const sftpInitTimeout = 4 * time.Second
+
 // execSFTP tries all sftp-server paths and returns the first successful client.
 func execSFTP(client *ssh.Client) (*sftp.Client, error) {
 	var lastErr error
@@ -167,7 +222,7 @@ func execSFTPCmd(client *ssh.Client, cmd string) (*sftp.Client, error) {
 		return nil, err
 	}
 
-	sc, err := newSFTPClient(pr, pw)
+	sc, err := newSFTPClient(pr, pw, session.Close)
 	if err != nil {
 		pw.Close()
 		session.Close()
@@ -249,7 +304,7 @@ func trySubsystem(client *ssh.Client) (*sftp.Client, error) {
 		return nil, err
 	}
 
-	sc, err := newSFTPClient(pr, pw)
+	sc, err := newSFTPClient(pr, pw, session.Close)
 	if err != nil {
 		pw.Close()
 		session.Close()
@@ -261,9 +316,27 @@ func trySubsystem(client *ssh.Client) (*sftp.Client, error) {
 // newSFTPClient wraps pr with a preamble filter that discards any
 // shell rc output (like "hello world") before the first valid SFTP
 // packet, then creates an sftp.Client.
-func newSFTPClient(pr io.Reader, pw io.WriteCloser) (*sftp.Client, error) {
+func newSFTPClient(pr io.Reader, pw io.WriteCloser, cleanup func() error) (*sftp.Client, error) {
 	r := &preambleReader{rd: pr}
-	return sftp.NewClientPipe(r, pw)
+	type result struct {
+		client *sftp.Client
+		err    error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		sc, err := sftp.NewClientPipe(r, pw)
+		ch <- result{client: sc, err: err}
+	}()
+	select {
+	case res := <-ch:
+		return res.client, res.err
+	case <-time.After(sftpInitTimeout):
+		pw.Close()
+		if cleanup != nil {
+			cleanup()
+		}
+		return nil, fmt.Errorf("sftp init timed out after %s", sftpInitTimeout)
+	}
 }
 
 // preambleReader drops everything before the first valid SFTP packet

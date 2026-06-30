@@ -32,6 +32,13 @@ type Server struct {
 	UpdatedAt     string `json:"updatedAt"`
 }
 
+type HostKey struct {
+	Addr        string `json:"addr"`
+	KeyB64      string `json:"keyB64,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty"`
+	CreatedAt   string `json:"createdAt"`
+}
+
 type Store struct {
 	db *sql.DB
 	ae cipher.AEAD
@@ -88,6 +95,11 @@ func (s *Store) migrate() error {
 			totp_secret TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS host_keys (
+			addr TEXT PRIMARY KEY,
+			key_b64 TEXT NOT NULL,
+			created_at TEXT NOT NULL
 		)
 	`)
 	if err != nil {
@@ -318,5 +330,48 @@ func (s *Store) UpdateServer(ctx context.Context, svr *Server) error {
 
 func (s *Store) DeleteServer(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM servers WHERE id=?", id)
+	return err
+}
+
+// ---- Host key operations ----
+
+func (s *Store) LoadHostKey(addr string) (string, error) {
+	var keyB64 string
+	err := s.db.QueryRow("SELECT key_b64 FROM host_keys WHERE addr=?", addr).Scan(&keyB64)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return keyB64, err
+}
+
+func (s *Store) StoreHostKey(addr, keyB64 string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(
+		"INSERT OR IGNORE INTO host_keys (addr, key_b64, created_at) VALUES (?, ?, ?)",
+		addr, keyB64, now,
+	)
+	return err
+}
+
+func (s *Store) ListHostKeys() ([]HostKey, error) {
+	rows, err := s.db.Query("SELECT addr, key_b64, created_at FROM host_keys ORDER BY addr")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keys []HostKey
+	for rows.Next() {
+		var key HostKey
+		if err := rows.Scan(&key.Addr, &key.KeyB64, &key.CreatedAt); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
+func (s *Store) DeleteHostKey(addr string) error {
+	_, err := s.db.Exec("DELETE FROM host_keys WHERE addr=?", addr)
 	return err
 }

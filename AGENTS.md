@@ -23,7 +23,8 @@
 - `internal/sshterm/handler.go`: WebSocket SSH 中继（双向二进制、resize JSON）；多 shell OSC 7 CWD 注入（bash/zsh/fish 探测 `$SHELL` 后下发对应语法的 hook）；接受 `DecryptFunc` 解密连接参数；`dialSSH` 支持密码（password + keyboard-interactive）和私钥认证，放宽 Cipher/KEX/HostKey 算法兼容老设备
 - `internal/sshterm/session.go`: `SessionManager`，`DialSFTP()` 三级回退，`preambleReader`，`hostKeyCallback` TOFU
 - `internal/sshterm/sftp.go`: SFTP REST handlers（list/download/upload/remove/rename/mkdir/read/write）；**`sanitizePath()` 拒绝所有 `..` 遍历**；`HandleFSUpload` 添加 `MaxBytesReader` 限制 + `io.Copy` error 检查 + 失败自动清理远端残缺文件；`HandleFSDownload` 设置 `Content-Length` 头支持前端进度条；`HandleFSUpload` 支持 `X-Upload-Offset`/`X-Upload-Name` 头部实现分块上传续写
-- `internal/auth/auth.go`: 用户认证、bcrypt 密码校验、每会话 AES-256-GCM 密钥、`KeyHandler` 返回 `{key, csrf, maxBodyMB}`、`CSRFValidate` 中间件、`DecryptField`/`DecryptWithKey`、速率限制（5 次/15 分钟封禁）、token 过期（24h）、密码修改
+- `internal/auth/auth.go`: 用户认证、会话管理、每会话 AES-256-GCM 密钥、`KeyHandler` 返回 `{key, csrf, maxBodyMB}`、`CSRFValidate` 中间件、`DecryptField`/`DecryptWithKey`、速率限制（5 次/15 分钟封禁）、token 过期（24h）、密码修改、登录页 HTML；拆分了 TOTP 逻辑到 `totp.go`
+- `internal/auth/totp.go`: TOTP/2FA 处理器（setup/enable/disable/reset/status）、`TOTPLoginHandler`（独立二级页面 `/login/2fa` 输入验证码）、`CompleteTOTPSetupHandler`、二维码页面 HTML、`login2FAPage`
 - `internal/store/store.go`: SQLite 操作 — `config` 表（AES-256-GCM 主密钥）、`servers` 表（password/privateKey AES-GCM 加密、`tags` 字段）、`users` 表（bcrypt 哈希）；方法包括 `EnsureUser`、`VerifyPassword`、`ChangePassword`、`UserExists`、`updatePassword`；服务器 CRUD 加解密；`EnsureUser` 已存在时调用 `updatePassword` 修复 `-pass` 覆盖
 - `internal/store/handler.go`: 服务器 CRUD HTTP handlers，接受 `DecryptFunc` 参数
 - `static/index.html`: 三栏布局、多会话终端、文件浏览器（拖拽上传、进度条、队列）、OSC 7 CWD、自定义确认/重命名模态框、Toast 通知、批量导入、密码修改、CodeMirror 内联编辑器、服务器搜索/过滤输入框、标签输入与展示、服务器列表 "+" 按钮新建终端、标签栏多会话切换/关闭；`encField()` Web Crypto API AES-GCM 加密；`apiHeaders()` 统一添加 `X-CSRF-Token`；文件下载用 XHR + 进度条替代 `<a download>`；重命名用自定义模态框替代 `prompt()`；修复重复 `api()` 函数导致 CSRF 头丢失；所有图标使用内嵌 SVG（Feather 风格），文件类型用彩色方块替代 emoji；终端 Consolas 字体、GitHub Dark 配色、深绿 `#1f7a2e` 改善 777 目录可读性；选中即复制（`onSelectionChange` → `clipboard.writeText`）；上传前检查 `maxUploadMB`，超限跳过并 toast 提示；大文件 >512KB 自动分块上传（`FileReader.readAsArrayBuffer` + `X-Upload-Offset`）
@@ -45,6 +46,7 @@
 - 存储加密密钥独立于登录密码：随机 AES-256-GCM 密钥存 `config` 表，改登录密码不影响已存服务器密码
 - CSRF token = session token 前 16 字符
 - 自动生成密码仅首次创建用户时生成；后续启动检测到已有用户则直接使用
+- TOTP 登录采用两级页面：`/login` 仅用户名+密码，密码正确后 redirect 到 `/login/2fa?token=xxx` 输入 6 位验证码；`login_token` 10 分钟过期，过期或无效自动跳回 `/login`；未开启 `-2fa` 时登录页完全不包含 TOTP 相关 HTML
 - Three-stage SFTP fallback: subsystem → exec sftp-server → 新 SSH 连接
 - `hostKeyCallback` 使用 TOFU（内存 sync.Map）
 - `dialSSH` 认证与算法兼容性（修复「命令行能连、webssh 连不上」）：
@@ -71,7 +73,8 @@
 - `internal/sshterm/handler.go`: WebSocket ↔ SSH、dialSSH
 - `internal/sshterm/session.go`: SessionManager、SFTP 重连、preambleReader、TOFU
 - `internal/sshterm/sftp.go`: SFTP handlers、sanitizePath、上传限流、分块上传续写、Content-Length 下载
-- `internal/auth/auth.go`: 认证、加密、CSRF、速率限制、KeyHandler（含 maxBodyMB）
+- `internal/auth/auth.go`: 会话管理、加密、CSRF、速率限制、KeyHandler（含 maxBodyMB）、登录
+- `internal/auth/totp.go`: TOTP/2FA 处理器、独立 TOTP 登录页、二维码设置页
 - `internal/store/store.go`: SQLite 操作、加解密、服务器 CRUD、标签
 - `internal/store/handler.go`: 服务器 CRUD HTTP handlers
 - `static/index.html`: 完整前端（多会话标签栏、服务器列表新建终端、标签搜索/过滤、标签输入/展示、内嵌 SVG 图标、彩色方块文件类型、选中复制、上传前大小检查、大文件分块上传、XHR 下载进度条）

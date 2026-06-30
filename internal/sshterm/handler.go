@@ -52,7 +52,7 @@ func cwdReportSnippet(shell string) string {
 	}
 }
 
-type DecryptFunc func(r *http.Request, value string) string
+type DecryptFunc func(r *http.Request, value string) (string, error)
 type ServerResolver func(id string) (*ConnectParams, error)
 
 type ConnectParams struct {
@@ -63,6 +63,7 @@ type ConnectParams struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	PrivateKey string `json:"privateKey"`
+	Passphrase string `json:"passphrase,omitempty"`
 }
 
 type ResizeMsg struct {
@@ -125,10 +126,26 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			}
 			serverParams.SessionID = params.SessionID
 			serverParams.ServerID = params.ServerID
+			serverParams.Passphrase = params.Passphrase
 			params = *serverParams
 		} else if decrypt != nil {
-			params.Password = decrypt(r, params.Password)
-			params.PrivateKey = decrypt(r, params.PrivateKey)
+			if params.Password, err = decrypt(r, params.Password); err != nil {
+				_ = conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: invalid encrypted password"))
+				conn.Close()
+				return
+			}
+			if params.PrivateKey, err = decrypt(r, params.PrivateKey); err != nil {
+				_ = conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: invalid encrypted private key"))
+				conn.Close()
+				return
+			}
+		}
+		if decrypt != nil && params.Passphrase != "" {
+			if params.Passphrase, err = decrypt(r, params.Passphrase); err != nil {
+				_ = conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: invalid encrypted passphrase"))
+				conn.Close()
+				return
+			}
 		}
 
 		if params.Port == 0 {
@@ -162,18 +179,6 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			return
 		}
 
-		// SSH 保活: 每 30s 发 keepalive，防止 NAT/防火墙超时断开
-		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
-				_, _, err := sshClient.SendRequest("keepalive@openssh.com", true, nil)
-				if err != nil {
-					return
-				}
-			}
-		}()
-
 		session, err := sshClient.NewSession()
 		if err != nil {
 			log.Printf("SSH session failed: %v", err)
@@ -183,30 +188,54 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			return
 		}
 
+		// SSH 保活: 每 30s 发 keepalive，防止 NAT/防火墙超时断开
+		done := make(chan struct{})
+		var closeOnce sync.Once
+		closeAll := func() {
+			closeOnce.Do(func() {
+				close(done)
+				session.Close()
+				sshClient.Close()
+				Manager.Remove(params.SessionID)
+				conn.Close()
+			})
+		}
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					_, _, err := sshClient.SendRequest("keepalive@openssh.com", true, nil)
+					if err != nil {
+						writeText("SSH connection closed: " + err.Error())
+						closeAll()
+						return
+					}
+				}
+			}
+		}()
+
 		stdin, err := session.StdinPipe()
 		if err != nil {
 			log.Printf("stdin pipe failed: %v", err)
-			session.Close()
-			sshClient.Close()
-			conn.Close()
+			closeAll()
 			return
 		}
 
 		stdout, err := session.StdoutPipe()
 		if err != nil {
 			log.Printf("stdout pipe failed: %v", err)
-			session.Close()
-			sshClient.Close()
-			conn.Close()
+			closeAll()
 			return
 		}
 
 		stderr, err := session.StderrPipe()
 		if err != nil {
 			log.Printf("stderr pipe failed: %v", err)
-			session.Close()
-			sshClient.Close()
-			conn.Close()
+			closeAll()
 			return
 		}
 
@@ -224,17 +253,13 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 
 		if err := session.RequestPty("xterm-256color", 40, 80, modes); err != nil {
 			log.Printf("request pty failed: %v", err)
-			session.Close()
-			sshClient.Close()
-			conn.Close()
+			closeAll()
 			return
 		}
 
 		if err := session.Shell(); err != nil {
 			log.Printf("shell failed: %v", err)
-			session.Close()
-			sshClient.Close()
-			conn.Close()
+			closeAll()
 			return
 		}
 
@@ -254,12 +279,28 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 		go func() {
 			buf := make([]byte, 4096)
 			first := true
+			cwdEchoNeedle := strings.TrimSpace(cwdSnippet)
+			filterCwdEcho := func(data []byte) []byte {
+				if cwdEchoNeedle == "" || !strings.Contains(string(data), cwdEchoNeedle) {
+					return data
+				}
+				lines := strings.SplitAfter(string(data), "\n")
+				var out strings.Builder
+				for _, line := range lines {
+					if strings.Contains(line, cwdEchoNeedle) {
+						continue
+					}
+					out.WriteString(line)
+				}
+				return []byte(out.String())
+			}
 			for {
 				n, err := stdout.Read(buf)
 				if err != nil {
 					break
 				}
-				if !writeBinary(buf[:n]) {
+				data := filterCwdEcho(buf[:n])
+				if len(data) > 0 && !writeBinary(data) {
 					break
 				}
 				if first {
@@ -281,10 +322,7 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 				}
 			}
 		}()
-		defer func() {
-			Manager.Remove(params.SessionID)
-			conn.Close()
-		}()
+		defer closeAll()
 
 		for {
 			msgType, data, err := conn.ReadMessage()
@@ -343,10 +381,16 @@ func dialSSH(params *ConnectParams) (*ssh.Client, *ssh.ClientConfig, error) {
 
 	var methods []ssh.AuthMethod
 	if params.PrivateKey != "" {
-		signer, err := ssh.ParsePrivateKey([]byte(params.PrivateKey))
+		var signer ssh.Signer
+		var err error
+		if params.Passphrase != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(params.PrivateKey), []byte(params.Passphrase))
+		} else {
+			signer, err = ssh.ParsePrivateKey([]byte(params.PrivateKey))
+		}
 		if err != nil {
 			if _, ok := err.(*ssh.PassphraseMissingError); ok {
-				return nil, nil, fmt.Errorf("私钥已加密（带密码短语），暂不支持，请使用未加密的私钥")
+				return nil, nil, fmt.Errorf("私钥已加密，请输入密码短语")
 			}
 			return nil, nil, fmt.Errorf("parse private key: %w", err)
 		}
