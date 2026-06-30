@@ -10,3 +10,7 @@
 /vendor/
 .DS_Store
 *.db*
+.gocache/
+uos-offline-bundle/
+webssh-linux
+webssh-*-amd64.deb
