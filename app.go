@@ -360,6 +360,8 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 	}()
 
 	// Read stdout → emit terminal:output events
+	// Filter the CWD-reporting hook echo so users don't see it.
+	cwdEchoNeedle := strings.TrimSpace(cwdSnippet)
 	go func() {
 		buf := make([]byte, 4096)
 		first := true
@@ -368,11 +370,26 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 			if err != nil {
 				break
 			}
-			data := base64.StdEncoding.EncodeToString(buf[:n])
-			runtime.EventsEmit(a.ctx, "terminal:output", map[string]string{
-				"sessionId": sessionID,
-				"data":      data,
-			})
+			data := buf[:n]
+			// Strip lines that contain the injected hook text.
+			if cwdEchoNeedle != "" && strings.Contains(string(data), cwdEchoNeedle) {
+				lines := strings.SplitAfter(string(data), "\n")
+				var out strings.Builder
+				for _, line := range lines {
+					if strings.Contains(line, cwdEchoNeedle) {
+						continue
+					}
+					out.WriteString(line)
+				}
+				data = []byte(out.String())
+			}
+			if len(data) > 0 {
+				enc := base64.StdEncoding.EncodeToString(data)
+				runtime.EventsEmit(a.ctx, "terminal:output", map[string]string{
+					"sessionId": sessionID,
+					"data":      enc,
+				})
+			}
 			if first {
 				first = false
 				go func() {
