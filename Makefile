@@ -10,7 +10,8 @@ CGO_LDFLAGS = -framework UniformTypeIdentifiers
 endif
 
 build:
-	go build -ldflags="-s -w" -o $(BINARY) .
+	wails build -clean -ldflags "-s -w" -tags webkit2_41
+	cp build/bin/$(BINARY).app/Contents/MacOS/$(BINARY) $(BINARY)
 
 build-windows:
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(BINARY).exe .
