@@ -6,8 +6,11 @@
 /release/
 /dist/
 /build/bin/
+/build/etc/
+/build/go/
 *.db*
 frontend/favicon.ico
+frontend/wailsjs/
 rsrc_windows_*.syso
 winres/
 
