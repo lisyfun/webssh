@@ -596,6 +596,24 @@ input, textarea, button { font-family: inherit; }
 <script src="lib/xterm.min.js"></script>
 <script src="lib/xterm-addon-fit.min.js"></script>
 <script src="lib/codemirror.min.js"></script>
+<script src="lib/cm-shell.min.js"></script>
+<script src="lib/cm-python.min.js"></script>
+<script src="lib/cm-javascript.min.js"></script>
+<script src="lib/cm-clike.min.js"></script>
+<script src="lib/cm-xml.min.js"></script>
+<script src="lib/cm-yaml.min.js"></script>
+<script src="lib/cm-markdown.min.js"></script>
+<script src="lib/cm-ruby.min.js"></script>
+<script src="lib/cm-css.min.js"></script>
+<script src="lib/cm-sql.min.js"></script>
+<script src="lib/cm-perl.min.js"></script>
+<script src="lib/cm-lua.min.js"></script>
+<script src="lib/cm-go.min.js"></script>
+<script src="lib/cm-rust.min.js"></script>
+<script src="lib/cm-php.min.js"></script>
+<script src="lib/cm-swift.min.js"></script>
+<script src="lib/cm-dart.min.js"></script>
+<script src="lib/cm-powershell.min.js"></script>
 <script>
 // ---- State ----
 let servers = [];
@@ -1695,6 +1713,34 @@ function fileDownload(name) {
 var activeEditorFile = null;
 var activeEditorCM = null;
 
+function getCMMode(ext) {
+  var map = {
+    'sh':'text/x-sh','bash':'text/x-sh','zsh':'text/x-sh','fish':'text/x-sh',
+    'py':'text/x-python',
+    'js':'text/javascript','mjs':'text/javascript','cjs':'text/javascript',
+    'ts':'text/typescript','tsx':'text/typescript-jsx','jsx':'text/jsx',
+    'json':'application/json','jsonl':'application/json',
+    'c':'text/x-csrc','h':'text/x-csrc','cc':'text/x-c++src','cpp':'text/x-c++src',
+    'hpp':'text/x-c++src','java':'text/x-java','kt':'text/x-kotlin','kts':'text/x-kotlin',
+    'scala':'text/x-scala',
+    'xml':'text/xml','html':'text/html','htm':'text/html',
+    'yaml':'text/x-yaml','yml':'text/x-yaml',
+    'md':'text/x-markdown','markdown':'text/x-markdown',
+    'rb':'text/x-ruby',
+    'css':'text/css','scss':'text/x-scss','less':'text/x-less',
+    'sql':'text/x-sql',
+    'pl':'text/x-perl','pm':'text/x-perl',
+    'lua':'text/x-lua',
+    'go':'text/x-go',
+    'rs':'text/x-rust',
+    'php':'text/x-php','dart':'text/x-dart','swift':'text/x-swift',
+    'vue':'text/html','svelte':'text/html',
+    'r':'text/x-rsrc',
+    'bat':'text/x-sh','cmd':'text/x-sh','ps1':'text/x-powershell',
+  };
+  return map[ext] || null;
+}
+
 function openEditor(name) {
   const ses = getActiveSession();
   if (!ses) return;
@@ -1709,9 +1755,13 @@ function openEditor(name) {
       return;
     }
   }
-  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-  const textNames = ['dockerfile','makefile','rakefile','gemfile','go.mod','go.sum','readme','license','hosts','fstab','crontab'];
-  const textExts = ['txt','log','md','markdown','rst','json','jsonl','yaml','yml','toml','ini','conf','cfg','env','xml','html','htm','css','scss','less','js','mjs','cjs','ts','tsx','jsx','go','py','rb','php','java','kt','kts','scala','c','h','cc','cpp','hpp','rs','swift','sh','bash','zsh','fish','ps1','bat','cmd','sql','lua','pl','pm','r','dart','vue','svelte','gitignore','gitattributes','editorconfig'];
+  var ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  // Dotfiles like .bashrc: treat the base name as extension
+  if (name.startsWith('.') && name.lastIndexOf('.') === 0) ext = name.slice(1).toLowerCase();
+  const textNames = ['dockerfile','makefile','rakefile','gemfile','go.mod','go.sum','readme','license','hosts','fstab','crontab',
+    '.bashrc','.profile','.zshrc','.gitconfig','.tmux.conf','.vimrc','.inputrc'];
+  const textExts = ['txt','log','md','markdown','rst','json','jsonl','yaml','yml','toml','ini','conf','cfg','env','xml','html','htm','css','scss','less','js','mjs','cjs','ts','tsx','jsx','go','py','rb','php','java','kt','kts','scala','c','h','cc','cpp','hpp','rs','swift','sh','bash','zsh','fish','ps1','bat','cmd','sql','lua','pl','pm','r','dart','vue','svelte','gitignore','gitattributes','editorconfig',
+    'bashrc','zshrc','profile','gitconfig','tmux.conf','vimrc','inputrc','aliases','exports','functions','path'];
   if (!textExts.includes(ext) && !textNames.includes(name.toLowerCase())) {
     showToast('只允许打开文本文件', 'error');
     return;
@@ -1734,6 +1784,7 @@ function openEditor(name) {
       var ta = document.createElement('textarea');
       ta.value = text;
       container.appendChild(ta);
+      var mode = getCMMode(ext);
       activeEditorCM = CodeMirror.fromTextArea(ta, {
         lineNumbers: true,
         lineWrapping: true,
@@ -1741,6 +1792,7 @@ function openEditor(name) {
         tabSize: 2,
         matchBrackets: true,
         autoCloseBrackets: true,
+        mode: mode,
         extraKeys: {
           'Ctrl-S': function() { saveEditor(); },
           'Cmd-S': function() { saveEditor(); }

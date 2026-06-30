@@ -96,6 +96,10 @@ func isTextLikeName(name string) bool {
 		return true
 	}
 	ext := strings.TrimPrefix(path.Ext(lower), ".")
+	// Dotfiles without extension: .bashrc, .profile, etc.
+	if ext == "" && strings.HasPrefix(lower, ".") {
+		ext = lower[1:]
+	}
 	if ext == "" {
 		return false
 	}
@@ -109,6 +113,8 @@ func isTextLikeName(name string) bool {
 		"sh": true, "bash": true, "zsh": true, "fish": true, "ps1": true, "bat": true, "cmd": true,
 		"sql": true, "lua": true, "pl": true, "pm": true, "r": true, "dart": true, "vue": true, "svelte": true,
 		"dockerfile": true, "gitignore": true, "gitattributes": true, "editorconfig": true,
+		"bashrc": true, "zshrc": true, "profile": true, "gitconfig": true, "tmux.conf": true, "vimrc": true,
+		"inputrc": true, "aliases": true, "exports": true, "functions": true, "path": true,
 	}
 	return textExt[ext]
 }
