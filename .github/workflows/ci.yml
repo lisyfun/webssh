@@ -27,7 +27,6 @@ jobs:
       - run: go vet ./...
 
   build-linux:
-    if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: check
     runs-on: ubuntu-latest
     steps:
