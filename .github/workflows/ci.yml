@@ -12,34 +12,34 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.26"
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.2
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev dpkg-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev
       - run: go vet ./...
 
   build-linux:
     needs: check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.26"
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.2
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev dpkg-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev
       - name: Generate bindings
         run: wails generate module
       - name: Build for Linux
@@ -58,9 +58,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.26"
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.2
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       - name: Generate bindings
         run: wails generate module
       - name: Build for macOS
@@ -81,9 +81,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.26"
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.2
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
         shell: bash
       - name: Generate bindings
         run: wails generate module
@@ -100,7 +100,7 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: [build-linux, build-macos, build-windows]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
       - name: Bundle
