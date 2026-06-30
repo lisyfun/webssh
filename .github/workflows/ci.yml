@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -28,7 +31,11 @@ jobs:
         with:
           go-version: '1.26'
       - run: make release
-      - name: Upload Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
+      - name: Create Release and Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --latest
