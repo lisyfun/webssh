@@ -50,27 +50,6 @@ jobs:
           name: webssh-linux
           path: build/bin/webssh
 
-  build-macos:
-    if: startsWith(github.ref, 'refs/tags/gui-v')
-    needs: check
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-      - name: Generate bindings
-        run: wails generate module
-      - name: Build for macOS
-        run: wails build -clean -ldflags "-s -w" -tags webkit2_41
-      - name: Upload .app
-        uses: actions/upload-artifact@v4
-        with:
-          name: WebSSH-macos
-          path: build/bin/WebSSH.app/
-
   build-windows:
     if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: check
@@ -97,7 +76,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/gui-v')
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -107,11 +86,6 @@ jobs:
           mkdir -p dist
           [ -f webssh-linux/webssh ] && cp webssh-linux/webssh dist/webssh-linux-amd64
           [ -f webssh-windows/webssh.exe ] && cp webssh-windows/webssh.exe dist/webssh-windows-amd64.exe
-          if [ -d "WebSSH-macos" ]; then
-            cp -r WebSSH-macos dist/WebSSH.app
-            tar czf dist/WebSSH-macos-universal.tar.gz -C dist WebSSH.app
-            rm -rf dist/WebSSH.app
-          fi
           ls -lh dist/
       - name: Create Release
         env:
