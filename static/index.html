@@ -13,6 +13,7 @@
   --bg-secondary: #161b22;
   --bg-tertiary: #21262d;
   --bg-hover: #30363d;
+  --border: #30363d;
   --border-color: #30363d;
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
@@ -594,6 +595,9 @@ input, textarea, button { font-family: inherit; }
       <select id="theme-select" style="width:100%;padding:6px 8px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:13px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-color)'">
         <option value="github-dark">GitHub Dark</option>
         <option value="catppuccin-mocha">Catppuccin Mocha</option>
+        <option value="one-dark">One Dark</option>
+        <option value="tokyo-night">Tokyo Night</option>
+        <option value="nord">Nord</option>
       </select>
     </div>
   </div>
@@ -1340,7 +1344,7 @@ var themes = {
   'github-dark': {
     css: {
       '--bg-primary': '#0d1117', '--bg-secondary': '#161b22', '--bg-tertiary': '#21262d',
-      '--bg-hover': '#30363d', '--border-color': '#30363d',
+      '--bg-hover': '#30363d', '--border': '#30363d', '--border-color': '#30363d',
       '--text-primary': '#e6edf3', '--text-secondary': '#8b949e', '--text-muted': '#6e7681',
       '--accent': '#4a8cff', '--accent-hover': '#3a7ae8', '--green': '#3fb950', '--red': '#ff7b72',
     },
@@ -1357,7 +1361,7 @@ var themes = {
   'catppuccin-mocha': {
     css: {
       '--bg-primary': '#1e1e2e', '--bg-secondary': '#181825', '--bg-tertiary': '#313244',
-      '--bg-hover': '#45475a', '--border-color': '#45475a',
+      '--bg-hover': '#45475a', '--border': '#45475a', '--border-color': '#45475a',
       '--text-primary': '#cdd6f4', '--text-secondary': '#a6adc8', '--text-muted': '#6c7086',
       '--accent': '#89b4fa', '--accent-hover': '#74c7ec', '--green': '#a6e3a1', '--red': '#f38ba8',
     },
@@ -1369,6 +1373,57 @@ var themes = {
       brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
       brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#cba6f7',
       brightCyan: '#94e2d5', brightWhite: '#cdd6f4',
+    },
+  },
+  'one-dark': {
+    css: {
+      '--bg-primary': '#282c34', '--bg-secondary': '#21252b', '--bg-tertiary': '#333842',
+      '--bg-hover': '#3e4451', '--border': '#3e4451', '--border-color': '#3e4451',
+      '--text-primary': '#abb2bf', '--text-secondary': '#828997', '--text-muted': '#5c6370',
+      '--accent': '#61afef', '--accent-hover': '#528bff', '--green': '#98c379', '--red': '#e06c75',
+    },
+    xterm: {
+      background: '#282c34', foreground: '#abb2bf', cursor: '#abb2bf',
+      selectionBackground: '#3e4451',
+      black: '#3e4451', red: '#e06c75', green: '#98c379', yellow: '#e5c07b',
+      blue: '#61afef', magenta: '#c678dd', cyan: '#56b6c2', white: '#abb2bf',
+      brightBlack: '#5c6370', brightRed: '#e06c75', brightGreen: '#98c379',
+      brightYellow: '#e5c07b', brightBlue: '#61afef', brightMagenta: '#c678dd',
+      brightCyan: '#56b6c2', brightWhite: '#abb2bf',
+    },
+  },
+  'tokyo-night': {
+    css: {
+      '--bg-primary': '#1a1b26', '--bg-secondary': '#16161e', '--bg-tertiary': '#24283b',
+      '--bg-hover': '#2f3346', '--border': '#2f3346', '--border-color': '#2f3346',
+      '--text-primary': '#a9b1d6', '--text-secondary': '#787c99', '--text-muted': '#565f89',
+      '--accent': '#7aa2f7', '--accent-hover': '#3d59a1', '--green': '#9ece6a', '--red': '#f7768e',
+    },
+    xterm: {
+      background: '#1a1b26', foreground: '#a9b1d6', cursor: '#a9b1d6',
+      selectionBackground: '#2f3346',
+      black: '#2f3346', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+      blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6',
+      brightBlack: '#565f89', brightRed: '#f7768e', brightGreen: '#9ece6a',
+      brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
+      brightCyan: '#7dcfff', brightWhite: '#a9b1d6',
+    },
+  },
+  'nord': {
+    css: {
+      '--bg-primary': '#2e3440', '--bg-secondary': '#3b4252', '--bg-tertiary': '#434c5e',
+      '--bg-hover': '#4c566a', '--border': '#4c566a', '--border-color': '#4c566a',
+      '--text-primary': '#eceff4', '--text-secondary': '#d8dee9', '--text-muted': '#81a1c1',
+      '--accent': '#88c0d0', '--accent-hover': '#8fbcbb', '--green': '#a3be8c', '--red': '#bf616a',
+    },
+    xterm: {
+      background: '#2e3440', foreground: '#eceff4', cursor: '#eceff4',
+      selectionBackground: '#4c566a',
+      black: '#4c566a', red: '#bf616a', green: '#a3be8c', yellow: '#ebcb8b',
+      blue: '#81a1c1', magenta: '#b48ead', cyan: '#88c0d0', white: '#eceff4',
+      brightBlack: '#616e88', brightRed: '#bf616a', brightGreen: '#a3be8c',
+      brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead',
+      brightCyan: '#88c0d0', brightWhite: '#eceff4',
     },
   },
 };
