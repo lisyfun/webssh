@@ -65,15 +65,11 @@ jobs:
         run: wails generate module
       - name: Build for macOS
         run: wails build -clean -ldflags "-s -w" -tags webkit2_41
-      - name: Copy binary for packaging
-        run: cp build/bin/webssh webssh
-      - name: Package .app
-        run: make package
       - name: Upload .app
         uses: actions/upload-artifact@v4
         with:
           name: WebSSH-macos
-          path: WebSSH.app/
+          path: build/bin/WebSSH.app/
 
   build-windows:
     if: startsWith(github.ref, 'refs/tags/gui-v')
