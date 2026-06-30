@@ -11,6 +11,7 @@
 *.db*
 frontend/favicon.ico
 frontend/wailsjs/
+build/bin/
 rsrc_windows_*.syso
 winres/
 
