@@ -79,14 +79,13 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
-			return true
+			return false
 		}
 		scheme := "http://"
 		if r.TLS != nil {
 			scheme = "https://"
 		}
-		expected := scheme + r.Host
-		return origin == expected
+		return origin == scheme+r.Host
 	},
 }
 

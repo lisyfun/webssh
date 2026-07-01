@@ -9,6 +9,7 @@
 *.out
 /vendor/
 .DS_Store
+frontend/
 *.db*
 .gocache/
 uos-offline-bundle/

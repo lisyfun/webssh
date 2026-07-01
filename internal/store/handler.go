@@ -3,7 +3,10 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -46,6 +49,10 @@ func HandleCreateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r
 	}
 	if svr.Host == "" || svr.User == "" {
 		jsonResp(w, ServerResponse{Success: false, Error: "host and user are required"})
+		return
+	}
+	if err := validateHost(svr.Host); err != nil {
+		jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
 		return
 	}
 	if svr.Port == 0 {
@@ -97,6 +104,10 @@ func HandleUpdateServer(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r
 
 	if svr.Host == "" || svr.User == "" {
 		jsonResp(w, ServerResponse{Success: false, Error: "host and user are required"})
+		return
+	}
+	if err := validateHost(svr.Host); err != nil {
+		jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
 		return
 	}
 	if svr.Port == 0 {
@@ -164,6 +175,10 @@ func HandleBatchImport(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r 
 		if svr.Host == "" {
 			continue
 		}
+		if err := validateHost(svr.Host); err != nil {
+			jsonResp(w, ServerResponse{Success: false, Error: err.Error()})
+			return
+		}
 		if svr.Port == 0 {
 			svr.Port = 22
 		}
@@ -189,4 +204,29 @@ func HandleBatchImport(st *Store, decrypt DecryptFunc, w http.ResponseWriter, r 
 	}
 
 	jsonResp(w, ServerResponse{Success: true, Data: map[string]int{"imported": imported}})
+}
+
+var blockedHosts = []string{
+	"localhost",
+	"127.0.0.1",
+	"::1",
+	"0.0.0.0",
+	"169.254.169.254",
+	"metadata.google.internal",
+	"100.100.100.200", // aliyun metadata
+}
+
+func validateHost(host string) error {
+	lower := strings.ToLower(host)
+	for _, b := range blockedHosts {
+		if lower == b {
+			return errors.New("host not allowed")
+		}
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+			return errors.New("host not allowed")
+		}
+	}
+	return nil
 }

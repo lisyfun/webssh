@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +25,7 @@ type tokenEntry struct {
 	created time.Time
 	ip      string
 	encKey  []byte
+	csrf    string
 }
 
 type rateEntry struct {
@@ -67,11 +69,12 @@ type Auth struct {
 	banTime       time.Duration
 	maxBodyMB     int64
 	enable2FA     bool
+	trustedProxy  bool
 }
 
 var ErrEncryptedFieldRequired = errors.New("encrypted field required")
 
-func New(store UserStore, username, basePath string, maxBodyMB int64, enable2FA bool) *Auth {
+func New(store UserStore, username, basePath string, maxBodyMB int64, enable2FA, trustedProxy bool) *Auth {
 	a := &Auth{
 		store:         store,
 		username:      username,
@@ -85,6 +88,7 @@ func New(store UserStore, username, basePath string, maxBodyMB int64, enable2FA 
 		banTime:       15 * time.Minute,
 		maxBodyMB:     maxBodyMB,
 		enable2FA:     enable2FA,
+		trustedProxy:  trustedProxy,
 	}
 	go a.cleanupLoop()
 	return a
@@ -169,14 +173,15 @@ func (a *Auth) KeyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	key, ok := a.SessionEncryptionKey(r)
+	a.mu.RLock()
+	entry, ok := a.tokens[cookie.Value]
+	a.mu.RUnlock()
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	csrf := cookie.Value[:16]
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"key":"%s","csrf":"%s","maxBodyMB":%d}`, hex.EncodeToString(key), csrf, a.maxBodyMB)
+	fmt.Fprintf(w, `{"key":"%s","csrf":"%s","maxBodyMB":%d}`, hex.EncodeToString(entry.encKey), entry.csrf, a.maxBodyMB)
 }
 
 // CSRFValidate is middleware that checks the X-CSRF-Token header for state-changing requests.
@@ -191,9 +196,15 @@ func (a *Auth) CSRFValidate(next http.Handler) http.Handler {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
-		expected := cookie.Value[:16]
+		a.mu.RLock()
+		entry, ok := a.tokens[cookie.Value]
+		a.mu.RUnlock()
+		if !ok {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
 		token := r.Header.Get("X-CSRF-Token")
-		if token == "" || token != expected {
+		if token == "" || token != entry.csrf {
 			http.Error(w, "invalid csrf token", http.StatusForbidden)
 			return
 		}
@@ -232,7 +243,7 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 
 		// Bind the session token to the IP it was issued to, so a stolen
 		// token cannot be replayed from another address.
-		if entry.ip != clientIP(r) {
+		if entry.ip != a.clientIP(r) {
 			a.mu.Lock()
 			delete(a.tokens, cookie.Value)
 			a.mu.Unlock()
@@ -244,7 +255,18 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func clientIP(r *http.Request) string {
+func (a *Auth) clientIP(r *http.Request) string {
+	if a.trustedProxy {
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			if i := strings.IndexByte(fwd, ','); i >= 0 {
+				fwd = fwd[:i]
+			}
+			return strings.TrimSpace(fwd)
+		}
+		if real := r.Header.Get("X-Real-IP"); real != "" {
+			return strings.TrimSpace(real)
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
@@ -291,9 +313,30 @@ func sameOrigin(r *http.Request, ref string) bool {
 	return len(ref) >= len(scheme+r.Host) && ref[:len(scheme+r.Host)] == scheme+r.Host
 }
 
+// rateLimitCheck returns true if the request should be rejected (rate limit exceeded).
+// On first call from an IP it initializes the counter; on excess it writes the error.
+func (a *Auth) rateLimitCheck(w http.ResponseWriter, ip string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	re, exists := a.rateLimit[ip]
+	if exists {
+		if time.Since(re.firstTry) > a.banTime {
+			re.count = 0
+			re.firstTry = time.Now()
+		} else if re.count >= a.maxLogins {
+			http.Error(w, "尝试过多，请15分钟后再试", http.StatusTooManyRequests)
+			return true
+		}
+	} else {
+		a.rateLimit[ip] = &rateEntry{firstTry: time.Now()}
+	}
+	a.rateLimit[ip].count++
+	return false
+}
+
 func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		ip := clientIP(r)
+		ip := a.clientIP(r)
 
 		a.mu.Lock()
 		re, exists := a.rateLimit[ip]
@@ -380,8 +423,9 @@ func (a *Auth) establishSession(w http.ResponseWriter, r *http.Request, ip strin
 		http.Error(w, "failed to initialize session", http.StatusInternalServerError)
 		return
 	}
+	csrfToken := generateToken()[:16]
 	a.mu.Lock()
-	a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey}
+	a.tokens[token] = tokenEntry{created: time.Now(), ip: ip, encKey: encKey, csrf: csrfToken}
 	a.mu.Unlock()
 
 	http.SetCookie(w, &http.Cookie{

@@ -86,6 +86,9 @@ func (a *Auth) CompleteTOTPSetupHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if a.rateLimitCheck(w, a.clientIP(r)) {
+		return
+	}
 	r.ParseForm()
 	setupToken := r.FormValue("setup_token")
 	code := r.FormValue("code")
@@ -119,7 +122,7 @@ func (a *Auth) CompleteTOTPSetupHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	a.establishSession(w, r, clientIP(r))
+	a.establishSession(w, r, a.clientIP(r))
 }
 
 func (a *Auth) TOTPResetHandler(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +256,11 @@ func (a *Auth) TOTPLoginHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	token := r.FormValue("login_token")
 	code := r.FormValue("totp_code")
-	ip := clientIP(r)
+	ip := a.clientIP(r)
+
+	if a.rateLimitCheck(w, ip) {
+		return
+	}
 
 	a.mu.Lock()
 	pl, ok := a.pendingLogins[token]
