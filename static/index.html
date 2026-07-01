@@ -117,6 +117,9 @@ input, textarea, button { font-family: inherit; }
 .tab .tab-host { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
 .tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
 .tab-close:hover { color: var(--text-primary); }
+.tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; line-height: 1; display: flex; align-items: center; flex-shrink: 0; }
+.tab-refresh:hover { color: var(--accent); }
+.tab-refresh svg { width: 14px; height: 14px; }
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
 .terminal-wrapper .xterm { padding: 6px 0 0 14px; box-sizing: border-box; }
 .terminal-wrapper .empty-state {
@@ -826,6 +829,29 @@ function switchSession(sid) {
   setActiveSession(sid);
 }
 
+function reconnectSession(sid) {
+  if (!sid) return;
+  const ses = sessions[sid];
+  if (!ses) return;
+  if (ses.ws) {
+    if (ses._ka) { clearInterval(ses._ka); ses._ka = null; }
+    ses.ws.onclose = null;
+    ses.ws.onmessage = null;
+    ses.ws.onerror = null;
+    ses.ws.close();
+  }
+  if (ses.term) {
+    ses.term.dispose();
+    ses.term = null;
+    ses.fitAddon = null;
+  }
+  const container = document.getElementById(`term-${sid}`);
+  if (container) container.remove();
+  ses.connected = false;
+  ses.sessionId = null;
+  connectToServer(sid);
+}
+
 function closeSession(sid) {
   const ses = sessions[sid];
   if (!ses) return;
@@ -868,6 +894,7 @@ function renderTabs() {
     return `<div class="tab${active}" onclick="switchSession('${sid}')">
       <span class="tab-name">${escHtml(name)}</span>
       <span class="tab-host">${escHtml(host)}</span>
+      <button class="tab-refresh" onclick="event.stopPropagation();reconnectSession('${sid}')" title="重新连接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
       <button class="tab-close" onclick="event.stopPropagation();closeSession('${sid}')">&times;</button>
     </div>`;
   }).join('');
