@@ -8,7 +8,7 @@ import (
 )
 
 func TestDecryptWithKeyStrictRejectsMalformedCiphertext(t *testing.T) {
-	a := New(noopStore{}, "admin", "/x", 50, false)
+	a := New(noopStore{}, "admin", "/x", 50, false, false)
 	key := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
 		t.Fatal(err)
@@ -20,7 +20,7 @@ func TestDecryptWithKeyStrictRejectsMalformedCiphertext(t *testing.T) {
 }
 
 func TestDecryptWithKeyStrictAllowsEmptyField(t *testing.T) {
-	a := New(noopStore{}, "admin", "/x", 50, false)
+	a := New(noopStore{}, "admin", "/x", 50, false, false)
 	got, err := a.DecryptWithKeyStrict(nil, "")
 	if err != nil {
 		t.Fatalf("DecryptWithKeyStrict empty unexpected error: %v", err)
@@ -31,7 +31,7 @@ func TestDecryptWithKeyStrictAllowsEmptyField(t *testing.T) {
 }
 
 func TestDecryptWithKeyStrictRejectsNonEmptyFieldWithoutKey(t *testing.T) {
-	a := New(noopStore{}, "admin", "/x", 50, false)
+	a := New(noopStore{}, "admin", "/x", 50, false, false)
 	if got, err := a.DecryptWithKeyStrict(nil, "secret"); err == nil {
 		t.Fatalf("DecryptWithKeyStrict returned %q, nil; want error", got)
 	}
