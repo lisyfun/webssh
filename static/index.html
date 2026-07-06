@@ -970,6 +970,14 @@ function connectToServer(sid, passphrase) {
       ws.close();
       return;
     }
+    // 连接建立后发送初始终端尺寸，确保 PTY 尺寸与显示一致
+    // 避免 bash readline 用 80 列计算光标定位，删除/方向键后文字错位
+    if (sessions[sid] && sessions[sid].fitAddon) {
+      const dims = sessions[sid].fitAddon.proposeDimensions();
+      if (dims) {
+        ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+      }
+    }
     // 每 30s 发 keepalive，防止 WS 被 NAT/防火墙超时断开
     ses._ka = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'keepalive'}));

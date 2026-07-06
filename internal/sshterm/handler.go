@@ -245,11 +245,13 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 		cwdSnippet := cwdReportSnippet(shell)
 
 		modes := ssh.TerminalModes{
-			ssh.ECHO:          1,
+			ssh.ECHO:          1,   // 回显输入
+			ssh.ICRNL:         1,   // 输入 CR → NL
+			ssh.OPOST:         1,   // 启用输出处理（ONLCR 等生效的前提）
+			ssh.ONLCR:         1,   // 输出 NL → CR+NL，修复方向键换行错位
 			ssh.TTY_OP_ISPEED: 14400,
 			ssh.TTY_OP_OSPEED: 14400,
 		}
-
 		if err := session.RequestPty("xterm-256color", 40, 80, modes); err != nil {
 			log.Printf("request pty failed: %v", err)
 			closeAll()
