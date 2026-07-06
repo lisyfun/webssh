@@ -64,6 +64,8 @@ type ConnectParams struct {
 	Password   string `json:"password"`
 	PrivateKey string `json:"privateKey"`
 	Passphrase string `json:"passphrase,omitempty"`
+	Cols       int    `json:"cols"`
+	Rows       int    `json:"rows"`
 }
 
 type ResizeMsg struct {
@@ -123,10 +125,13 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 				conn.Close()
 				return
 			}
+			// 保存前端发送的终端尺寸，resolve 返回的 serverParams 不含这些字段
+			cols, rows := params.Cols, params.Rows
 			serverParams.SessionID = params.SessionID
 			serverParams.ServerID = params.ServerID
 			serverParams.Passphrase = params.Passphrase
 			params = *serverParams
+			params.Cols, params.Rows = cols, rows
 		} else if decrypt != nil {
 			if params.Password, err = decrypt(r, params.Password); err != nil {
 				_ = conn.WriteMessage(websocket.TextMessage, []byte("SSH connection failed: invalid encrypted password"))
@@ -252,7 +257,15 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			ssh.TTY_OP_ISPEED: 14400,
 			ssh.TTY_OP_OSPEED: 14400,
 		}
-		if err := session.RequestPty("xterm-256color", 40, 80, modes); err != nil {
+		ptyCols := params.Cols
+		if ptyCols <= 0 {
+			ptyCols = 80
+		}
+		ptyRows := params.Rows
+		if ptyRows <= 0 {
+			ptyRows = 40
+		}
+		if err := session.RequestPty("xterm-256color", ptyRows, ptyCols, modes); err != nil {
 			log.Printf("request pty failed: %v", err)
 			closeAll()
 			return
