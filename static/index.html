@@ -933,6 +933,8 @@ function setActiveSession(sid) {
   }
   updateStatus();
   loadFileList();
+  // 切换标签后更新进度条为当前 session 的上传进度
+  updateUploadProgress(ses._uploadQ);
 }
 
 function connectToServer(sid, passphrase) {
@@ -2097,7 +2099,32 @@ function saveEditor() {
   });
 }
 
-var _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
+function getSessionQ(ses) {
+  if (!ses._uploadQ) ses._uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
+  return ses._uploadQ;
+}
+
+function updateUploadProgress(q) {
+  const progressEl = document.getElementById('file-progress');
+  const fillEl = document.getElementById('progress-fill');
+  const textEl = document.getElementById('progress-text');
+  const pctEl = document.getElementById('progress-pct');
+  if (!q || q.items.length === 0) {
+    if (q && q.done > 0) {
+      textEl.textContent = '上传完成';
+      fillEl.style.width = '100%';
+      pctEl.textContent = '100%';
+      window._uploadHideTimer = setTimeout(() => { progressEl.style.display = 'none'; }, 1500);
+    }
+    return;
+  }
+  progressEl.style.display = 'block';
+  const total = q.done + q.items.length;
+  const pct = q.totalBytes > 0 ? Math.round((q.sentBytes / q.totalBytes) * 100) : 0;
+  textEl.textContent = `${q.done + 1}/${total} ${q.items[0].name}`;
+  fillEl.style.width = pct + '%';
+  pctEl.textContent = pct + '%';
+}
 
 function fileUpload() {
   document.getElementById('file-input').click();
@@ -2111,8 +2138,7 @@ function fileUploadDo(input) {
 function uploadFiles(files) {
   const ses = getActiveSession();
   if (!ses || !ses.connected || !files.length) return;
-
-  // 绑定上传时的 session 信息到每个文件，不同标签上传互不影响
+  const q = getSessionQ(ses);
   const curSessionId = ses.sessionId;
   const curFsPath = ses.fsPath;
 
@@ -2127,24 +2153,15 @@ function uploadFiles(files) {
     }
   }
   if (ok.length === 0) return;
-  _uploadQ.items.push(...ok);
-  _uploadQ.totalBytes += arr.reduce((s, f) => s + f.size, 0);
+  q.items.push(...ok);
+  q.totalBytes += arr.reduce((s, f) => s + f.size, 0);
 
   if (window._uploadHideTimer) clearTimeout(window._uploadHideTimer);
+  updateUploadProgress(q);
 
-  const progressEl = document.getElementById('file-progress');
-  const fillEl = document.getElementById('progress-fill');
-  const textEl = document.getElementById('progress-text');
-  const pctEl = document.getElementById('progress-pct');
-
-  progressEl.style.display = 'block';
-  textEl.textContent = `排队中 ${_uploadQ.items.length} 个文件...`;
-  pctEl.textContent = '0%';
-  fillEl.style.width = '0%';
-
-  if (!_uploadQ.active) {
-    _uploadQ.active = true;
-    processUploadQ();
+  if (!q.active) {
+    q.active = true;
+    processSessionQ(ses);
   }
 }
 
@@ -2170,13 +2187,7 @@ function uploadChunk(sessionId, path, item, offset, chunkData) {
   });
 }
 
-function uploadFileChunked(sessionId, path, item) {
-  const progressEl = document.getElementById('file-progress');
-  const fillEl = document.getElementById('progress-fill');
-  const textEl = document.getElementById('progress-text');
-  const pctEl = document.getElementById('progress-pct');
-
-  const total = _uploadQ.done + _uploadQ.items.length;
+function uploadFileChunked(ses, q, item) {
   const reader = new FileReader();
   let offset = 0;
   let failCount = 0;
@@ -2187,37 +2198,33 @@ function uploadFileChunked(sessionId, path, item) {
       const chunkData = e.target.result;
       while (true) {
         try {
-          await uploadChunk(sessionId, path, item, offset, chunkData);
+          await uploadChunk(item._sessionId, item._fsPath, item, offset, chunkData);
           break;
         } catch (err) {
           failCount++;
           if (failCount >= 3) {
-            textEl.textContent = `失败: ${item.name}`;
             showToast(`上传失败: ${item.name}`, 'error');
-            _uploadQ.active = false;
-            _uploadQ.items = [];
+            q.active = false;
+            q.items = [];
+            updateUploadProgress(q);
             return;
           }
           await new Promise(r => setTimeout(r, 1000));
         }
       }
       offset += chunkData.byteLength;
-      const filePct = Math.round((offset / item.size) * 100);
-      const overall = ((_uploadQ.sentBytes + offset) / _uploadQ.totalBytes) * 100;
-      textEl.textContent = `${_uploadQ.done + 1}/${total} ${item.name}`;
-      fillEl.style.width = overall + '%';
-      pctEl.textContent = Math.round(overall) + '%';
+      q.sentBytes += chunkData.byteLength;
+      updateUploadProgress(q);
       if (offset < item.size) {
         setTimeout(readNext, 0);
       } else {
-        _uploadQ.sentBytes += item.size;
-        _uploadQ.done++;
-        _uploadQ.items.shift();
-        setTimeout(processUploadQ, 80);
+        q.done++;
+        q.items.shift();
+        updateUploadProgress(q);
+        setTimeout(() => processSessionQ(ses), 80);
       }
     };
     reader.onerror = function () {
-      textEl.textContent = `失败: ${item.name}`;
       showToast(`读取文件失败: ${item.name}`, 'error');
     };
     reader.readAsArrayBuffer(slice);
@@ -2226,59 +2233,51 @@ function uploadFileChunked(sessionId, path, item) {
   readNext();
 }
 
-function processUploadQ() {
-  const progressEl = document.getElementById('file-progress');
-  const fillEl = document.getElementById('progress-fill');
-  const textEl = document.getElementById('progress-text');
-  const pctEl = document.getElementById('progress-pct');
-
-  if (_uploadQ.items.length === 0) {
-    _uploadQ.active = false;
-    _uploadQ.totalBytes = 0;
-    _uploadQ.done = 0;
-    textEl.textContent = '上传完成';
-    fillEl.style.width = '100%';
-    pctEl.textContent = '100%';
-    window._uploadHideTimer = setTimeout(() => { progressEl.style.display = 'none'; }, 1500);
+function processSessionQ(ses) {
+  const q = getSessionQ(ses);
+  if (q.items.length === 0) {
+    q.active = false;
+    q.totalBytes = 0;
+    q.sentBytes = 0;
+    q.done = 0;
+    updateUploadProgress(q);
     loadFileList();
     return;
   }
-  const item = _uploadQ.items[0];
-  // 使用文件条目上绑定的 sessionId/fsPath，不同标签的上传互不影响
-  const targetSessionId = item._sessionId;
-  const targetPath = item._fsPath;
+
+  const item = q.items[0];
 
   if (item.size > CHUNK_SIZE) {
-    uploadFileChunked(targetSessionId, targetPath, item);
+    uploadFileChunked(ses, q, item);
     return;
   }
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', `__BASE_PATH__/api/fs/${targetSessionId}/upload?path=${encodeURIComponent(targetPath)}`);
+  xhr.open('POST', `__BASE_PATH__/api/fs/${item._sessionId}/upload?path=${encodeURIComponent(item._fsPath)}`);
   if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
 
   xhr.upload.onprogress = (e) => {
     if (e.lengthComputable) {
-      const overall = ((_uploadQ.sentBytes + e.loaded) / _uploadQ.totalBytes) * 100;
-      fillEl.style.width = overall + '%';
-      pctEl.textContent = Math.round(overall) + '%';
+      const overall = ((q.sentBytes + e.loaded) / q.totalBytes) * 100;
+      document.getElementById('progress-fill').style.width = overall + '%';
+      document.getElementById('progress-pct').textContent = Math.round(overall) + '%';
     }
   };
 
   xhr.onload = () => {
     if (xhr.status === 200) {
-      _uploadQ.sentBytes += item.size;
-      _uploadQ.done++;
-      _uploadQ.items.shift();
-      progressEl.style.display = 'block';
-      setTimeout(processUploadQ, 80);
+      q.sentBytes += item.size;
+      q.done++;
+      q.items.shift();
+      updateUploadProgress(q);
+      setTimeout(() => processSessionQ(ses), 80);
     } else {
-      textEl.textContent = `失败: ${item.name}`;
+      showToast(`上传失败: ${item.name}`, 'error');
     }
   };
 
   xhr.onerror = () => {
-    textEl.textContent = `失败: ${item.name}`;
+    showToast(`上传失败: ${item.name}`, 'error');
   };
 
   const form = new FormData();
