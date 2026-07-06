@@ -2097,7 +2097,7 @@ function saveEditor() {
   });
 }
 
-var _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
+var _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0, _sessionId: null, _fsPath: null };
 
 function fileUpload() {
   document.getElementById('file-input').click();
@@ -2111,6 +2111,10 @@ function fileUploadDo(input) {
 function uploadFiles(files) {
   const ses = getActiveSession();
   if (!ses || !ses.connected || !files.length) return;
+
+  // 绑定上传时的 session 信息，避免切换标签后上传到错误终端
+  _uploadQ._sessionId = ses.sessionId;
+  _uploadQ._fsPath = ses.fsPath;
 
   const arr = Array.from(files);
   const limitBytes = maxUploadMB > 0 ? maxUploadMB * 1024 * 1024 : 0;
@@ -2146,10 +2150,10 @@ function uploadFiles(files) {
 
 const CHUNK_SIZE = 512 * 1024;
 
-function uploadChunk(ses, item, offset, chunkData) {
+function uploadChunk(sessionId, path, item, offset, chunkData) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `__BASE_PATH__/api/fs/${ses.sessionId}/upload?path=${encodeURIComponent(ses.fsPath)}`);
+    xhr.open('POST', `__BASE_PATH__/api/fs/${sessionId}/upload?path=${encodeURIComponent(path)}`);
     if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
     xhr.setRequestHeader('X-Upload-Offset', String(offset));
     xhr.setRequestHeader('X-Upload-Name', item.name);
@@ -2166,7 +2170,7 @@ function uploadChunk(ses, item, offset, chunkData) {
   });
 }
 
-function uploadFileChunked(ses, item) {
+function uploadFileChunked(sessionId, path, item) {
   const progressEl = document.getElementById('file-progress');
   const fillEl = document.getElementById('progress-fill');
   const textEl = document.getElementById('progress-text');
@@ -2183,7 +2187,7 @@ function uploadFileChunked(ses, item) {
       const chunkData = e.target.result;
       while (true) {
         try {
-          await uploadChunk(ses, item, offset, chunkData);
+          await uploadChunk(sessionId, path, item, offset, chunkData);
           break;
         } catch (err) {
           failCount++;
@@ -2192,6 +2196,8 @@ function uploadFileChunked(ses, item) {
             showToast(`上传失败: ${item.name}`, 'error');
             _uploadQ.active = false;
             _uploadQ.items = [];
+            _uploadQ._sessionId = null;
+            _uploadQ._fsPath = null;
             return;
           }
           await new Promise(r => setTimeout(r, 1000));
@@ -2233,6 +2239,8 @@ function processUploadQ() {
     _uploadQ.totalBytes = 0;
     _uploadQ.sentBytes = 0;
     _uploadQ.done = 0;
+    _uploadQ._sessionId = null;
+    _uploadQ._fsPath = null;
     textEl.textContent = '上传完成';
     fillEl.style.width = '100%';
     pctEl.textContent = '100%';
@@ -2241,22 +2249,18 @@ function processUploadQ() {
     return;
   }
 
-  const item = _uploadQ.items[0];
-  const total = _uploadQ.done + _uploadQ.items.length;
-  textEl.textContent = `${_uploadQ.done + 1}/${total} ${item.name}`;
-  pctEl.textContent = '0%';
-  fillEl.style.width = '0%';
-
-  const ses = getActiveSession();
-  if (!ses) { textEl.textContent = '会话已断开'; return; }
+  // 使用上传开始时绑定的 sessionId/fsPath，切换标签不改变上传目标
+  const targetSessionId = _uploadQ._sessionId;
+  const targetPath = _uploadQ._fsPath;
+  if (!targetSessionId) { textEl.textContent = '会话已断开'; return; }
 
   if (item.size > CHUNK_SIZE) {
-    uploadFileChunked(ses, item);
+    uploadFileChunked(targetSessionId, targetPath, item);
     return;
   }
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', `__BASE_PATH__/api/fs/${ses.sessionId}/upload?path=${encodeURIComponent(ses.fsPath)}`);
+  xhr.open('POST', `__BASE_PATH__/api/fs/${targetSessionId}/upload?path=${encodeURIComponent(targetPath)}`);
   if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
 
   xhr.upload.onprogress = (e) => {
