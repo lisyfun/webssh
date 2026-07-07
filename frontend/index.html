@@ -32,7 +32,10 @@ input, textarea, button { font-family: inherit; }
 ::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
 .app { display: flex; flex-direction: column; height: 100vh; }
 .body { display: flex; flex: 1; overflow: hidden; }
-.sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
+.sidebar.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
+
+
 .sidebar-header { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
 .sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; }
@@ -75,6 +78,9 @@ input, textarea, button { font-family: inherit; }
 .tab .tab-host { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
 .tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
 .tab-close:hover { color: var(--text-primary); }
+.tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; line-height: 1; display: inline-flex; align-items: center; flex-shrink: 0; }
+.tab-refresh:hover { color: var(--accent); }
+
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
 .terminal-wrapper .xterm { padding: 6px 0 0 14px; box-sizing: border-box; }
 .terminal-wrapper .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; gap: 8px; }
@@ -91,6 +97,8 @@ input, textarea, button { font-family: inherit; }
 .file-panel-header .actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
 .file-panel-header .actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .file-panel-header .actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+.file-panel-header .actions button.active { color: var(--accent); }
+
 .file-breadcrumb { padding: 6px 12px; border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow-x: auto; flex-shrink: 0; }
 .file-breadcrumb::-webkit-scrollbar { height: 2px; }
 .file-breadcrumb .crumb { cursor: pointer; padding: 2px 4px; border-radius: 2px; }
@@ -171,6 +179,44 @@ input, textarea, button { font-family: inherit; }
 .editor-modal .cm-s-default .cm-attribute { color: #ffa657; }
 .editor-modal .CodeMirror-focused .CodeMirror-selected { background: #264f78; }
 .CodeMirror { background: #0d1117; color: #e6edf3; }
+/* Theme picker */
+.theme-picker { display: flex; flex-direction: column; gap: 6px; }
+.theme-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.theme-card:hover { border-color: var(--accent); }
+.theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,140,255,0.2); }
+.theme-card .preview { width: 36px; height: 24px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+.theme-card .info { flex: 1; min-width: 0; }
+.theme-card .info .tname { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.theme-card .info .tdesc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.theme-card .check { font-size: 14px; opacity: 0; transition: opacity .15s; color: var(--accent); }
+.theme-card.active .check { opacity: 1; }
+
+/* Font settings popup */
+.font-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px; width: 380px; z-index: 1500; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.font-popup h2 { font-size: 15px; font-weight: 600; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+.popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.popup-header h2 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.popup-header .close-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 4px; display: inline-flex; }
+.popup-header .close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.popup-body .section { margin-bottom: 18px; }
+.popup-body .section-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.font-popup .form-group { margin-bottom: 10px; }
+.font-popup .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.font-popup .form-row { display: flex; gap: 10px; }
+.font-popup .form-row .form-group { flex: 1; }
+.font-popup .form-group input[type="text"], .font-popup .form-group input[type="number"] { width: 100%; padding: 6px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; }
+.font-popup .form-group input:focus { border-color: var(--accent); }
+.size-group { display: flex; align-items: center; gap: 4px; }
+.size-group input { text-align: center; width: 60px; }
+.size-btn { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
+.size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.font-popup .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.font-popup .actions button { padding: 6px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; }
+.font-popup .btn-cancel { background: var(--bg-tertiary); color: var(--text-secondary); }
+.font-popup .btn-cancel:hover { background: var(--bg-hover); }
+.font-popup .btn-apply { background: var(--accent); color: #fff; }
+.font-popup .btn-apply:hover { opacity: .85; }
+.settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1400; }
 </style>
 </head>
 <body>
@@ -194,6 +240,8 @@ input, textarea, button { font-family: inherit; }
       <div class="tab-bar" id="tab-bar" style="display:none">
         <div class="tab-list" id="tab-list"></div>
         <div class="tab-bar-right">
+          <button class="tab-bar-btn" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="收起/展开服务器列表"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+          <button class="tab-bar-btn" onclick="showFontSettings()" title="终端设置"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
           <button class="tab-bar-btn" id="toggle-files-btn" onclick="toggleFilePanel()" title="文件浏览器"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
         </div>
       </div>
@@ -215,6 +263,7 @@ input, textarea, button { font-family: inherit; }
       <div class="file-panel-header">
         <span>文件浏览器</span>
         <div class="actions">
+          <button onclick="toggleHiddenFiles()" id="file-hidden-btn" title="显示隐藏文件"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
           <button onclick="fileUpload()" id="file-upload-btn" disabled title="上传文件">&#x2191;</button>
           <button onclick="fileMkdir()" id="file-mkdir-btn" disabled title="新建目录">+</button>
         </div>
@@ -414,9 +463,198 @@ let resumeWaiter = null;
 let activeEditorFile = null;
 let activeEditorCM = null;
 var _renaming = '';
+let sidebarOpen = true;
+let showHidden = localStorage.getItem('webssh-show-hidden') === 'true';
+var fontSettings = {};
 
 function App() { return window.go.main.App; }
 
+
+var themeMeta = {
+  'github-dark': { name: 'GitHub Dark', desc: '经典 GitHub 暗色', bg: '#0d1117', accent: '#4a8cff', fg: '#e6edf3' },
+  'catppuccin-mocha': { name: 'Catppuccin Mocha', desc: '热门暖紫暗色', bg: '#1e1e2e', accent: '#89b4fa', fg: '#cdd6f4' },
+  'one-dark': { name: 'One Dark', desc: 'Atom 编辑器经典', bg: '#282c34', accent: '#61afef', fg: '#abb2bf' },
+  'tokyo-night': { name: 'Tokyo Night', desc: '霓虹蓝紫暗色', bg: '#1a1b26', accent: '#7aa2f7', fg: '#a9b1d6' },
+  'nord': { name: 'Nord', desc: '北极蓝调暗色', bg: '#2e3440', accent: '#88c0d0', fg: '#eceff4' },
+  'github-light': { name: 'GitHub Light', desc: 'GitHub 经典亮色', bg: '#ffffff', accent: '#0969da', fg: '#1f2328' },
+  'catppuccin-latte': { name: 'Catppuccin Latte', desc: '柔和暖色亮色', bg: '#eff1f5', accent: '#1e66f5', fg: '#4c4f69' },
+  'one-light': { name: 'One Light', desc: 'Atom 编辑器亮色', bg: '#fafafa', accent: '#4078f2', fg: '#383a42' },
+  'solarized-light': { name: 'Solarized Light', desc: '经典护眼亮色', bg: '#fdf6e3', accent: '#268bd2', fg: '#657b83' },
+  'tokyo-day': { name: 'Tokyo Day', desc: 'Tokyo Night 亮色版', bg: '#e1e2e7', accent: '#2f54a6', fg: '#3760bf' },
+};
+
+var themes = {
+  'github-dark': {
+    css: {
+      '--bg-primary': '#0d1117', '--bg-secondary': '#161b22', '--bg-tertiary': '#21262d',
+      '--bg-hover': '#30363d', '--border': '#30363d', '--border-color': '#30363d',
+      '--text-primary': '#e6edf3', '--text-secondary': '#8b949e', '--text-muted': '#6e7681',
+      '--accent': '#4a8cff', '--accent-hover': '#3a7ae8', '--green': '#3fb950', '--red': '#ff7b72',
+    },
+    xterm: {
+      background: '#0d1117', foreground: '#e6edf3', cursor: '#e6edf3',
+      selectionBackground: '#3b5998',
+      black: '#000000', red: '#ff7b72', green: '#1f7a2e', yellow: '#e3b341',
+      blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
+      brightBlack: '#484f58', brightRed: '#ffa198', brightGreen: '#56d364',
+      brightYellow: '#e9c46a', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+      brightCyan: '#56d4dd', brightWhite: '#e6edf3',
+    },
+  },
+  'catppuccin-mocha': {
+    css: {
+      '--bg-primary': '#1e1e2e', '--bg-secondary': '#181825', '--bg-tertiary': '#313244',
+      '--bg-hover': '#45475a', '--border': '#45475a', '--border-color': '#45475a',
+      '--text-primary': '#cdd6f4', '--text-secondary': '#a6adc8', '--text-muted': '#6c7086',
+      '--accent': '#89b4fa', '--accent-hover': '#74c7ec', '--green': '#a6e3a1', '--red': '#f38ba8',
+    },
+    xterm: {
+      background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#cdd6f4',
+      selectionBackground: '#45475a',
+      black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+      blue: '#89b4fa', magenta: '#cba6f7', cyan: '#94e2d5', white: '#bac2de',
+      brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
+      brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#cba6f7',
+      brightCyan: '#94e2d5', brightWhite: '#cdd6f4',
+    },
+  },
+  'one-dark': {
+    css: {
+      '--bg-primary': '#282c34', '--bg-secondary': '#21252b', '--bg-tertiary': '#333842',
+      '--bg-hover': '#3e4451', '--border': '#3e4451', '--border-color': '#3e4451',
+      '--text-primary': '#abb2bf', '--text-secondary': '#828997', '--text-muted': '#5c6370',
+      '--accent': '#61afef', '--accent-hover': '#528bff', '--green': '#98c379', '--red': '#e06c75',
+    },
+    xterm: {
+      background: '#282c34', foreground: '#abb2bf', cursor: '#abb2bf',
+      selectionBackground: '#3e4451',
+      black: '#3e4451', red: '#e06c75', green: '#98c379', yellow: '#e5c07b',
+      blue: '#61afef', magenta: '#c678dd', cyan: '#56b6c2', white: '#abb2bf',
+      brightBlack: '#5c6370', brightRed: '#e06c75', brightGreen: '#98c379',
+      brightYellow: '#e5c07b', brightBlue: '#61afef', brightMagenta: '#c678dd',
+      brightCyan: '#56b6c2', brightWhite: '#abb2bf',
+    },
+  },
+  'tokyo-night': {
+    css: {
+      '--bg-primary': '#1a1b26', '--bg-secondary': '#16161e', '--bg-tertiary': '#24283b',
+      '--bg-hover': '#2f3346', '--border': '#2f3346', '--border-color': '#2f3346',
+      '--text-primary': '#a9b1d6', '--text-secondary': '#787c99', '--text-muted': '#565f89',
+      '--accent': '#7aa2f7', '--accent-hover': '#3d59a1', '--green': '#9ece6a', '--red': '#f7768e',
+    },
+    xterm: {
+      background: '#1a1b26', foreground: '#a9b1d6', cursor: '#a9b1d6',
+      selectionBackground: '#2f3346',
+      black: '#2f3346', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+      blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6',
+      brightBlack: '#565f89', brightRed: '#f7768e', brightGreen: '#9ece6a',
+      brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
+      brightCyan: '#7dcfff', brightWhite: '#a9b1d6',
+    },
+  },
+  'nord': {
+    css: {
+      '--bg-primary': '#2e3440', '--bg-secondary': '#3b4252', '--bg-tertiary': '#434c5e',
+      '--bg-hover': '#4c566a', '--border': '#4c566a', '--border-color': '#4c566a',
+      '--text-primary': '#eceff4', '--text-secondary': '#d8dee9', '--text-muted': '#81a1c1',
+      '--accent': '#88c0d0', '--accent-hover': '#8fbcbb', '--green': '#a3be8c', '--red': '#bf616a',
+    },
+    xterm: {
+      background: '#2e3440', foreground: '#eceff4', cursor: '#eceff4',
+      selectionBackground: '#4c566a',
+      black: '#4c566a', red: '#bf616a', green: '#a3be8c', yellow: '#ebcb8b',
+      blue: '#81a1c1', magenta: '#b48ead', cyan: '#88c0d0', white: '#eceff4',
+      brightBlack: '#616e88', brightRed: '#bf616a', brightGreen: '#a3be8c',
+      brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead',
+      brightCyan: '#88c0d0', brightWhite: '#eceff4',
+    },
+  },
+  'github-light': {
+    css: {
+      '--bg-primary': '#ffffff', '--bg-secondary': '#f6f8fa', '--bg-tertiary': '#eaeef2',
+      '--bg-hover': '#d0d7de', '--border': '#d0d7de', '--border-color': '#d0d7de',
+      '--text-primary': '#1f2328', '--text-secondary': '#656d76', '--text-muted': '#6e7681',
+      '--accent': '#0969da', '--accent-hover': '#0556b3', '--green': '#1a7f37', '--red': '#cf222e',
+    },
+    xterm: {
+      background: '#ffffff', foreground: '#1f2328', cursor: '#1f2328',
+      selectionBackground: '#0369d640',
+      black: '#1f2328', red: '#cf222e', green: '#1a7f37', yellow: '#9a6700',
+      blue: '#0969da', magenta: '#8250df', cyan: '#1b7c83', white: '#6e7681',
+      brightBlack: '#8b949e', brightRed: '#cf222e', brightGreen: '#2da44e',
+      brightYellow: '#bf8700', brightBlue: '#0969da', brightMagenta: '#8250df',
+      brightCyan: '#1b7c83', brightWhite: '#1f2328',
+    },
+  },
+  'catppuccin-latte': {
+    css: {
+      '--bg-primary': '#eff1f5', '--bg-secondary': '#e6e9ef', '--bg-tertiary': '#ccd0da',
+      '--bg-hover': '#bcc0cc', '--border': '#bcc0cc', '--border-color': '#bcc0cc',
+      '--text-primary': '#4c4f69', '--text-secondary': '#5c5f77', '--text-muted': '#9ca0b0',
+      '--accent': '#1e66f5', '--accent-hover': '#1450c2', '--green': '#40a02b', '--red': '#d20f39',
+    },
+    xterm: {
+      background: '#eff1f5', foreground: '#4c4f69', cursor: '#4c4f69',
+      selectionBackground: '#9ca0b040',
+      black: '#5c5f77', red: '#d20f39', green: '#40a02b', yellow: '#df8e1d',
+      blue: '#1e66f5', magenta: '#ea76cb', cyan: '#179299', white: '#acb0be',
+      brightBlack: '#9ca0b0', brightRed: '#d20f39', brightGreen: '#40a02b',
+      brightYellow: '#df8e1d', brightBlue: '#1e66f5', brightMagenta: '#ea76cb',
+      brightCyan: '#179299', brightWhite: '#4c4f69',
+    },
+  },
+  'one-light': {
+    css: {
+      '--bg-primary': '#fafafa', '--bg-secondary': '#f0f0f1', '--bg-tertiary': '#e5e5e6',
+      '--bg-hover': '#d0d0d1', '--border': '#d0d0d1', '--border-color': '#d0d0d1',
+      '--text-primary': '#383a42', '--text-secondary': '#696c77', '--text-muted': '#a0a1a7',
+      '--accent': '#4078f2', '--accent-hover': '#2a5ec7', '--green': '#50a14f', '--red': '#e45649',
+    },
+    xterm: {
+      background: '#fafafa', foreground: '#383a42', cursor: '#383a42',
+      selectionBackground: '#526fff20',
+      black: '#383a42', red: '#e45649', green: '#50a14f', yellow: '#c18401',
+      blue: '#4078f2', magenta: '#a626a4', cyan: '#0184bc', white: '#a0a1a7',
+      brightBlack: '#696c77', brightRed: '#e45649', brightGreen: '#50a14f',
+      brightYellow: '#c18401', brightBlue: '#4078f2', brightMagenta: '#a626a4',
+      brightCyan: '#0184bc', brightWhite: '#383a42',
+    },
+  },
+  'solarized-light': {
+    css: {
+      '--bg-primary': '#fdf6e3', '--bg-secondary': '#eee8d5', '--bg-tertiary': '#e0dbc8',
+      '--bg-hover': '#d3cfb8', '--border': '#d3cfb8', '--border-color': '#d3cfb8',
+      '--text-primary': '#657b83', '--text-secondary': '#586e75', '--text-muted': '#839496',
+      '--accent': '#268bd2', '--accent-hover': '#2aa198', '--green': '#859900', '--red': '#dc322f',
+    },
+    xterm: {
+      background: '#fdf6e3', foreground: '#657b83', cursor: '#657b83',
+      selectionBackground: '#eee8d5',
+      black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900',
+      blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5',
+      brightBlack: '#002b36', brightRed: '#dc322f', brightGreen: '#859900',
+      brightYellow: '#b58900', brightBlue: '#268bd2', brightMagenta: '#d33682',
+      brightCyan: '#2aa198', brightWhite: '#fdf6e3',
+    },
+  },
+  'tokyo-day': {
+    css: {
+      '--bg-primary': '#e1e2e7', '--bg-secondary': '#d5d6db', '--bg-tertiary': '#c4c5cb',
+      '--bg-hover': '#b4b5bb', '--border': '#b4b5bb', '--border-color': '#b4b5bb',
+      '--text-primary': '#3760bf', '--text-secondary': '#2c3f7a', '--text-muted': '#848cb0',
+      '--accent': '#2f54a6', '--accent-hover': '#1a3b8a', '--green': '#485e30', '--red': '#8c3a3a',
+    },
+    xterm: {
+      background: '#e1e2e7', foreground: '#3760bf', cursor: '#3760bf',
+      selectionBackground: '#b4b5bb',
+      black: '#2c3f7a', red: '#8c3a3a', green: '#485e30', yellow: '#7a5e20',
+      blue: '#2f54a6', magenta: '#743fa6', cyan: '#1e6c80', white: '#848cb0',
+      brightBlack: '#b4b5bb', brightRed: '#8c3a3a', brightGreen: '#485e30',
+      brightYellow: '#7a5e20', brightBlue: '#2f54a6', brightMagenta: '#743fa6',
+      brightCyan: '#1e6c80', brightWhite: '#3760bf',
+    },
+  },
+};
 // ---- Server List ----
 function filterTag(tag) {
   document.getElementById('server-search-input').value = tag;
@@ -525,10 +763,10 @@ function renderTabs() {
     const host = svr ? `${svr.user}@${svr.host}:${svr.port}` : '?';
     const active = sid === activeSessionId ? ' active' : '';
     const unread = ses.unread && sid !== activeSessionId ? ' unread' : '';
-    return `<div class="tab${active}${unread}" onclick="switchSession('${sid}')">
+    return `<div class="tab${active}${unread}" onclick="switchSession('${sid}')" ondblclick="duplicateSession('${sid}')">
       <span class="tab-name">${escHtml(name)}</span>
       <span class="tab-host">${escHtml(host)}</span>
-      ${ses.connected || ses.connecting ? '' : `<button class="tab-close" onclick="event.stopPropagation();reconnectSession('${sid}')" title="重新连接">&#x21bb;</button>`}
+      <button class="tab-refresh" onclick="event.stopPropagation();reconnectSession('${sid}')" title="重新连接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
       <button class="tab-close" onclick="event.stopPropagation();closeSession('${sid}')">&times;</button>
     </div>`;
   }).join('');
@@ -649,22 +887,15 @@ function initTerminal(sid) {
     el.style.display = el.id === `term-${sid}` ? 'block' : 'none';
   });
 
+  loadFontSettings();
   const term = new Terminal({
     cursorBlink: true,
     cursorStyle: 'block',
-    fontSize: 13,
-    fontFamily: "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
-    letterSpacing: 0.5,
-    lineHeight: 1.3,
-    theme: {
-      background: '#0d1117', foreground: '#e6edf3', cursor: '#e6edf3',
-      selectionBackground: '#3b5998',
-      black: '#000000', red: '#ff7b72', green: '#1f7a2e', yellow: '#e3b341',
-      blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
-      brightBlack: '#484f58', brightRed: '#ffa198', brightGreen: '#56d364',
-      brightYellow: '#e9c46a', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
-      brightCyan: '#56d4dd', brightWhite: '#e6edf3',
-    },
+    fontSize: fontSettings.fontSize || 13,
+    fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
+    letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0.5,
+    lineHeight: fontSettings.lineHeight || 1.3,
+    theme: (themes[fontSettings.theme] || themes['github-dark']).xterm,
     allowTransparency: true,
     drawBoldTextInBrightColors: false,
   });
@@ -1040,6 +1271,110 @@ function toggleFilePanel() {
   }, 250);
 }
 
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const btn = document.getElementById('toggle-sidebar-btn');
+  sidebarOpen = !sidebarOpen;
+  sidebar.classList.toggle('collapsed', !sidebarOpen);
+  btn.classList.toggle('active', sidebarOpen);
+  setTimeout(() => {
+    Object.values(sessions).forEach(s => { if (s.fitAddon) s.fitAddon.fit(); });
+  }, 250);
+}
+
+function toggleHiddenFiles() {
+  showHidden = !showHidden;
+  localStorage.setItem('webssh-show-hidden', showHidden);
+  const btn = document.getElementById('file-hidden-btn');
+  btn.title = showHidden ? '隐藏隐藏文件' : '显示隐藏文件';
+  btn.classList.toggle('active', showHidden);
+  loadFileList();
+}
+
+function duplicateSession(sid) {
+  const ses = sessions[sid];
+  if (!ses) return;
+  openNewTerminal(ses.serverId);
+}
+
+// ---- Terminal Font Settings ----
+function loadFontSettings() {
+  try {
+    fontSettings = JSON.parse(localStorage.getItem('webssh-font') || '{}');
+  } catch (_) { fontSettings = {}; }
+  const def = { fontFamily: "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace", fontSize: 13, lineHeight: 1.3, letterSpacing: 0.5, theme: 'github-dark' };
+  Object.keys(def).forEach(k => { if (fontSettings[k] == null) fontSettings[k] = def[k]; });
+}
+
+function applyTheme(name) {
+  var t = themes[name];
+  if (!t) return;
+  Object.keys(t.css).forEach(k => document.documentElement.style.setProperty(k, t.css[k]));
+  Object.values(sessions).forEach(function(s) {
+    if (s.term) {
+      s.term.options.theme = t.xterm;
+    }
+  });
+}
+
+function renderThemePicker(selected) {
+  var container = document.getElementById('theme-picker');
+  container.innerHTML = '';
+  Object.keys(themeMeta).forEach(function(key) {
+    var m = themeMeta[key];
+    var card = document.createElement('div');
+    card.className = 'theme-card' + (key === selected ? ' active' : '');
+    card.dataset.theme = key;
+    card.innerHTML =
+      '<div class="preview" style="background:' + m.bg + ';color:' + m.fg + ';border:1px solid ' + m.accent + '">A</div>' +
+      '<div class="info"><div class="tname">' + m.name + '</div><div class="tdesc">' + m.desc + '</div></div>' +
+      '<div class="check">✓</div>';
+    card.onclick = function() {
+      document.querySelectorAll('.theme-card').forEach(function(c) { c.classList.remove('active'); });
+      card.classList.add('active');
+      applyTheme(key);
+      fontSettings.theme = key;
+      localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+    };
+    container.appendChild(card);
+  });
+}
+
+function showFontSettings() {
+  loadFontSettings();
+  document.getElementById('font-family').value = fontSettings.fontFamily;
+  document.getElementById('font-size').value = fontSettings.fontSize;
+  document.getElementById('line-height').value = fontSettings.lineHeight;
+  document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
+  renderThemePicker(fontSettings.theme || 'github-dark');
+  document.getElementById('font-popup').style.display = 'block';
+  document.getElementById('settings-overlay').style.display = 'block';
+}
+
+function hideFontSettings() {
+  document.getElementById('font-popup').style.display = 'none';
+  document.getElementById('settings-overlay').style.display = 'none';
+}
+
+function adjFontSize(delta) {
+  const inp = document.getElementById('font-size');
+  let v = parseInt(inp.value) + delta;
+  if (v < 8) v = 8;
+  if (v > 36) v = 36;
+  inp.value = v;
+}
+
+function saveFontSettings() {
+  fontSettings.fontFamily = document.getElementById('font-family').value.trim() || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace";
+  fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
+  fontSettings.lineHeight = parseFloat(document.getElementById('line-height').value) || 1.3;
+  fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
+  fontSettings.theme = document.querySelector('.theme-card.active') ? document.querySelector('.theme-card.active').dataset.theme : 'github-dark';
+  localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+  applyTheme(fontSettings.theme);
+  hideFontSettings();
+}
+
 function getActiveSession() { return activeSessionId ? sessions[activeSessionId] : null; }
 
 async function loadFileList(dir) {
@@ -1090,9 +1425,10 @@ async function loadFileList(dir) {
       list.innerHTML = '<div class="file-loading">目录为空</div>';
       return;
     }
-    const dirs = res.filter(f => f.isDir).sort((a,b) => a.name.localeCompare(b.name));
-    const files = res.filter(f => !f.isDir).sort((a,b) => a.name.localeCompare(b.name));
-    const all = [...dirs, ...files];
+      const visible = showHidden ? res : res.filter(f => !f.name.startsWith('.'));
+      const dirs = visible.filter(f => f.isDir).sort((a,b) => a.name.localeCompare(b.name));
+      const files = visible.filter(f => !f.isDir).sort((a,b) => a.name.localeCompare(b.name));
+      const all = [...dirs, ...files];
 
     list.innerHTML = all.map(f => {
       const icon = f.isDir ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' : getFileIcon(f.name);
@@ -1533,6 +1869,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await fetchServers();
   updateStatus();
   renderServers();
+  loadFontSettings();
+  applyTheme(fontSettings.theme);
+  document.getElementById('file-hidden-btn').classList.toggle('active', showHidden);
 
   const fileList = document.getElementById('file-list');
   let dragCounter = 0;
@@ -1561,5 +1900,51 @@ document.addEventListener('keydown', (e) => {
   }
 });
 </script>
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settings-overlay" style="display:none" onclick="hideFontSettings()"></div>
+
+<!-- Terminal Settings Popup -->
+<div id="font-popup" class="font-popup" style="display:none">
+  <div class="popup-header">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> 终端设置</h2>
+    <button class="close-btn" onclick="hideFontSettings()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="popup-body">
+    <div class="section">
+      <div class="section-label">字体</div>
+      <div class="form-group">
+        <label>字体系列</label>
+        <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>大小</label>
+          <div class="size-group">
+            <button class="size-btn" onclick="adjFontSize(-1)">−</button>
+            <input type="number" id="font-size" min="8" max="36" step="1">
+            <button class="size-btn" onclick="adjFontSize(1)">+</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>行高</label>
+          <input type="number" id="line-height" min="0.5" max="3" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>字距</label>
+          <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">主题</div>
+      <div class="theme-picker" id="theme-picker"></div>
+    </div>
+    <div class="actions">
+      <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
+      <button class="btn-apply" onclick="saveFontSettings()">应用</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
