@@ -54,6 +54,9 @@ input, textarea, button { font-family: inherit; }
 .header .sep { width: 1px; height: 20px; background: var(--border-color); margin: 0 6px; flex-shrink: 0; }
 .header .user-group { display: flex; align-items: center; gap: 2px; }
 
+.header .toggle-sidebar { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; transition: background .15s, color .15s; margin-right: 4px; }
+.header .toggle-sidebar:hover { background: var(--bg-hover); color: var(--text-primary); }
+.header .toggle-sidebar.active { color: var(--accent); }
 .body { display: flex; flex: 1; overflow: hidden; }
 
 /* Left Sidebar - Server List */
@@ -64,7 +67,10 @@ input, textarea, button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.2s, opacity 0.2s;
 }
+.sidebar.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
 .sidebar-header {
   padding: 10px 12px;
   display: flex;
@@ -388,6 +394,7 @@ input, textarea, button { font-family: inherit; }
 
 <div class="app">
   <div class="header">
+    <button class="toggle-sidebar" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="收起/展开服务器列表"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <h1>WebSSH</h1>
     <div class="spacer"></div>
     <button class="toggle-files" id="toggle-files-btn" onclick="toggleFilePanel()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> 文件</button>
@@ -710,6 +717,7 @@ let editingId = null;
 let sessions = {};          // sid -> { serverId, ws, term, fitAddon, connected, fsPath, info }
 let activeSessionId = null;
 let filePanelOpen = false;
+let sidebarOpen = true;
 let sessionKey = null;
 let csrfToken = null;
 let maxUploadMB = 0;
@@ -1781,6 +1789,17 @@ function toggleFilePanel() {
   panel.classList.toggle('collapsed', !filePanelOpen);
   btn.classList.toggle('active', filePanelOpen);
   if (filePanelOpen) loadFileList();
+  setTimeout(() => {
+    Object.values(sessions).forEach(s => { if (s.fitAddon) s.fitAddon.fit(); });
+  }, 250);
+}
+
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const btn = document.getElementById('toggle-sidebar-btn');
+  sidebarOpen = !sidebarOpen;
+  sidebar.classList.toggle('collapsed', !sidebarOpen);
+  btn.classList.toggle('active', sidebarOpen);
   setTimeout(() => {
     Object.values(sessions).forEach(s => { if (s.fitAddon) s.fitAddon.fit(); });
   }, 250);
