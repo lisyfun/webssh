@@ -1471,6 +1471,11 @@ var themeMeta = {
   'one-dark': { name: 'One Dark', desc: 'Atom 编辑器经典', bg: '#282c34', accent: '#61afef', fg: '#abb2bf' },
   'tokyo-night': { name: 'Tokyo Night', desc: '霓虹蓝紫暗色', bg: '#1a1b26', accent: '#7aa2f7', fg: '#a9b1d6' },
   'nord': { name: 'Nord', desc: '北极蓝调暗色', bg: '#2e3440', accent: '#88c0d0', fg: '#eceff4' },
+  'github-light': { name: 'GitHub Light', desc: 'GitHub 经典亮色', bg: '#ffffff', accent: '#0969da', fg: '#1f2328' },
+  'catppuccin-latte': { name: 'Catppuccin Latte', desc: '柔和暖色亮色', bg: '#eff1f5', accent: '#1e66f5', fg: '#4c4f69' },
+  'one-light': { name: 'One Light', desc: 'Atom 编辑器亮色', bg: '#fafafa', accent: '#4078f2', fg: '#383a42' },
+  'solarized-light': { name: 'Solarized Light', desc: '经典护眼亮色', bg: '#fdf6e3', accent: '#268bd2', fg: '#657b83' },
+  'tokyo-day': { name: 'Tokyo Day', desc: 'Tokyo Night 亮色版', bg: '#e1e2e7', accent: '#2f54a6', fg: '#3760bf' },
 };
 
 var themes = {
@@ -1557,6 +1562,91 @@ var themes = {
       brightBlack: '#616e88', brightRed: '#bf616a', brightGreen: '#a3be8c',
       brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead',
       brightCyan: '#88c0d0', brightWhite: '#eceff4',
+    },
+  },
+  'github-light': {
+    css: {
+      '--bg-primary': '#ffffff', '--bg-secondary': '#f6f8fa', '--bg-tertiary': '#eaeef2',
+      '--bg-hover': '#d0d7de', '--border': '#d0d7de', '--border-color': '#d0d7de',
+      '--text-primary': '#1f2328', '--text-secondary': '#656d76', '--text-muted': '#6e7681',
+      '--accent': '#0969da', '--accent-hover': '#0556b3', '--green': '#1a7f37', '--red': '#cf222e',
+    },
+    xterm: {
+      background: '#ffffff', foreground: '#1f2328', cursor: '#1f2328',
+      selectionBackground: '#0369d640',
+      black: '#1f2328', red: '#cf222e', green: '#1a7f37', yellow: '#9a6700',
+      blue: '#0969da', magenta: '#8250df', cyan: '#1b7c83', white: '#6e7681',
+      brightBlack: '#8b949e', brightRed: '#cf222e', brightGreen: '#2da44e',
+      brightYellow: '#bf8700', brightBlue: '#0969da', brightMagenta: '#8250df',
+      brightCyan: '#1b7c83', brightWhite: '#1f2328',
+    },
+  },
+  'catppuccin-latte': {
+    css: {
+      '--bg-primary': '#eff1f5', '--bg-secondary': '#e6e9ef', '--bg-tertiary': '#ccd0da',
+      '--bg-hover': '#bcc0cc', '--border': '#bcc0cc', '--border-color': '#bcc0cc',
+      '--text-primary': '#4c4f69', '--text-secondary': '#5c5f77', '--text-muted': '#9ca0b0',
+      '--accent': '#1e66f5', '--accent-hover': '#1450c2', '--green': '#40a02b', '--red': '#d20f39',
+    },
+    xterm: {
+      background: '#eff1f5', foreground: '#4c4f69', cursor: '#4c4f69',
+      selectionBackground: '#9ca0b040',
+      black: '#5c5f77', red: '#d20f39', green: '#40a02b', yellow: '#df8e1d',
+      blue: '#1e66f5', magenta: '#ea76cb', cyan: '#179299', white: '#acb0be',
+      brightBlack: '#9ca0b0', brightRed: '#d20f39', brightGreen: '#40a02b',
+      brightYellow: '#df8e1d', brightBlue: '#1e66f5', brightMagenta: '#ea76cb',
+      brightCyan: '#179299', brightWhite: '#4c4f69',
+    },
+  },
+  'one-light': {
+    css: {
+      '--bg-primary': '#fafafa', '--bg-secondary': '#f0f0f1', '--bg-tertiary': '#e5e5e6',
+      '--bg-hover': '#d0d0d1', '--border': '#d0d0d1', '--border-color': '#d0d0d1',
+      '--text-primary': '#383a42', '--text-secondary': '#696c77', '--text-muted': '#a0a1a7',
+      '--accent': '#4078f2', '--accent-hover': '#2a5ec7', '--green': '#50a14f', '--red': '#e45649',
+    },
+    xterm: {
+      background: '#fafafa', foreground: '#383a42', cursor: '#383a42',
+      selectionBackground: '#526fff20',
+      black: '#383a42', red: '#e45649', green: '#50a14f', yellow: '#c18401',
+      blue: '#4078f2', magenta: '#a626a4', cyan: '#0184bc', white: '#a0a1a7',
+      brightBlack: '#696c77', brightRed: '#e45649', brightGreen: '#50a14f',
+      brightYellow: '#c18401', brightBlue: '#4078f2', brightMagenta: '#a626a4',
+      brightCyan: '#0184bc', brightWhite: '#383a42',
+    },
+  },
+  'solarized-light': {
+    css: {
+      '--bg-primary': '#fdf6e3', '--bg-secondary': '#eee8d5', '--bg-tertiary': '#e0dbc8',
+      '--bg-hover': '#d3cfb8', '--border': '#d3cfb8', '--border-color': '#d3cfb8',
+      '--text-primary': '#657b83', '--text-secondary': '#586e75', '--text-muted': '#839496',
+      '--accent': '#268bd2', '--accent-hover': '#2aa198', '--green': '#859900', '--red': '#dc322f',
+    },
+    xterm: {
+      background: '#fdf6e3', foreground: '#657b83', cursor: '#657b83',
+      selectionBackground: '#eee8d5',
+      black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900',
+      blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5',
+      brightBlack: '#002b36', brightRed: '#dc322f', brightGreen: '#859900',
+      brightYellow: '#b58900', brightBlue: '#268bd2', brightMagenta: '#d33682',
+      brightCyan: '#2aa198', brightWhite: '#fdf6e3',
+    },
+  },
+  'tokyo-day': {
+    css: {
+      '--bg-primary': '#e1e2e7', '--bg-secondary': '#d5d6db', '--bg-tertiary': '#c4c5cb',
+      '--bg-hover': '#b4b5bb', '--border': '#b4b5bb', '--border-color': '#b4b5bb',
+      '--text-primary': '#3760bf', '--text-secondary': '#2c3f7a', '--text-muted': '#848cb0',
+      '--accent': '#2f54a6', '--accent-hover': '#1a3b8a', '--green': '#485e30', '--red': '#8c3a3a',
+    },
+    xterm: {
+      background: '#e1e2e7', foreground: '#3760bf', cursor: '#3760bf',
+      selectionBackground: '#b4b5bb',
+      black: '#2c3f7a', red: '#8c3a3a', green: '#485e30', yellow: '#7a5e20',
+      blue: '#2f54a6', magenta: '#743fa6', cyan: '#1e6c80', white: '#848cb0',
+      brightBlack: '#b4b5bb', brightRed: '#8c3a3a', brightGreen: '#485e30',
+      brightYellow: '#7a5e20', brightBlue: '#2f54a6', brightMagenta: '#743fa6',
+      brightCyan: '#1e6c80', brightWhite: '#3760bf',
     },
   },
 };
