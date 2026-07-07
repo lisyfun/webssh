@@ -1698,6 +1698,17 @@ function renderThemePicker(selected) {
   updateThemePreview();
 }
 
+function showFontSettings() {
+  loadFontSettings();
+  document.getElementById('font-family').value = fontSettings.fontFamily;
+  document.getElementById('font-size').value = fontSettings.fontSize;
+  document.getElementById('line-height').value = fontSettings.lineHeight;
+  document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
+  renderThemePicker(fontSettings.theme || 'github-dark');
+  document.getElementById('font-popup').style.display = 'block';
+  document.getElementById('settings-overlay').style.display = 'block';
+}
+
 function hideFontSettings() {
   document.getElementById('font-popup').style.display = 'none';
   document.getElementById('settings-overlay').style.display = 'none';
