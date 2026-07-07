@@ -72,10 +72,11 @@ input, textarea, button { font-family: inherit; }
 .tab-bar .tab-bar-btn.active { color: var(--accent); }
 .tab-list { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tab-list::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; flex-shrink: 0; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; max-width: 160px; flex-shrink: 0; overflow: hidden; }
 .tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); }
 .tab.unread .tab-name::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
-.tab .tab-host { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
+.tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.tab .tab-host { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 11px; margin-left: 2px; }
 .tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
 .tab-close:hover { color: var(--text-primary); }
 .tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; line-height: 1; display: inline-flex; align-items: center; flex-shrink: 0; }
