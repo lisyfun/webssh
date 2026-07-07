@@ -170,6 +170,7 @@ input, textarea, button { font-family: inherit; }
 .file-panel-header .actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
 .file-panel-header .actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .file-panel-header .actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+.file-panel-header .actions button.active { color: var(--accent); }
 
 .file-breadcrumb {
   padding: 6px 12px;
@@ -446,6 +447,7 @@ input, textarea, button { font-family: inherit; }
         <span>文件浏览器</span>
         <div class="actions">
           <button onclick="fileUpload()" id="file-upload-btn" disabled title="上传文件">&#x2191;</button>
+          <button onclick="toggleHiddenFiles()" id="file-hidden-btn" title="显示隐藏文件 (.dotfiles)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
           <button onclick="fileMkdir()" id="file-mkdir-btn" disabled title="新建目录">+</button>
         </div>
       </div>
@@ -723,6 +725,7 @@ let csrfToken = null;
 let maxUploadMB = 0;
 let passphraseWaiter = null;
 let currentFileEntries = {};
+let showHidden = localStorage.getItem('webssh-show-hidden') === 'true';
 
 // ---- Encryption & CSRF ----
 async function fetchSessionKey() {
@@ -1889,6 +1892,15 @@ function toggleSidebar() {
   }, 250);
 }
 
+function toggleHiddenFiles() {
+  showHidden = !showHidden;
+  localStorage.setItem('webssh-show-hidden', showHidden);
+  const btn = document.getElementById('file-hidden-btn');
+  btn.title = showHidden ? '隐藏隐藏文件 (.dotfiles)' : '显示隐藏文件 (.dotfiles)';
+  btn.classList.toggle('active', showHidden);
+  loadFileList();
+}
+
 function getActiveSession() {
   return activeSessionId ? sessions[activeSessionId] : null;
 }
@@ -1949,8 +1961,9 @@ function loadFileList(dir) {
         currentFileEntries = {};
         return;
       }
-      const dirs = res.data.filter(f => f.isDir).sort((a,b) => a.name.localeCompare(b.name));
-      const files = res.data.filter(f => !f.isDir).sort((a,b) => a.name.localeCompare(b.name));
+      const visible = showHidden ? res.data : res.data.filter(f => !f.name.startsWith('.'));
+      const dirs = visible.filter(f => f.isDir).sort((a,b) => a.name.localeCompare(b.name));
+      const files = visible.filter(f => !f.isDir).sort((a,b) => a.name.localeCompare(b.name));
       const all = [...dirs, ...files];
       currentFileEntries = {};
       all.forEach(f => { currentFileEntries[f.name] = f; });
@@ -2514,6 +2527,7 @@ function escJsStr(s) {
 document.addEventListener('DOMContentLoaded', async () => {
   await fetchSessionKey();
   await fetchServers();
+  document.getElementById('file-hidden-btn').classList.toggle('active', showHidden);
   loadFontSettings();
   applyFontSettings();
   applyTheme(fontSettings.theme);
