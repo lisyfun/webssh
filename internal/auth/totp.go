@@ -171,60 +171,70 @@ func setup2FAPage(basePath, setupToken, qrData, secret string, errMsg ...string)
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebSSH - 双因素认证</title>
+<title>WebSSH Terminal — 2FA Setup</title>
 <style>
-:root {
-  --bg: #0d1117; --card: #161b22; --border: #30363d;
-  --text: #e6edf3; --muted: #8b949e; --accent: #4a8cff; --accent-hover: #3a7ae8;
-  --danger: #ff7b72;
-}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-body::before{content:"";position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 0%,rgba(74,140,255,0.06) 0%,transparent 70%);pointer-events:none}
+html,body{height:100%;background:#0c0c0c;color:#33ff33;font-family:"Consolas","Menlo","Monaco","Courier New",monospace;display:flex;align-items:center;justify-content:center}
 
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:400px;box-shadow:0 4px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.03);text-align:center}
-.logo{width:44px;height:44px;margin:0 auto 16px;background:linear-gradient(135deg,#4a8cff,#58a6ff);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700}
-h1{font-size:18px;font-weight:600;margin-bottom:4px;letter-spacing:-0.2px}
-.sub{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.term{border:1px solid #1a3a1a;border-radius:8px;width:580px;overflow:hidden;box-shadow:0 0 40px rgba(51,255,51,.04)}
+.term-bar{background:#1a1a1a;padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1a3a1a}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.r{background:#ff5f56}
+.dot.y{background:#ffbd2e}
+.dot.g{background:#27c93f}
+.term-title{font-size:12px;color:#666;margin-left:8px}
 
-.qr-wrap{background:#fff;border-radius:10px;padding:12px;display:inline-block;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.qr{width:180px;height:180px;display:block}
+.term-body{padding:28px 32px 32px;text-align:center}
 
-.form-group{margin-bottom:18px}
-.form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:500}
-.form-group input{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:15px;outline:none;text-align:center;letter-spacing:5px;transition:border-color .2s,box-shadow .2s}
-.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,140,255,0.15)}
-.form-group input::placeholder{color:#484f58;letter-spacing:normal}
+.banner{font-size:13px;line-height:1.6;margin-bottom:20px;color:#33ff33;text-align:left}
+.banner .dim{color:#1a8c1a}
 
-.btn{width:100%;padding:10px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s,transform .1s}
-.btn:hover{background:var(--accent-hover)}
-.btn:active{transform:scale(0.98)}
+.qr-wrap{background:#fff;border-radius:6px;padding:10px;display:inline-block;margin-bottom:20px}
+.qr{width:170px;height:170px;display:block}
 
-	.tip{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6}
-	.tip a{color:var(--accent);text-decoration:none}
-	.tip a:hover{text-decoration:underline}
-	.error{margin-top:14px;padding:8px 12px;border-radius:6px;background:rgba(255,123,114,0.08);border:1px solid rgba(255,123,114,0.2);color:var(--danger);font-size:12px}
-	.error.hidden{display:none}
-	</style>
+.prompt{margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:0}
+.prompt .prefix{color:#1a8c1a;font-size:14px;white-space:pre}
+.prompt input{background:transparent;border:none;color:#33ff33;font-family:inherit;font-size:14px;outline:none;padding:4px 0;caret-color:#33ff33;max-width:160px;letter-spacing:4px;text-align:center}
+.prompt input::placeholder{color:#1a4a1a}
+
+.btn{margin-top:18px;padding:8px 20px;background:transparent;border:1px solid #33ff33;color:#33ff33;font-family:inherit;font-size:13px;cursor:pointer;transition:background .2s}
+.btn:hover{background:rgba(51,255,51,.08)}
+.btn:active{background:rgba(51,255,51,.15)}
+
+.error{margin-top:16px;padding:6px 0;font-size:13px;color:#ff5555;border-top:1px solid rgba(255,85,85,.2)}
+.error.hidden{display:none}
+
+.tip{font-size:11px;color:#1a4a1a;margin-top:18px;line-height:1.6;text-align:left}
+</style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">&gt;_</div>
-  <h1>双因素认证</h1>
-  <div class="sub">使用 Google Authenticator / Authy / Microsoft Authenticator 扫码绑定</div>
-  <div class="qr-wrap">
-    <img class="qr" src="` + qrData + `" alt="QR Code">
+<div class="term">
+  <div class="term-bar">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+    <span class="term-title">admin@webssh — 2fa-setup</span>
   </div>
-  <form method="post" action="` + basePath + `/complete-2fa-setup">
-    <input type="hidden" name="setup_token" value="` + setupToken + `">
-    <div class="form-group">
-      <label>六位验证码</label>
-      <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus placeholder="000 000">
-	    </div>
-	    <button class="btn" type="submit">验证并登录</button>
-	    <div class="error ` + errClass + `">` + errText + `</div>
-	  </form>
-  <div class="tip">首次绑定，扫码或手动输入密钥后输入 App 中的 6 位数字即可。</div>
+  <div class="term-body">
+    <div class="banner">
+      two-factor authentication setup<br>
+      <span class="dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+    </div>
+    <div class="qr-wrap">
+      <img class="qr" src="` + qrData + `" alt="QR Code">
+    </div>
+    <form method="post" action="` + basePath + `/complete-2fa-setup" autocomplete="off" style="text-align:center">
+      <input type="hidden" name="setup_token" value="` + setupToken + `">
+      <div class="prompt" style="justify-content:center">
+        <span class="prefix">verify: </span>
+        <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus placeholder="000000" spellcheck="false">
+      </div>
+      <button class="btn" type="submit">[ 绑定 ]</button>
+      <div class="error ` + errClass + `">` + errText + `</div>
+    </form>
+    <div class="tip">» scan QR code with Authenticator, then enter the 6-digit code</div>
+  </div>
 </div>
 </body>
 </html>`
@@ -302,50 +312,63 @@ func login2FAPage(basePath, errMsg, token string) string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebSSH - 双因素认证</title>
+<title>WebSSH Terminal — 2FA</title>
 <style>
-:root {
-  --bg: #0d1117; --card: #161b22; --border: #30363d;
-  --text: #e6edf3; --muted: #8b949e; --accent: #4a8cff; --accent-hover: #3a7ae8;
-  --danger: #ff7b72; --danger-bg: rgba(255,123,114,0.08);
-}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-body::before{content:"";position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 0%,rgba(74,140,255,0.06) 0%,transparent 70%);pointer-events:none}
+html,body{height:100%;background:#0c0c0c;color:#33ff33;font-family:"Consolas","Menlo","Monaco","Courier New",monospace;display:flex;align-items:center;justify-content:center}
 
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.03)}
-.logo{width:44px;height:44px;margin:0 auto 20px;background:linear-gradient(135deg,#4a8cff,#58a6ff);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700}
-h1{font-size:18px;font-weight:600;text-align:center;margin-bottom:4px;letter-spacing:-0.2px}
-.sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:28px}
+.term{border:1px solid #1a3a1a;border-radius:8px;width:580px;overflow:hidden;box-shadow:0 0 40px rgba(51,255,51,.04)}
+.term-bar{background:#1a1a1a;padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1a3a1a}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.r{background:#ff5f56}
+.dot.y{background:#ffbd2e}
+.dot.g{background:#27c93f}
+.term-title{font-size:12px;color:#666;margin-left:8px}
 
-.form-group{margin-bottom:20px}
-.form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:500}
-.form-group input{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;outline:none;text-align:center;letter-spacing:5px;transition:border-color .2s,box-shadow .2s}
-.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,140,255,0.15)}
-.form-group input::placeholder{color:#484f58;letter-spacing:normal}
+.term-body{padding:28px 32px 32px}
 
-.btn{width:100%;padding:10px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s,transform .1s}
-.btn:hover{background:var(--accent-hover)}
-.btn:active{transform:scale(0.98)}
+.banner{font-size:13px;line-height:1.6;margin-bottom:24px;color:#33ff33}
+.banner .dim{color:#1a8c1a}
 
-.error{margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--danger-bg);border:1px solid rgba(255,123,114,0.2);color:var(--danger);font-size:12px;text-align:center}
+.prompt{margin-bottom:6px;display:flex;align-items:center;gap:0}
+.prompt .prefix{color:#1a8c1a;font-size:14px;white-space:pre}
+.prompt input{background:transparent;border:none;color:#33ff33;font-family:inherit;font-size:14px;outline:none;flex:1;padding:4px 0;caret-color:#33ff33;max-width:200px}
+.prompt input::placeholder{color:#1a4a1a}
+
+.btn{margin-top:18px;padding:8px 20px;background:transparent;border:1px solid #33ff33;color:#33ff33;font-family:inherit;font-size:13px;cursor:pointer;transition:background .2s}
+.btn:hover{background:rgba(51,255,51,.08)}
+.btn:active{background:rgba(51,255,51,.15)}
+
+.error{margin-top:16px;padding:6px 0;font-size:13px;color:#ff5555;border-top:1px solid rgba(255,85,85,.2)}
 .error.hidden{display:none}
+
+.cursor{display:inline-block;width:8px;height:15px;background:#33ff33;animation:blink 1s step-end infinite;margin-left:4px;vertical-align:middle}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">&gt;_</div>
-  <h1>双因素认证</h1>
-  <div class="sub">请输入认证器中的 6 位动态码</div>
-  <form method="post" action="` + basePath + `/login/2fa">
-    <input type="hidden" name="login_token" value="` + token + `">
-    <div class="form-group">
-      <label>双因素认证码</label>
-      <input type="text" name="totp_code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autofocus placeholder="000 000">
+<div class="term">
+  <div class="term-bar">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+    <span class="term-title">admin@webssh — 2fa</span>
+  </div>
+  <div class="term-body">
+    <div class="banner">
+      two-factor authentication required<br>
+      <span class="dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
     </div>
-    <button class="btn" type="submit">验证</button>
-    <div class="error ` + errClass + `">` + errMsg + `</div>
-  </form>
+    <form method="post" action="` + basePath + `/login/2fa" autocomplete="off">
+      <input type="hidden" name="login_token" value="` + token + `">
+      <div class="prompt">
+        <span class="prefix">2fa code: </span>
+        <input type="text" name="totp_code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autofocus placeholder="000000" spellcheck="false" style="max-width:160px;letter-spacing:4px">
+      </div>
+      <button class="btn" type="submit">[ 验证 ]</button>
+      <div class="error ` + errClass + `">` + errMsg + `</div>
+    </form>
+  </div>
 </div>
 </body>
 </html>`

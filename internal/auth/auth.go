@@ -476,73 +476,93 @@ func loginPage(basePath, errMsg string, _ string) string {
 	if errMsg == "" {
 		errShow = "hidden"
 	}
+	errColor := ""
+	if errMsg != "" {
+		errColor = "color:#ff5555"
+	}
 	return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebSSH</title>
+<title>WebSSH Terminal</title>
 <style>
-:root {
-  --bg: #0d1117; --card: #161b22; --border: #30363d;
-  --text: #e6edf3; --muted: #8b949e; --accent: #4a8cff; --accent-hover: #3a7ae8;
-  --danger: #ff7b72; --danger-bg: rgba(255,123,114,0.08);
-}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-body::before{content:"";position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 0%,rgba(74,140,255,0.06) 0%,transparent 70%);pointer-events:none}
+html,body{height:100%;background:#0c0c0c;color:#33ff33;font-family:"Consolas","Menlo","Monaco","Courier New",monospace;display:flex;align-items:center;justify-content:center}
 
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.03)}
-.logo{width:44px;height:44px;margin:0 auto 20px;background:linear-gradient(135deg,#4a8cff,#58a6ff);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700}
-h1{font-size:18px;font-weight:600;text-align:center;margin-bottom:6px;letter-spacing:-0.2px}
-.sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:28px}
+.term{border:1px solid #1a3a1a;border-radius:8px;width:580px;overflow:hidden;box-shadow:0 0 40px rgba(51,255,51,.04)}
+.term-bar{background:#1a1a1a;padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1a3a1a}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.r{background:#ff5f56}
+.dot.y{background:#ffbd2e}
+.dot.g{background:#27c93f}
+.term-title{font-size:12px;color:#666;margin-left:8px}
 
-.form-group{margin-bottom:16px}
-.form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:500}
-.form-group input{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
-.form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,140,255,0.15)}
-.form-group input::placeholder{color:#484f58}
+.term-body{padding:28px 32px 32px}
 
-.btn{width:100%;padding:10px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s,transform .1s;margin-top:4px}
-.btn:hover{background:var(--accent-hover)}
-.btn:active{transform:scale(0.98)}
+.banner{font-size:13px;line-height:1.6;margin-bottom:24px;color:#33ff33}
+.banner .dim{color:#1a8c1a}
 
-.error{margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--danger-bg);border:1px solid rgba(255,123,114,0.2);color:var(--danger);font-size:12px;text-align:center;line-height:1.4}
+.prompt{margin-bottom:6px;display:flex;align-items:center;gap:0}
+.prompt .prefix{color:#1a8c1a;font-size:14px;white-space:pre}
+.prompt input{background:transparent;border:none;color:#33ff33;font-family:inherit;font-size:14px;outline:none;flex:1;padding:4px 0;caret-color:#33ff33}
+.prompt input::placeholder{color:#1a4a1a}
+
+.btn{margin-top:18px;padding:8px 20px;background:transparent;border:1px solid #33ff33;color:#33ff33;font-family:inherit;font-size:13px;cursor:pointer;transition:background .2s}
+.btn:hover{background:rgba(51,255,51,.08)}
+.btn:active{background:rgba(51,255,51,.15)}
+
+.error{margin-top:16px;padding:6px 0;font-size:13px;color:#ff5555;border-top:1px solid rgba(255,85,85,.2)}
 .error.hidden{display:none}
+
+.cursor{display:inline-block;width:8px;height:15px;background:#33ff33;animation:blink 1s step-end infinite;margin-left:4px;vertical-align:middle}
+
+.footer{font-size:11px;color:#1a4a1a;margin-top:20px;text-align:center}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">&gt;_</div>
-  <h1>WebSSH</h1>
-  <div class="sub">安全远程终端管理</div>
-  <form method="post" action="` + basePath + `/login">
-    <div class="form-group">
-      <label>用户名</label>
-      <input type="text" name="user" placeholder="admin" autofocus autocomplete="username">
+<div class="term">
+  <div class="term-bar">
+    <div class="dot r"></div>
+    <div class="dot y"></div>
+    <div class="dot g"></div>
+    <span class="term-title">admin@webssh — ssh</span>
+  </div>
+  <div class="term-body">
+    <div class="banner">
+      Welcome to WebSSH Terminal Server<br>
+      <span class="dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span><br>
+      <span class="dim">»  secure remote terminal management</span>
     </div>
-    <div class="form-group">
-      <label>密码</label>
-      <input type="password" name="pass" placeholder="········" autocomplete="current-password">
-    </div>
-    <button class="btn" type="submit">登录</button>
-    <div class="error ` + errShow + `">` + errMsg + `</div>
-  </form>
+    <form method="post" action="` + basePath + `/login" autocomplete="off">
+      <div class="prompt">
+        <span class="prefix">login: </span>
+        <input type="text" name="user" placeholder="admin" autofocus autocomplete="username" spellcheck="false">
+      </div>
+      <div class="prompt">
+        <span class="prefix">password: </span>
+        <input type="password" name="pass" placeholder="········" autocomplete="current-password" spellcheck="false">
+      </div>
+      <button class="btn" type="submit">[ 连接 ]</button>
+      <div class="error ` + errShow + `" style="` + errColor + `">` + errMsg + `</div>
+    </form>
+    <div class="footer">WebSSH v1.0 — <span class="cursor"></span></div>
+  </div>
 </div>
 </body>
 </html>`
 }
-
 func (a *Auth) cleanupLoop() {
 	for {
-		time.Sleep(10 * time.Minute)
+		time.Sleep(5 * time.Minute)
+		now := time.Now()
 		a.mu.Lock()
 		for k, v := range a.tokens {
 			if time.Since(v.created) > a.tokenTTL {
 				delete(a.tokens, k)
 			}
 		}
-		now := time.Now()
 		for k, v := range a.rateLimit {
 			if now.Sub(v.firstTry) > a.banTime {
 				delete(a.rateLimit, k)
