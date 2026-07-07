@@ -370,25 +370,12 @@ input, textarea, button { font-family: inherit; }
 .font-popup .actions .btn-apply { background: var(--accent); color: #fff; }
 .font-popup .actions .btn-apply:hover { background: var(--accent-hover); }
 
-/* Theme picker cards */
-.theme-picker { display: flex; flex-direction: column; gap: 6px; }
-.theme-card {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-  background: var(--bg-primary); border: 1px solid var(--border-color);
-  border-radius: 6px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
-}
-.theme-card:hover { border-color: var(--accent); }
-.theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,140,255,0.2); }
-.theme-card .preview {
-  width: 36px; height: 24px; border-radius: 4px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
-}
-.theme-card .info { flex: 1; min-width: 0; }
-.theme-card .info .tname { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-.theme-card .info .tdesc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-.theme-card .check { font-size: 14px; opacity: 0; transition: opacity .15s; color: var(--accent); }
-.theme-card.active .check { opacity: 1; }
+/* Theme select */
+.theme-row { display: flex; align-items: center; gap: 10px; }
+#theme-preview { width: 36px; height: 24px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border: 1px solid var(--border-color); }
+#theme-select { flex: 1; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; cursor: pointer; }
+#theme-select:focus { border-color: var(--accent); }
+#theme-select option { background: var(--bg-primary); color: var(--text-primary); padding: 4px; }
 </style>
 </head>
 <body>
@@ -683,8 +670,10 @@ input, textarea, button { font-family: inherit; }
       </div>
     </div>
     <div class="section">
-      <div class="section-label">主题</div>
-      <div class="theme-picker" id="theme-picker"></div>
+      <div class="theme-row">
+        <div id="theme-preview">A</div>
+        <select id="theme-select" onchange="applyTheme(this.value); fontSettings.theme=this.value; localStorage.setItem('webssh-font',JSON.stringify(fontSettings)); updateThemePreview()"></select>
+      </div>
     </div>
     <div class="actions">
       <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
@@ -1685,39 +1674,28 @@ function applyFontSettings() {
     }
   });
 }
-
-function renderThemePicker(selected) {
-  var container = document.getElementById('theme-picker');
-  container.innerHTML = '';
-  Object.keys(themeMeta).forEach(function(key) {
-    var m = themeMeta[key];
-    var card = document.createElement('div');
-    card.className = 'theme-card' + (key === selected ? ' active' : '');
-    card.dataset.theme = key;
-    card.innerHTML =
-      '<div class="preview" style="background:' + m.bg + ';color:' + m.fg + ';border:1px solid ' + m.accent + '">A</div>' +
-      '<div class="info"><div class="tname">' + m.name + '</div><div class="tdesc">' + m.desc + '</div></div>' +
-      '<div class="check">✓</div>';
-    card.onclick = function() {
-      document.querySelectorAll('.theme-card').forEach(function(c) { c.classList.remove('active'); });
-      card.classList.add('active');
-      applyTheme(key);
-      fontSettings.theme = key;
-      localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
-    };
-    container.appendChild(card);
-  });
+function updateThemePreview() {
+  var key = document.getElementById('theme-select').value;
+  var m = themeMeta[key];
+  if (!m) return;
+  var preview = document.getElementById('theme-preview');
+  preview.style.background = m.bg;
+  preview.style.color = m.fg;
+  preview.style.borderColor = m.accent;
 }
 
-function showFontSettings() {
-  loadFontSettings();
-  document.getElementById('font-family').value = fontSettings.fontFamily;
-  document.getElementById('font-size').value = fontSettings.fontSize;
-  document.getElementById('line-height').value = fontSettings.lineHeight;
-  document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
-  renderThemePicker(fontSettings.theme || 'github-dark');
-  document.getElementById('font-popup').style.display = 'block';
-  document.getElementById('settings-overlay').style.display = 'block';
+function renderThemePicker(selected) {
+  var sel = document.getElementById('theme-select');
+  sel.innerHTML = '';
+  Object.keys(themeMeta).forEach(function(key) {
+    var m = themeMeta[key];
+    var opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = m.name + ' — ' + m.desc;
+    if (key === selected) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  updateThemePreview();
 }
 
 function hideFontSettings() {
@@ -1738,7 +1716,7 @@ function saveFontSettings() {
   fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
   fontSettings.lineHeight = parseFloat(document.getElementById('line-height').value) || 1.3;
   fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
-  fontSettings.theme = document.querySelector('.theme-card.active') ? document.querySelector('.theme-card.active').dataset.theme : 'github-dark';
+  fontSettings.theme = document.getElementById('theme-select').value;
   localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
   applyFontSettings();
   applyTheme(fontSettings.theme);
