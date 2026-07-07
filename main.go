@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +39,7 @@ func defaultDBPath() string {
 func main() {
 	dbPath := flag.String("db", defaultDBPath(), "path to SQLite database file")
 	flag.Parse()
+
 
 	if *maxBody < 0 {
 		log.Fatal("-maxbody must be >= 0")
@@ -90,6 +92,7 @@ func singleInstanceOrExit() {
 				os.Exit(0)
 			}
 		}
+
 	}
 	os.WriteFile(lockFile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644)
 }
@@ -98,4 +101,57 @@ func cleanupLock() {
 	if lockFile != "" {
 		os.Remove(lockFile)
 	}
+}
+
+// tlsFilter is an io.Writer that discards TLS handshake error log lines.
+// These are expected noise when using self-signed certificates.
+type tlsFilter struct{}
+
+func (tlsFilter) Write(p []byte) (int, error) {
+	if len(p) > 0 && p[len(p)-1] == '\n' {
+		p = p[:len(p)-1]
+	}
+	s := string(p)
+	if strings.Contains(s, "TLS handshake error") || strings.Contains(s, "tls:") {
+		return len(p), nil
+	}
+	return len(p), nil // discard all non-critical errors
+}
+
+func generateSelfSignedCert() tls.Certificate {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
+	if err != nil {
+		log.Fatal("generate key:", err)
+	}
+	sn, err := crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		log.Fatal("generate serial:", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: sn,
+		Subject:      pkix.Name{CommonName: "WebSSH"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1"), net.IPv4zero},
+		DNSNames:     []string{"localhost"},
+	}
+	certDER, err := x509.CreateCertificate(crand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		log.Fatal("create cert:", err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		log.Fatal("marshal key:", err)
+	}
+	cert, err := tls.X509KeyPair(
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}),
+		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}),
+	)
+	if err != nil {
+		log.Fatal("load cert pair:", err)
+	}
+	return cert
 }

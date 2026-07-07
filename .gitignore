@@ -8,6 +8,16 @@
 /build/bin/
 /build/etc/
 /build/go/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/vendor/
+.DS_Store
+frontend/
 *.db*
 frontend/favicon.ico
 frontend/wailsjs/
