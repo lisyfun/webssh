@@ -182,12 +182,25 @@ input, textarea, button { font-family: inherit; }
 .editor-modal .cm-s-default .cm-attribute { color: #ffa657; }
 .editor-modal .CodeMirror-focused .CodeMirror-selected { background: #264f78; }
 .CodeMirror { background: #0d1117; color: #e6edf3; }
-/* Theme select */
-.theme-row { display: flex; align-items: center; gap: 10px; }
-#theme-preview { width: 36px; height: 24px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border: 1px solid var(--border-color); }
-#theme-select { flex: 1; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; cursor: pointer; }
-#theme-select:focus { border-color: var(--accent); }
-#theme-select option { background: var(--bg-primary); color: var(--text-primary); padding: 4px; }
+/* Custom theme dropdown */
+.theme-dropdown { position: relative; }
+.theme-trigger { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; cursor: pointer; transition: border-color .15s; }
+.theme-trigger:hover, .theme-trigger.open { border-color: var(--accent); }
+.theme-swatch { width: 28px; height: 18px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border-color); }
+.theme-trigger .theme-name { flex: 1; text-align: left; }
+.theme-trigger .arrow { color: var(--text-muted); font-size: 10px; transition: transform .15s; }
+.theme-trigger.open .arrow { transform: rotate(180deg); }
+.theme-menu { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; z-index: 100; max-height: 280px; overflow-y: auto; display: none; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.theme-menu.open { display: block; }
+.theme-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; transition: background .1s; }
+.theme-item:hover { background: var(--bg-hover); }
+.theme-item.active { background: var(--bg-tertiary); }
+.theme-item .item-swatch { width: 28px; height: 18px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border-color); }
+.theme-item .item-info { flex: 1; min-width: 0; }
+.theme-item .item-name { font-size: 13px; color: var(--text-primary); }
+.theme-item .item-desc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.theme-item .check { color: var(--accent); font-size: 14px; opacity: 0; }
+.theme-item.active .check { opacity: 1; }
 
 /* Font settings popup */
 .font-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px; width: 380px; z-index: 1500; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
@@ -1318,28 +1331,46 @@ function applyTheme(name) {
       s.term.options.theme = t.xterm;
     }
   });
-function updateThemePreview() {
-  var key = document.getElementById('theme-select').value;
-  var m = themeMeta[key];
-  if (!m) return;
-  var preview = document.getElementById('theme-preview');
-  preview.style.background = m.bg;
-  preview.style.color = m.fg;
-  preview.style.borderColor = m.accent;
 }
 
 function renderThemePicker(selected) {
-  var sel = document.getElementById('theme-select');
-  sel.innerHTML = '';
+  var menu = document.getElementById('theme-menu');
+  menu.innerHTML = '';
   Object.keys(themeMeta).forEach(function(key) {
     var m = themeMeta[key];
-    var opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = m.name + ' — ' + m.desc;
-    if (key === selected) opt.selected = true;
-    sel.appendChild(opt);
+    var item = document.createElement('div');
+    item.className = 'theme-item' + (key === selected ? ' active' : '');
+    item.dataset.theme = key;
+    item.innerHTML =
+      '<div class="item-swatch" style="background:' + m.bg + ';border-color:' + m.accent + '"></div>' +
+      '<div class="item-info"><div class="item-name">' + m.name + '</div><div class="item-desc">' + m.desc + '</div></div>' +
+      '<div class="check">✓</div>';
+    item.onclick = function() {
+      document.querySelectorAll('.theme-item').forEach(function(c) { c.classList.remove('active'); });
+      item.classList.add('active');
+      applyTheme(key);
+      fontSettings.theme = key;
+      localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+      updateThemeTrigger(key);
+      document.getElementById('theme-menu').classList.remove('open');
+    };
+    menu.appendChild(item);
   });
-  updateThemePreview();
+  updateThemeTrigger(selected);
+}
+
+function updateThemeTrigger(key) {
+  var m = themeMeta[key];
+  if (!m) return;
+  document.getElementById('theme-swatch').style.background = m.bg;
+  document.getElementById('theme-swatch').style.borderColor = m.accent;
+  document.getElementById('theme-name').textContent = m.name;
+}
+
+function toggleThemeMenu() {
+  var menu = document.getElementById('theme-menu');
+  menu.classList.toggle('open');
+  document.getElementById('theme-trigger').classList.toggle('open', menu.classList.contains('open'));
 }
 
 function showFontSettings() {
@@ -1354,6 +1385,8 @@ function showFontSettings() {
 }
 
 function hideFontSettings() {
+  document.getElementById('theme-menu').classList.remove('open');
+  document.getElementById('theme-trigger').classList.remove('open');
   document.getElementById('font-popup').style.display = 'none';
   document.getElementById('settings-overlay').style.display = 'none';
 }
@@ -1371,7 +1404,7 @@ function saveFontSettings() {
   fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
   fontSettings.lineHeight = parseFloat(document.getElementById('line-height').value) || 1.3;
   fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
-  fontSettings.theme = document.getElementById('theme-select').value;
+  fontSettings.theme = document.querySelector('.theme-item.active') ? document.querySelector('.theme-item.active').dataset.theme : 'github-dark';
   localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
   applyTheme(fontSettings.theme);
   hideFontSettings();
@@ -1542,6 +1575,13 @@ function pasteTerminalClipboard(sid) {
 
 document.addEventListener('click', hideContextMenu);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideContextMenu(); });
+document.addEventListener('click', function(e) {
+  var tm = document.getElementById('theme-menu');
+  if (tm && tm.classList.contains('open') && !e.target.closest('.theme-dropdown')) {
+    tm.classList.remove('open');
+    document.getElementById('theme-trigger').classList.remove('open');
+  }
+});
 
 function renderBreadcrumb(p) {
   const el = document.getElementById('file-breadcrumb');
@@ -1937,15 +1977,20 @@ document.addEventListener('keydown', (e) => {
     </div>
     <div class="section">
       <div class="section-label">主题</div>
-      <div class="theme-row">
-        <div id="theme-preview">A</div>
-        <select id="theme-select" onchange="applyTheme(this.value); fontSettings.theme=this.value; localStorage.setItem('webssh-font',JSON.stringify(fontSettings)); updateThemePreview()"></select>
+      <div class="theme-dropdown">
+        <div class="theme-trigger" id="theme-trigger" onclick="toggleThemeMenu()">
+          <div class="theme-swatch" id="theme-swatch"></div>
+          <span class="theme-name" id="theme-name">GitHub Dark</span>
+          <span class="arrow">▾</span>
+        </div>
+        <div class="theme-menu" id="theme-menu"></div>
       </div>
     </div>
     <div class="actions">
       <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
       <button class="btn-apply" onclick="saveFontSettings()">应用</button>
     </div>
+  </div>
 
 </body>
 </html>
