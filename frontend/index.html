@@ -183,7 +183,9 @@ input, textarea, button { font-family: inherit; }
 .editor-modal .CodeMirror-focused .CodeMirror-selected { background: #264f78; }
 .CodeMirror { background: #0d1117; color: #e6edf3; }
 /* Theme select */
-#theme-select { width: 100%; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; cursor: pointer; }
+.theme-row { display: flex; align-items: center; gap: 10px; }
+#theme-preview { width: 36px; height: 24px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border: 1px solid var(--border-color); }
+#theme-select { flex: 1; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; cursor: pointer; }
 #theme-select:focus { border-color: var(--accent); }
 #theme-select option { background: var(--bg-primary); color: var(--text-primary); padding: 4px; }
 
@@ -1316,6 +1318,14 @@ function applyTheme(name) {
       s.term.options.theme = t.xterm;
     }
   });
+function updateThemePreview() {
+  var key = document.getElementById('theme-select').value;
+  var m = themeMeta[key];
+  if (!m) return;
+  var preview = document.getElementById('theme-preview');
+  preview.style.background = m.bg;
+  preview.style.color = m.fg;
+  preview.style.borderColor = m.accent;
 }
 
 function renderThemePicker(selected) {
@@ -1329,6 +1339,7 @@ function renderThemePicker(selected) {
     if (key === selected) opt.selected = true;
     sel.appendChild(opt);
   });
+  updateThemePreview();
 }
 
 function showFontSettings() {
@@ -1926,7 +1937,10 @@ document.addEventListener('keydown', (e) => {
     </div>
     <div class="section">
       <div class="section-label">主题</div>
-      <select id="theme-select" onchange="applyTheme(this.value); fontSettings.theme=this.value; localStorage.setItem('webssh-font',JSON.stringify(fontSettings))"></select>
+      <div class="theme-row">
+        <div id="theme-preview">A</div>
+        <select id="theme-select" onchange="applyTheme(this.value); fontSettings.theme=this.value; localStorage.setItem('webssh-font',JSON.stringify(fontSettings)); updateThemePreview()"></select>
+      </div>
     </div>
     <div class="actions">
       <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
