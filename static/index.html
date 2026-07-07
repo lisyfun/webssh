@@ -1085,15 +1085,7 @@ function initTerminal(sid) {
     fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
     letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0.5,
     lineHeight: fontSettings.lineHeight || 1.3,
-    theme: {
-      background: '#0d1117', foreground: '#e6edf3', cursor: '#e6edf3',
-      selectionBackground: '#3b5998',
-      black: '#000000', red: '#ff7b72', green: '#1f7a2e', yellow: '#e3b341',
-      blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
-      brightBlack: '#484f58', brightRed: '#ffa198', brightGreen: '#56d364',
-      brightYellow: '#e9c46a', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
-      brightCyan: '#56d4dd', brightWhite: '#e6edf3',
-    },
+    theme: (themes[fontSettings.theme] || themes['github-dark']).xterm,
     allowTransparency: true,
     drawBoldTextInBrightColors: false,
   });
