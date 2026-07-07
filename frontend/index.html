@@ -182,17 +182,10 @@ input, textarea, button { font-family: inherit; }
 .editor-modal .cm-s-default .cm-attribute { color: #ffa657; }
 .editor-modal .CodeMirror-focused .CodeMirror-selected { background: #264f78; }
 .CodeMirror { background: #0d1117; color: #e6edf3; }
-/* Theme picker */
-.theme-picker { display: flex; flex-direction: column; gap: 6px; }
-.theme-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
-.theme-card:hover { border-color: var(--accent); }
-.theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,140,255,0.2); }
-.theme-card .preview { width: 36px; height: 24px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
-.theme-card .info { flex: 1; min-width: 0; }
-.theme-card .info .tname { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-.theme-card .info .tdesc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-.theme-card .check { font-size: 14px; opacity: 0; transition: opacity .15s; color: var(--accent); }
-.theme-card.active .check { opacity: 1; }
+/* Theme select */
+#theme-select { width: 100%; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; cursor: pointer; }
+#theme-select:focus { border-color: var(--accent); }
+#theme-select option { background: var(--bg-primary); color: var(--text-primary); padding: 4px; }
 
 /* Font settings popup */
 .font-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px; width: 380px; z-index: 1500; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
@@ -1326,25 +1319,15 @@ function applyTheme(name) {
 }
 
 function renderThemePicker(selected) {
-  var container = document.getElementById('theme-picker');
-  container.innerHTML = '';
+  var sel = document.getElementById('theme-select');
+  sel.innerHTML = '';
   Object.keys(themeMeta).forEach(function(key) {
     var m = themeMeta[key];
-    var card = document.createElement('div');
-    card.className = 'theme-card' + (key === selected ? ' active' : '');
-    card.dataset.theme = key;
-    card.innerHTML =
-      '<div class="preview" style="background:' + m.bg + ';color:' + m.fg + ';border:1px solid ' + m.accent + '">A</div>' +
-      '<div class="info"><div class="tname">' + m.name + '</div><div class="tdesc">' + m.desc + '</div></div>' +
-      '<div class="check">✓</div>';
-    card.onclick = function() {
-      document.querySelectorAll('.theme-card').forEach(function(c) { c.classList.remove('active'); });
-      card.classList.add('active');
-      applyTheme(key);
-      fontSettings.theme = key;
-      localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
-    };
-    container.appendChild(card);
+    var opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = m.name + ' — ' + m.desc;
+    if (key === selected) opt.selected = true;
+    sel.appendChild(opt);
   });
 }
 
@@ -1377,7 +1360,7 @@ function saveFontSettings() {
   fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
   fontSettings.lineHeight = parseFloat(document.getElementById('line-height').value) || 1.3;
   fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
-  fontSettings.theme = document.querySelector('.theme-card.active') ? document.querySelector('.theme-card.active').dataset.theme : 'github-dark';
+  fontSettings.theme = document.getElementById('theme-select').value;
   localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
   applyTheme(fontSettings.theme);
   hideFontSettings();
@@ -1388,8 +1371,6 @@ function getActiveSession() { return activeSessionId ? sessions[activeSessionId]
 async function loadFileList(dir) {
   const ses = getActiveSession();
   if (!ses) return;
-
-  // 正在加载中：记下待处理路径，不更新 ses.fsPath（防竞态）
   if (ses._loading) {
     if (dir !== undefined) ses._pendingPath = dir;
     return;
@@ -1945,14 +1926,12 @@ document.addEventListener('keydown', (e) => {
     </div>
     <div class="section">
       <div class="section-label">主题</div>
-      <div class="theme-picker" id="theme-picker"></div>
+      <select id="theme-select" onchange="applyTheme(this.value); fontSettings.theme=this.value; localStorage.setItem('webssh-font',JSON.stringify(fontSettings))"></select>
     </div>
     <div class="actions">
       <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
       <button class="btn-apply" onclick="saveFontSettings()">应用</button>
     </div>
-  </div>
-</div>
 
 </body>
 </html>
