@@ -1693,6 +1693,8 @@ function renderThemePicker(selected) {
       document.querySelectorAll('.theme-card').forEach(function(c) { c.classList.remove('active'); });
       card.classList.add('active');
       applyTheme(key);
+      fontSettings.theme = key;
+      localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
     };
     container.appendChild(card);
   });
