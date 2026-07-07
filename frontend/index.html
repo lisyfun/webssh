@@ -34,6 +34,8 @@ input, textarea, button { font-family: inherit; }
 .body { display: flex; flex: 1; overflow: hidden; }
 .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
 .sidebar.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
+.sidebar-toggle-float { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 100; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-left: none; border-radius: 0 6px 6px 0; color: var(--text-secondary); cursor: pointer; padding: 8px 4px; font-size: 12px; display: none; align-items: center; transition: background .15s; writing-mode: vertical-rl; }
+.sidebar-toggle-float:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 
 .sidebar-header { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
@@ -226,7 +228,10 @@ input, textarea, button { font-family: inherit; }
   <div class="body">
     <div class="sidebar">
       <div class="sidebar-header">
-        <span>服务器</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="add-btn" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="收起/展开服务器列表" style="font-size:14px">☰</button>
+          <span>服务器</span>
+        </div>
         <div style="display:flex;gap:2px">
           <button class="add-btn" onclick="showBatchImport()" title="批量导入"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
           <button class="add-btn" onclick="showHostKeys()" title="主机密钥">#</button>
@@ -236,12 +241,12 @@ input, textarea, button { font-family: inherit; }
       <div class="server-search"><input type="text" id="server-search-input" placeholder="搜索名称/主机/用户..." oninput="renderServers()"></div>
       <div class="server-list" id="server-list"></div>
     </div>
+    <button class="sidebar-toggle-float" id="sidebar-toggle-float" onclick="toggleSidebar()" title="展开服务器列表">服务器列表 ▸</button>
 
     <div class="center">
       <div class="tab-bar" id="tab-bar" style="display:none">
         <div class="tab-list" id="tab-list"></div>
         <div class="tab-bar-right">
-          <button class="tab-bar-btn" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="收起/展开服务器列表"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
           <button class="tab-bar-btn" onclick="showFontSettings()" title="终端设置"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
           <button class="tab-bar-btn" id="toggle-files-btn" onclick="toggleFilePanel()" title="文件浏览器"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
         </div>
@@ -1276,14 +1281,15 @@ function toggleFilePanel() {
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const btn = document.getElementById('toggle-sidebar-btn');
+  const floatBtn = document.getElementById('sidebar-toggle-float');
   sidebarOpen = !sidebarOpen;
   sidebar.classList.toggle('collapsed', !sidebarOpen);
   btn.classList.toggle('active', sidebarOpen);
+  floatBtn.style.display = sidebarOpen ? 'none' : 'flex';
   setTimeout(() => {
     Object.values(sessions).forEach(s => { if (s.fitAddon) s.fitAddon.fit(); });
   }, 250);
 }
-
 function toggleHiddenFiles() {
   showHidden = !showHidden;
   localStorage.setItem('webssh-show-hidden', showHidden);
