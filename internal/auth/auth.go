@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -335,6 +336,7 @@ func (a *Auth) rateLimitCheck(w http.ResponseWriter, ip string) bool {
 }
 
 func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if r.Method == "POST" {
 		ip := a.clientIP(r)
 
@@ -412,7 +414,6 @@ func (a *Auth) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		a.establishSession(w, r, ip)
 		return
 	}
-
 	w.Write([]byte(loginPage(a.basePath, "", "")))
 }
 
@@ -472,6 +473,7 @@ func generateToken() string {
 }
 
 func loginPage(basePath, errMsg string, _ string) string {
+	errMsg = html.EscapeString(errMsg)
 	errShow := ""
 	if errMsg == "" {
 		errShow = "hidden"
