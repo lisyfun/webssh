@@ -486,40 +486,82 @@ func loginPage(basePath, errMsg string, _ string) string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WebSSH Terminal</title>
-<style>
+<style id="theme-style">
+:root {
+  --bg: #0c0c0c;
+  --fg: #33ff33;
+  --dim: #1a8c1a;
+  --dim2: #1a4a1a;
+  --border: #1a3a1a;
+  --bar-bg: #1a1a1a;
+  --bar-title: #666;
+  --err-fg: #ff5555;
+  --err-border: rgba(255,85,85,.2);
+}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;background:#0c0c0c;color:#33ff33;font-family:"Consolas","Menlo","Monaco","Courier New",monospace;display:flex;align-items:center;justify-content:center}
+html,body{height:100%;background:var(--bg);color:var(--fg);font-family:"Consolas","Menlo","Monaco","Courier New",monospace;display:flex;align-items:center;justify-content:center}
 
-.term{border:1px solid #1a3a1a;border-radius:8px;width:580px;overflow:hidden;box-shadow:0 0 40px rgba(51,255,51,.04)}
-.term-bar{background:#1a1a1a;padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1a3a1a}
+.term{border:1px solid var(--border);border-radius:8px;width:580px;overflow:hidden;box-shadow:0 0 40px color-mix(in srgb, var(--fg) 6%, transparent)}
+.term-bar{background:var(--bar-bg);padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
 .dot{width:10px;height:10px;border-radius:50%}
 .dot.r{background:#ff5f56}
 .dot.y{background:#ffbd2e}
 .dot.g{background:#27c93f}
-.term-title{font-size:12px;color:#666;margin-left:8px}
+.term-title{font-size:12px;color:var(--bar-title);margin-left:8px}
 
 .term-body{padding:28px 32px 32px}
 
-.banner{font-size:13px;line-height:1.6;margin-bottom:24px;color:#33ff33}
-.banner .dim{color:#1a8c1a}
+.banner{font-size:13px;line-height:1.6;margin-bottom:24px;color:var(--fg)}
+.banner .dim{color:var(--dim)}
 
 .prompt{margin-bottom:6px;display:flex;align-items:center;gap:0}
-.prompt .prefix{color:#1a8c1a;font-size:14px;white-space:pre}
-.prompt input{background:transparent;border:none;color:#33ff33;font-family:inherit;font-size:14px;outline:none;flex:1;padding:4px 0;caret-color:#33ff33}
-.prompt input::placeholder{color:#1a4a1a}
+.prompt .prefix{color:var(--dim);font-size:14px;white-space:pre}
+.prompt input{background:transparent;border:none;color:var(--fg);font-family:inherit;font-size:14px;outline:none;flex:1;padding:4px 0;caret-color:var(--fg)}
+.prompt input::placeholder{color:var(--dim2)}
 
-.btn{margin-top:18px;padding:8px 20px;background:transparent;border:1px solid #33ff33;color:#33ff33;font-family:inherit;font-size:13px;cursor:pointer;transition:background .2s}
-.btn:hover{background:rgba(51,255,51,.08)}
-.btn:active{background:rgba(51,255,51,.15)}
+.btn{margin-top:18px;padding:8px 20px;background:transparent;border:1px solid var(--fg);color:var(--fg);font-family:inherit;font-size:13px;cursor:pointer;transition:background .2s}
+.btn:hover{background:color-mix(in srgb, var(--fg) 8%, transparent)}
+.btn:active{background:color-mix(in srgb, var(--fg) 15%, transparent)}
 
-.error{margin-top:16px;padding:6px 0;font-size:13px;color:#ff5555;border-top:1px solid rgba(255,85,85,.2)}
+.error{margin-top:16px;padding:6px 0;font-size:13px;color:var(--err-fg);border-top:1px solid var(--err-border)}
 .error.hidden{display:none}
 
-.cursor{display:inline-block;width:8px;height:15px;background:#33ff33;animation:blink 1s step-end infinite;margin-left:4px;vertical-align:middle}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--fg);animation:blink 1s step-end infinite;margin-left:4px;vertical-align:middle}
 
-.footer{font-size:11px;color:#1a4a1a;margin-top:20px;text-align:center}
+.footer{font-size:11px;color:var(--dim2);margin-top:20px;text-align:center}
 </style>
+<script>
+(function(){
+  // 读取终端主题配色，使登录页跟随用户已选主题
+  var themes = {
+    'github-dark':       {bg:'#0d1117',fg:'#e6edf3',dim:'#8b949e',dim2:'#484f58',border:'#30363d',bar:'#161b22',title:'#8b949e'},
+    'catppuccin-mocha':  {bg:'#1e1e2e',fg:'#cdd6f4',dim:'#6c7086',dim2:'#45475a',border:'#313244',bar:'#181825',title:'#6c7086'},
+    'one-dark-pro':      {bg:'#282c34',fg:'#abb2bf',dim:'#5c6370',dim2:'#3e4451',border:'#3e4451',bar:'#21252b',title:'#5c6370'},
+    'tokyo-night':       {bg:'#1a1b26',fg:'#a9b1d6',dim:'#565f89',dim2:'#3b4261',border:'#2f3346',bar:'#13141f',title:'#565f89'},
+    'nord':              {bg:'#2e3440',fg:'#eceff4',dim:'#6c7a96',dim2:'#4c566a',border:'#4c566a',bar:'#242933',title:'#6c7a96'},
+    'github-light':      {bg:'#ffffff',fg:'#1f2328',dim:'#656d76',dim2:'#afb8c1',border:'#d0d7de',bar:'#f6f8fa',title:'#656d76'},
+    'catppuccin-latte':  {bg:'#eff1f5',fg:'#4c4f69',dim:'#6c7086',dim2:'#9ca0b0',border:'#ccd0da',bar:'#e6e9ef',title:'#6c7086'},
+    'one-light':         {bg:'#fafafa',fg:'#383a42',dim:'#6c6c6c',dim2:'#c8c8c8',border:'#d8d8d8',bar:'#f0f0f0',title:'#6c6c6c'},
+    'solarized-light':   {bg:'#fdf6e3',fg:'#657b83',dim:'#839496',dim2:'#b8c8c8',border:'#d5d8c9',bar:'#eee8d5',title:'#839496'},
+    'ibm-light':         {bg:'#e1e2e7',fg:'#3760bf',dim:'#5c7fc7',dim2:'#a8b8d8',border:'#c0c5d8',bar:'#d5d7e0',title:'#5c7fc7'}
+  };
+  try {
+    var saved = JSON.parse(localStorage.getItem('webssh-font') || '{}');
+    var t = themes[saved.theme];
+    if (t) {
+      var s = document.documentElement.style;
+      s.setProperty('--bg', t.bg);
+      s.setProperty('--fg', t.fg);
+      s.setProperty('--dim', t.dim);
+      s.setProperty('--dim2', t.dim2);
+      s.setProperty('--border', t.border);
+      s.setProperty('--bar-bg', t.bar);
+      s.setProperty('--bar-title', t.title);
+    }
+  } catch(e){}
+})();
+</script>
 </head>
 <body>
 <div class="term">
