@@ -489,10 +489,10 @@ func loginPage(basePath, errMsg string, _ string) string {
 <style id="theme-style">
 :root {
   --bg: #0c0c0c;
-  --fg: #33ff33;
-  --dim: #1a8c1a;
-  --dim2: #1a4a1a;
-  --border: #1a3a1a;
+  --fg: #e3b341;
+  --dim: #8a6e20;
+  --dim2: #4a3a10;
+  --border: #3a2e0a;
   --bar-bg: #1a1a1a;
   --bar-title: #666;
   --err-fg: #ff5555;
@@ -535,16 +535,16 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:"Consolas
 (function(){
   // 读取终端主题配色，使登录页跟随用户已选主题
   var themes = {
-    'github-dark':       {bg:'#0d1117',fg:'#e6edf3',dim:'#8b949e',dim2:'#484f58',border:'#30363d',bar:'#161b22',title:'#8b949e'},
-    'catppuccin-mocha':  {bg:'#1e1e2e',fg:'#cdd6f4',dim:'#6c7086',dim2:'#45475a',border:'#313244',bar:'#181825',title:'#6c7086'},
-    'one-dark-pro':      {bg:'#282c34',fg:'#abb2bf',dim:'#5c6370',dim2:'#3e4451',border:'#3e4451',bar:'#21252b',title:'#5c6370'},
-    'tokyo-night':       {bg:'#1a1b26',fg:'#a9b1d6',dim:'#565f89',dim2:'#3b4261',border:'#2f3346',bar:'#13141f',title:'#565f89'},
-    'nord':              {bg:'#2e3440',fg:'#eceff4',dim:'#6c7a96',dim2:'#4c566a',border:'#4c566a',bar:'#242933',title:'#6c7a96'},
-    'github-light':      {bg:'#ffffff',fg:'#1f2328',dim:'#656d76',dim2:'#afb8c1',border:'#d0d7de',bar:'#f6f8fa',title:'#656d76'},
-    'catppuccin-latte':  {bg:'#eff1f5',fg:'#4c4f69',dim:'#6c7086',dim2:'#9ca0b0',border:'#ccd0da',bar:'#e6e9ef',title:'#6c7086'},
-    'one-light':         {bg:'#fafafa',fg:'#383a42',dim:'#6c6c6c',dim2:'#c8c8c8',border:'#d8d8d8',bar:'#f0f0f0',title:'#6c6c6c'},
-    'solarized-light':   {bg:'#fdf6e3',fg:'#657b83',dim:'#839496',dim2:'#b8c8c8',border:'#d5d8c9',bar:'#eee8d5',title:'#839496'},
-    'ibm-light':         {bg:'#e1e2e7',fg:'#3760bf',dim:'#5c7fc7',dim2:'#a8b8d8',border:'#c0c5d8',bar:'#d5d7e0',title:'#5c7fc7'}
+    'github-dark':       {bg:'#0d1117',border:'#30363d',bar:'#161b22',title:'#8b949e'},
+    'catppuccin-mocha':  {bg:'#1e1e2e',border:'#313244',bar:'#181825',title:'#6c7086'},
+    'one-dark-pro':      {bg:'#282c34',border:'#3e4451',bar:'#21252b',title:'#5c6370'},
+    'tokyo-night':       {bg:'#1a1b26',border:'#2f3346',bar:'#13141f',title:'#565f89'},
+    'nord':              {bg:'#2e3440',border:'#4c566a',bar:'#242933',title:'#6c7a96'},
+    'github-light':      {bg:'#ffffff',border:'#d0d7de',bar:'#f6f8fa',title:'#656d76'},
+    'catppuccin-latte':  {bg:'#eff1f5',border:'#ccd0da',bar:'#e6e9ef',title:'#6c7086'},
+    'one-light':         {bg:'#fafafa',border:'#d8d8d8',bar:'#f0f0f0',title:'#6c6c6c'},
+    'solarized-light':   {bg:'#fdf6e3',border:'#d5d8c9',bar:'#eee8d5',title:'#839496'},
+    'ibm-light':         {bg:'#e1e2e7',border:'#c0c5d8',bar:'#d5d7e0',title:'#5c7fc7'}
   };
   try {
     var saved = JSON.parse(localStorage.getItem('webssh-font') || '{}');
@@ -552,9 +552,6 @@ html,body{height:100%;background:var(--bg);color:var(--fg);font-family:"Consolas
     if (t) {
       var s = document.documentElement.style;
       s.setProperty('--bg', t.bg);
-      s.setProperty('--fg', t.fg);
-      s.setProperty('--dim', t.dim);
-      s.setProperty('--dim2', t.dim2);
       s.setProperty('--border', t.border);
       s.setProperty('--bar-bg', t.bar);
       s.setProperty('--bar-title', t.title);
