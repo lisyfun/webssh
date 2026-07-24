@@ -1128,13 +1128,28 @@ function initTerminal(sid) {
 
   term.open(container);
 
-  // 选中即复制
-  term.onSelectionChange(() => {
+  // 选中即复制 — mouseup 保证用户手势有效，Clipboard API 优先，execCommand 回退
+  term.element.addEventListener('mouseup', () => {
     const sel = term.getSelection();
-    if (sel) {
-      navigator.clipboard.writeText(sel).catch(() => {});
-    }
+    if (!sel) return;
+    copyText(sel);
   });
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px'; ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+  }
 
   term.onData((data) => {
     const ses = sessions[sid];
