@@ -44,11 +44,11 @@ func detectShell(client *ssh.Client) string {
 func cwdReportSnippet(shell string) string {
 	switch shell {
 	case "fish":
-		return "function __webssh_cwd --on-event fish_prompt; printf '\\033]7;file://%s\\033\\\\' \"$PWD\"; end\n"
+		return "function __webssh_cwd --on-event fish_prompt; printf '\\033]7;file://%s\\033\\\\' \"$PWD\"; end"
 	case "zsh":
-		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; precmd_functions+=(__webssh_cwd)\n"
+		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; precmd_functions+=(__webssh_cwd)"
 	default:
-		return "export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'\n"
+		return "export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'"
 	}
 }
 
@@ -243,11 +243,21 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			return
 		}
 
-		// Detect the remote login shell so we can inject the correct
-		// CWD-reporting hook below. Falls back to the bash form, which is
-		// harmless (just inert) in sh/zsh/ksh.
+		// Detect the remote login shell and try to set PROMPT_COMMAND via
+		// SSH env request before the shell starts (silent, no PTY echo).
+		// bash/zsh/sh/ksh/dash all support PROMPT_COMMAND; fish does not.
+		// If the SSH server rejects Setenv (e.g., AcceptEnv restriction),
+		// fall back to stdin injection with stty -echo.
 		shell := detectShell(sshClient)
 		cwdSnippet := cwdReportSnippet(shell)
+		cwdInjected := false
+		switch shell {
+		case "", "bash", "sh", "ksh", "dash", "zsh":
+			cwdHook := "printf '\\033]7;file://%s\\033\\\\' \"$PWD\""
+			if err := session.Setenv("PROMPT_COMMAND", cwdHook); err == nil {
+				cwdInjected = true
+			}
+		}
 
 		modes := ssh.TerminalModes{
 			ssh.ECHO:          1,   // 回显输入
@@ -285,23 +295,31 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 
 		var injectedOnce sync.Once
 		writePROMPT := func() {
+			if cwdInjected {
+				return
+			}
 			injectedOnce.Do(func() {
-				stdin.Write([]byte(cwdSnippet))
+				// Single combined line so only one prompt appears;
+				// the whole line is filtered from visible output.
+				stdin.Write([]byte("stty -echo 2>/dev/null; " + cwdSnippet + "; stty echo 2>/dev/null\n"))
 			})
 		}
 
 		go func() {
 			buf := make([]byte, 4096)
 			first := true
-			cwdEchoNeedle := strings.TrimSpace(cwdSnippet)
 			filterCwdEcho := func(data []byte) []byte {
-				if cwdEchoNeedle == "" || !strings.Contains(string(data), cwdEchoNeedle) {
+				if cwdInjected {
 					return data
 				}
 				lines := strings.SplitAfter(string(data), "\n")
 				var out strings.Builder
 				for _, line := range lines {
-					if strings.Contains(line, cwdEchoNeedle) {
+					if strings.Contains(line, "stty -echo") ||
+						strings.Contains(line, "stty echo") ||
+						strings.Contains(line, "PROMPT_COMMAND=") ||
+						strings.Contains(line, "__webssh_cwd") ||
+						strings.Contains(line, "precmd_functions+=") {
 						continue
 					}
 					out.WriteString(line)

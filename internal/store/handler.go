@@ -224,7 +224,7 @@ func validateHost(host string) error {
 		}
 	}
 	if ip := net.ParseIP(host); ip != nil {
-		if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+		if ip.IsLoopback() || ip.IsUnspecified() {
 			return errors.New("host not allowed")
 		}
 	}
