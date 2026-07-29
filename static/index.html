@@ -746,6 +746,7 @@ async function fetchSessionKey() {
 
 async function encField(plain) {
   if (!sessionKey || !plain) return plain;
+  if (!crypto?.subtle) return plain; // ponytail: non-secure context (HTTP), skip encryption
   const keyBytes = new Uint8Array(sessionKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
   const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
