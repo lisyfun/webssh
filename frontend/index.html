@@ -74,8 +74,8 @@ input, textarea, button { font-family: inherit; }
 .tab-bar .tab-bar-btn.active { color: var(--accent); }
 .tab-list { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tab-list::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; max-width: 160px; flex-shrink: 0; overflow: hidden; }
-.tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); box-shadow: inset 0 -1.5px 0 var(--accent); }
+.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; max-width: 160px; flex-shrink: 0; overflow: hidden; }
+.tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); box-shadow: inset 0 1.5px 0 var(--accent); }
 .tab.unread .tab-name::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 .tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
 .tab .tab-host { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 11px; margin-left: 2px; }
@@ -108,13 +108,13 @@ input, textarea, button { font-family: inherit; }
 .file-breadcrumb .crumb:hover { color: var(--accent); background: var(--bg-hover); }
 .file-breadcrumb .sep { margin: 0 2px; color: var(--text-muted); }
 .file-list { flex: 1; overflow-y: auto; padding: 2px 0; }
-.file-item { padding: 5px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; border-radius: 2px; }
+.file-item { padding: 5px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; border-radius: 2px; position: relative; }
 .file-item:hover { background: var(--bg-tertiary); }
 .file-item .icon { flex-shrink: 0; width: 18px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
 .file-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-item .size { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 50px; text-align: right; }
 .file-item .mtime { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 60px; text-align: right; }
-.file-item .file-actions { opacity: 0; display: flex; gap: 2px; }
+.file-item .file-actions { opacity: 0; display: flex; gap: 2px; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: var(--bg-tertiary); border-radius: 2px; padding: 1px 3px; transition: opacity .15s; }
 .file-item:hover .file-actions { opacity: 1; }
 .file-item .file-actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 1px 4px; border-radius: 2px; font-size: 11px; }
 .file-item .file-actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
