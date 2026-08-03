@@ -195,13 +195,14 @@ input, textarea, button { font-family: inherit; }
   cursor: pointer;
   font-size: 13px;
   border-radius: 2px;
+  position: relative;
 }
 .file-item:hover { background: var(--bg-tertiary); }
 .file-item .icon { flex-shrink: 0; width: 18px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
 .file-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-item .size { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 50px; text-align: right; }
 .file-item .mtime { color: var(--text-muted); font-size: 11px; white-space: nowrap; min-width: 60px; text-align: right; }
-.file-item .file-actions { opacity: 0; display: flex; gap: 2px; }
+.file-item .file-actions { opacity: 0; display: flex; gap: 2px; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: var(--bg-tertiary); border-radius: 2px; padding: 1px 3px; transition: opacity .15s; }
 .file-item:hover .file-actions { opacity: 1; }
 .file-item .file-actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 1px 4px; border-radius: 2px; font-size: 11px; }
 .file-item .file-actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
