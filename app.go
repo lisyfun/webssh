@@ -768,10 +768,6 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 // chunks; this is a generous safety ceiling against a malformed call.
 const MaxChunkSize = 4 << 20 // 4 MB
 
-func (a *App) SFTPUpload(sessionID, destPath, fileName string, data []byte) error {
-	return a.sftpUploadInternal(sessionID, destPath, fileName, data, 0, true)
-}
-
 // SFTPUploadChunk appends a chunk at the given offset. offset==0 (first chunk)
 // truncates/creates the file; subsequent chunks are validated against the
 // current remote size to catch out-of-order or duplicated chunks.

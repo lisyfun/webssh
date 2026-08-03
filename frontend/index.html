@@ -1731,6 +1731,7 @@ async function uploadFiles(files) {
   const CHUNK_SIZE = 512 * 1024;
 
   let uploaded = 0;
+  let failed = 0;
   let cancelled = false;
   const totalBytes = arr.reduce((sum, f) => sum + f.size, 0);
   let sentBytes = 0;
@@ -1769,22 +1770,47 @@ async function uploadFiles(files) {
         pctEl.textContent = pct + '%';
         fillEl.style.width = pct + '%';
 
-        await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, offset);
+        // 分块失败自动重试 3 次(退避 0.5s/1s/1.5s)，仍失败才放弃
+        let attempt = 0;
+        for (;;) {
+          try {
+            await App().SFTPUploadChunk(ses.sessionId, ses.fsPath, f.name, base64, offset);
+            break;
+          } catch (err) {
+            if (++attempt >= 3) throw err;
+            await new Promise(r => setTimeout(r, 500 * attempt));
+          }
+        }
         sentBytes = nextSent;
         offset = end;
         await new Promise(r => setTimeout(r, 0));
       }
+      // 上传完成后校验远端文件大小，防止静默损坏
+      const verify = await App().SFTPStat(ses.sessionId, remotePath);
+      if (verify && verify.exists && !verify.isDir && verify.size !== f.size) {
+        throw new Error(`大小校验不一致 (远端 ${verify.size} / 本地 ${f.size})`);
+      }
       uploaded++;
     } catch (err) {
-      cancelled = String(err).includes('已取消');
-      showToast(`${cancelled ? '上传已取消' : `上传失败 ${f.name}: ${err}`}`, cancelled ? '' : 'error');
-      break;
+      if (String(err).includes('已取消')) {
+        cancelled = true;
+        break; // 取消则停止整个队列
+      }
+      failed++;
+      showToast(`上传失败 ${f.name}: ${err}`, 'error');
+      // 单个文件失败不中断队列，继续下一个
     }
   }
   cancelEl.style.display = 'none';
   activeUpload = null;
   progressEl.style.display = (uploaded === arr.length || cancelled) ? 'none' : 'block';
-  if (uploaded === arr.length) showToast(`成功上传 ${uploaded} 个文件`, 'success');
+  if (cancelled) {
+    showToast(`上传已取消(已成功 ${uploaded} 个)`, '');
+  } else if (failed > 0) {
+    showToast(`上传完成: 成功 ${uploaded} 个，失败 ${failed} 个`, 'error');
+  } else {
+    showToast(`成功上传 ${uploaded} 个文件`, 'success');
+  }
   loadFileList();
 }
 
