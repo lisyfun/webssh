@@ -48,19 +48,24 @@ func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error 
 	keyB64 := base64.StdEncoding.EncodeToString(key.Marshal())
 
 	if stored, loaded := hostKeyStore.Load(addr); loaded {
-		return verifyHostKey(addr, stored.(string), keyB64)
+		if stored.(string) == keyB64 {
+			return nil
+		}
+		return retrustHostKey(addr, stored.(string), key, keyB64)
 	}
 
 	if hostKeyPersister != nil {
 		if storedB64, err := hostKeyPersister.LoadHostKey(addr); err == nil && storedB64 != "" {
 			hostKeyStore.Store(addr, storedB64)
-			return verifyHostKey(addr, storedB64, keyB64)
+			if storedB64 == keyB64 {
+				return nil
+			}
+			return retrustHostKey(addr, storedB64, key, keyB64)
 		}
 	}
 
-	if stored, loaded := hostKeyStore.LoadOrStore(addr, keyB64); loaded {
-		return verifyHostKey(addr, stored.(string), keyB64)
-	}
+	// First contact (TOFU): accept and record in both cache and store.
+	hostKeyStore.Store(addr, keyB64)
 	if hostKeyPersister != nil {
 		if err := hostKeyPersister.StoreHostKey(addr, keyB64); err != nil {
 			log.Printf("warning: failed to persist host key for %s: %v", addr, err)
@@ -70,29 +75,31 @@ func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error 
 	return nil
 }
 
-func verifyHostKey(addr, storedB64, gotB64 string) error {
-	if storedB64 != gotB64 {
-		storedKey, _ := parsePublicKeyB64(storedB64)
-		gotKey, _ := parsePublicKeyB64(gotB64)
-		expected := storedB64
-		if storedKey != nil {
-			expected = ssh.FingerprintSHA256(storedKey)
+// retrustHostKey replaces the saved host key for addr after it changed.
+// This silently disables MITM protection — an explicit design choice; the
+// old/new fingerprints are logged so a rogue swap is still traceable.
+func retrustHostKey(addr, oldB64 string, key ssh.PublicKey, keyB64 string) error {
+	log.Printf("TOFU: host key CHANGED for %s (old %s, new %s) — auto re-trusting",
+		addr, ssh.FingerprintSHA256(mustPubKey(oldB64)), ssh.FingerprintSHA256(key))
+	hostKeyStore.Store(addr, keyB64)
+	if hostKeyPersister != nil {
+		if err := hostKeyPersister.StoreHostKey(addr, keyB64); err != nil {
+			log.Printf("warning: failed to persist host key for %s: %v", addr, err)
 		}
-		got := gotB64
-		if gotKey != nil {
-			got = ssh.FingerprintSHA256(gotKey)
-		}
-		return fmt.Errorf("host key mismatch for %s (expected %s, got %s)", addr, expected, got)
 	}
 	return nil
 }
 
-func parsePublicKeyB64(keyB64 string) (ssh.PublicKey, error) {
-	data, err := base64.StdEncoding.DecodeString(keyB64)
+func mustPubKey(b64 string) ssh.PublicKey {
+	data, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return ssh.ParsePublicKey(data)
+	pub, err := ssh.ParsePublicKey(data)
+	if err != nil {
+		return nil
+	}
+	return pub
 }
 
 type Session struct {
