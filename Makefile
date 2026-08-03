@@ -17,7 +17,7 @@ build-windows:
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(BINARY).exe .
 
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BINARY)-linux .
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -tags webkit2_41 -ldflags="-s -w" -o $(BINARY)-linux .
 
 # 统信OS 20 (Debian 10) .deb 打包（需要本机 Linux + GTK/WebKit dev libs）
 deb: build-linux
