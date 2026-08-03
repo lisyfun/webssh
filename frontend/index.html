@@ -87,7 +87,8 @@ input, textarea, button { font-family: inherit; }
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
 .terminal-wrapper .xterm { padding: 6px 0 0 14px; box-sizing: border-box; }
 .terminal-wrapper .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; gap: 8px; }
-.terminal-wrapper .empty-state .key-hint { font-size: 12px; color: var(--text-muted); opacity: 0.6; }
+.terminal-wrapper .empty-state .conn-error { color: var(--red); font-size: 12px; max-width: 85%; text-align: center; word-break: break-all; }
+.terminal-wrapper .empty-state .conn-error button { margin-top: 10px; padding: 6px 16px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .terminal-wrapper .loading-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 13px; gap: 8px; }
 .terminal-wrapper .loading-state .spinner { width: 16px; height: 16px; border: 2px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -259,6 +260,7 @@ input, textarea, button { font-family: inherit; }
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <div>选择左侧服务器进行连接</div>
           <div class="key-hint">点击 + 添加新的服务器</div>
+          <div class="conn-error" id="conn-error" style="display:none"></div>
         </div>
         <div class="loading-state" id="loading-state" style="display:none">
           <div class="spinner"></div>
@@ -850,14 +852,13 @@ async function connectToServer(sid) {
     load.style.display = 'none';
     empty.style.display = 'flex';
     const msg = String(err && (err.message || err));
-    const text = document.getElementById('loading-text');
+    const errEl = document.getElementById('conn-error');
+    errEl.style.display = 'block';
     if (msg.includes('host key mismatch')) {
       const m = msg.match(/got (SHA256:[^\s),]+)/);
-      text.innerHTML = '连接失败: 主机密钥已变更(服务器可能重装/重建)。<br>' +
-        '新密钥: <code style="font-size:11px;color:var(--text-muted)">' + escHtml(m ? m[1] : '') + '</code><br>' +
-        `<button onclick="trustAndReconnect('${escJsStr(sid)}')" style="margin-top:10px;padding:6px 16px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer">信任新密钥并重连</button>`;
+      errEl.innerHTML = escHtml(msg) + '<br><button onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
     } else {
-      text.textContent = '连接失败: ' + err;
+      errEl.textContent = msg;
     }
     renderServers();
     updateStatus();
