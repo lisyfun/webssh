@@ -539,6 +539,19 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 	return sessionID, nil
 }
 
+// TrustHostKey forgets the saved TOFU host key for host:port so the next
+// connect re-trusts whatever key the server presents. Only meaningful after
+// a "host key mismatch" failure — the frontend shows the new fingerprint for
+// the user to confirm before calling this.
+func (a *App) TrustHostKey(host string, port int) error {
+	addr := fmt.Sprintf("%s:%d", host, port)
+	if err := a.store.DeleteHostKey(addr); err != nil {
+		return err
+	}
+	sshterm.ForgetHostKey(addr)
+	return nil
+}
+
 func (a *App) TerminalInput(sessionID string, data string) error {
 	a.mu.Lock()
 	t, ok := a.terminals[sessionID]

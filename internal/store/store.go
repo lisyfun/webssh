@@ -317,3 +317,9 @@ func (s *Store) StoreHostKey(addr, keyB64 string) error {
 		addr, keyB64, now)
 	return err
 }
+
+// DeleteHostKey forgets the TOFU host key record for addr ("host:port").
+func (s *Store) DeleteHostKey(addr string) error {
+	_, err := s.db.Exec("DELETE FROM host_keys WHERE addr=?", addr)
+	return err
+}

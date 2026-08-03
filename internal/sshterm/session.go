@@ -41,6 +41,12 @@ func SetHostKeyPersister(p HostKeyPersister) {
 	hostKeyPersister = p
 }
 
+// ForgetHostKey drops the in-memory TOFU entry for addr ("host:port"). The
+// durable record is removed by the caller via the persister's delete method.
+func ForgetHostKey(addr string) {
+	hostKeyStore.Delete(addr)
+}
+
 func hostKeyCallback(hostname string, remote net.Addr, key ssh.PublicKey) error {
 	addr := net.JoinHostPort(hostname, "22")
 	if _, port, err := net.SplitHostPort(hostname); err == nil && port != "" {

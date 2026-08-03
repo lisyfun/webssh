@@ -849,9 +849,31 @@ async function connectToServer(sid) {
     ses.connected = false;
     load.style.display = 'none';
     empty.style.display = 'flex';
-    document.getElementById('loading-text').textContent = '连接失败: ' + err;
+    const msg = String(err && (err.message || err));
+    const text = document.getElementById('loading-text');
+    if (msg.includes('host key mismatch')) {
+      const m = msg.match(/got (SHA256:[^\s),]+)/);
+      text.innerHTML = '连接失败: 主机密钥已变更(服务器可能重装/重建)。<br>' +
+        '新密钥: <code style="font-size:11px;color:var(--text-muted)">' + escHtml(m ? m[1] : '') + '</code><br>' +
+        `<button onclick="trustAndReconnect('${escJsStr(sid)}')" style="margin-top:10px;padding:6px 16px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer">信任新密钥并重连</button>`;
+    } else {
+      text.textContent = '连接失败: ' + err;
+    }
     renderServers();
     updateStatus();
+  }
+}
+
+async function trustAndReconnect(sid) {
+  const ses = sessions[sid];
+  const svr = ses && servers.find(s => s.id === ses.serverId);
+  if (!svr) return;
+  try {
+    await App().TrustHostKey(svr.host, svr.port);
+    showToast('已信任新密钥，重新连接', 'success');
+    connectToServer(sid);
+  } catch (e) {
+    showToast(e.message || e, 'error');
   }
 }
 
