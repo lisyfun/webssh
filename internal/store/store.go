@@ -310,10 +310,13 @@ func (s *Store) LoadHostKey(addr string) (string, error) {
 }
 
 // StoreHostKey records the SSH host key for addr on first contact (TOFU).
+// StoreHostKey records the SSH host key for addr on first contact (TOFU), or
+// overwrites it when the key rotated (auto re-trust).
 func (s *Store) StoreHostKey(addr, keyB64 string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
-		"INSERT OR IGNORE INTO host_keys (addr, key_b64, created_at) VALUES (?, ?, ?)",
+		"INSERT INTO host_keys (addr, key_b64, created_at) VALUES (?, ?, ?) "+
+			"ON CONFLICT(addr) DO UPDATE SET key_b64=excluded.key_b64, created_at=excluded.created_at",
 		addr, keyB64, now)
 	return err
 }
