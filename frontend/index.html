@@ -1728,7 +1728,7 @@ async function uploadFiles(files) {
   progressEl.style.display = 'block';
   cancelEl.style.display = 'inline';
 
-  const CHUNK_SIZE = 512 * 1024;
+  const CHUNK_SIZE = 2 * 1024 * 1024;
 
   let uploaded = 0;
   let failed = 0;
