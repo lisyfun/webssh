@@ -217,10 +217,6 @@ input, textarea, button { font-family: inherit; }
 .font-popup .form-row .form-group { flex: 1; }
 .font-popup .form-group input[type="text"], .font-popup .form-group input[type="number"] { width: 100%; padding: 6px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; }
 .font-popup .form-group input:focus { border-color: var(--accent); }
-.size-group { display: flex; align-items: center; gap: 4px; }
-.size-group input { text-align: center; width: 60px; }
-.size-btn { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
-.size-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .font-popup .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .font-popup .actions button { padding: 6px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; }
 .font-popup .btn-cancel { background: var(--bg-tertiary); color: var(--text-secondary); }
@@ -922,7 +918,7 @@ function initTerminal(sid) {
   loadFontSettings();
   const term = new Terminal({
     cursorBlink: true,
-    cursorStyle: 'block',
+    cursorStyle: 'bar',
     fontSize: fontSettings.fontSize || 13,
     fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
     letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0.5,
@@ -1350,6 +1346,17 @@ function applyTheme(name) {
   });
 }
 
+function applyFontSettings() {
+  Object.values(sessions).forEach(function(s) {
+    if (!s.term) return;
+    s.term.options.fontFamily = fontSettings.fontFamily;
+    s.term.options.fontSize = fontSettings.fontSize;
+    s.term.options.lineHeight = fontSettings.lineHeight;
+    s.term.options.letterSpacing = fontSettings.letterSpacing;
+    if (s.fitAddon) s.fitAddon.fit();
+  });
+}
+
 function renderThemePicker(selected) {
   var menu = document.getElementById('theme-menu');
   menu.innerHTML = '';
@@ -1408,14 +1415,6 @@ function hideFontSettings() {
   document.getElementById('settings-overlay').style.display = 'none';
 }
 
-function adjFontSize(delta) {
-  const inp = document.getElementById('font-size');
-  let v = parseInt(inp.value) + delta;
-  if (v < 8) v = 8;
-  if (v > 36) v = 36;
-  inp.value = v;
-}
-
 function saveFontSettings() {
   fontSettings.fontFamily = document.getElementById('font-family').value.trim() || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace";
   fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
@@ -1423,6 +1422,7 @@ function saveFontSettings() {
   fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
   fontSettings.theme = document.querySelector('.theme-item.active') ? document.querySelector('.theme-item.active').dataset.theme : 'github-dark';
   localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+  applyFontSettings();
   applyTheme(fontSettings.theme);
   hideFontSettings();
 }
@@ -1989,11 +1989,7 @@ document.addEventListener('keydown', (e) => {
       <div class="form-row">
         <div class="form-group">
           <label>大小</label>
-          <div class="size-group">
-            <button class="size-btn" onclick="adjFontSize(-1)">−</button>
-            <input type="number" id="font-size" min="8" max="36" step="1">
-            <button class="size-btn" onclick="adjFontSize(1)">+</button>
-          </div>
+          <input type="number" id="font-size" min="8" max="36" step="1">
         </div>
         <div class="form-group">
           <label>行高</label>
