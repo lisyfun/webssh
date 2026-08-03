@@ -1494,6 +1494,7 @@ var themeMeta = {
   'one-dark': { name: 'One Dark', desc: 'Atom 编辑器经典', bg: '#282c34', accent: '#61afef', fg: '#abb2bf' },
   'tokyo-night': { name: 'Tokyo Night', desc: '霓虹蓝紫暗色', bg: '#1a1b26', accent: '#7aa2f7', fg: '#a9b1d6' },
   'nord': { name: 'Nord', desc: '北极蓝调暗色', bg: '#2e3440', accent: '#88c0d0', fg: '#eceff4' },
+  'retro-terminal': { name: 'Retro Terminal', desc: '登录页同款复古终端琥珀', bg: '#0c0c0c', accent: '#e3b341', fg: '#e3b341' },
   'github-light': { name: 'GitHub Light', desc: 'GitHub 经典亮色', bg: '#ffffff', accent: '#0969da', fg: '#1f2328' },
   'catppuccin-latte': { name: 'Catppuccin Latte', desc: '柔和暖色亮色', bg: '#eff1f5', accent: '#1e66f5', fg: '#4c4f69' },
   'one-light': { name: 'One Light', desc: 'Atom 编辑器亮色', bg: '#fafafa', accent: '#4078f2', fg: '#383a42' },
@@ -1585,6 +1586,23 @@ var themes = {
       brightBlack: '#616e88', brightRed: '#bf616a', brightGreen: '#a3be8c',
       brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead',
       brightCyan: '#88c0d0', brightWhite: '#eceff4',
+    },
+  },
+  'retro-terminal': {
+    css: {
+      '--bg-primary': '#0c0c0c', '--bg-secondary': '#1a1a1a', '--bg-tertiary': '#262626',
+      '--bg-hover': '#2f2f2f', '--border': '#3a2e0a', '--border-color': '#3a2e0a',
+      '--text-primary': '#e3b341', '--text-secondary': '#a8862e', '--text-muted': '#6b5518',
+      '--accent': '#e3b341', '--accent-hover': '#c9a32e', '--green': '#27c93f', '--red': '#ff5f56',
+    },
+    xterm: {
+      background: '#0c0c0c', foreground: '#e3b341', cursor: '#e3b341',
+      selectionBackground: '#3a2e0a',
+      black: '#1a1a1a', red: '#ff5f56', green: '#27c93f', yellow: '#e3b341',
+      blue: '#5c7aff', magenta: '#b877ff', cyan: '#3ec6c9', white: '#c8c8c8',
+      brightBlack: '#666666', brightRed: '#ff6e64', brightGreen: '#33d94a',
+      brightYellow: '#f0c04d', brightBlue: '#6b87ff', brightMagenta: '#c088ff',
+      brightCyan: '#4fd3d6', brightWhite: '#ffffff',
     },
   },
   'github-light': {
