@@ -232,6 +232,7 @@ func main() {
 	fsAPI := api.PathPrefix("/fs/{id}").Subrouter()
 	fsAPI.HandleFunc("/list", sshterm.HandleFSList).Methods("GET")
 	fsAPI.HandleFunc("/download", sshterm.HandleFSDownload).Methods("GET")
+	fsAPI.HandleFunc("/stat", sshterm.HandleFSStat).Methods("GET")
 	fsAPI.HandleFunc("/upload", sshterm.HandleFSUpload).Methods("POST")
 	fsAPI.HandleFunc("/remove", sshterm.HandleFSRemove).Methods("POST")
 	fsAPI.HandleFunc("/rename", sshterm.HandleFSRename).Methods("POST")

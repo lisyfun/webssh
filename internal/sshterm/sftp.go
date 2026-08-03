@@ -448,6 +448,47 @@ func HandleFSRename(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ActionResponse{Success: true})
 }
 
+// HandleFSStat reports existence/size/isDir for a remote path. Used by the
+// frontend to verify upload completeness.
+func HandleFSStat(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sessionID := vars["id"]
+	filePath := r.URL.Query().Get("path")
+	if filePath == "" {
+		jsonError(w, "path required")
+		return
+	}
+	filePath, err := sanitizePath(filePath)
+	if err != nil {
+		jsonError(w, err.Error())
+		return
+	}
+	s, err := Manager.Get(sessionID)
+	if err != nil {
+		jsonError(w, "session not found")
+		return
+	}
+	sc, err := s.SFTP()
+	if err != nil {
+		jsonError(w, "sftp init failed: "+err.Error())
+		return
+	}
+	info, err := sc.Stat(filePath)
+	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(strings.ToLower(err.Error()), "no such file") {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]bool{"success": true, "exists": false})
+			return
+		}
+		jsonError(w, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true, "exists": true, "size": info.Size(), "isDir": info.IsDir(),
+	})
+}
+
 func HandleFSMkdir(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sessionID := vars["id"]
