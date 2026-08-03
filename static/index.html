@@ -135,7 +135,8 @@ input, textarea, button { font-family: inherit; }
   align-items: center; justify-content: center;
   color: var(--text-muted); font-size: 14px; gap: 8px;
 }
-.terminal-wrapper .empty-state .key-hint { font-size: 12px; color: var(--text-muted); opacity: 0.6; }
+.terminal-wrapper .empty-state .conn-error { color: var(--red); font-size: 12px; max-width: 85%; text-align: center; word-break: break-all; }
+.terminal-wrapper .empty-state .conn-error button { margin-top: 10px; padding: 6px 16px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .terminal-wrapper .loading-state {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -433,6 +434,7 @@ input, textarea, button { font-family: inherit; }
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <div>选择左侧服务器进行连接</div>
           <div class="key-hint">点击 + 添加新的服务器</div>
+          <div class="conn-error" id="conn-error" style="display:none"></div>
         </div>
         <div class="loading-state" id="loading-state" style="display:none">
           <div class="spinner"></div>
@@ -1024,7 +1026,13 @@ function connectToServer(sid, passphrase) {
       if (typeof msg === 'string' && (msg.startsWith('SSH connection failed') || msg.startsWith('SSH session failed'))) {
         load.style.display = 'none';
         empty.style.display = 'flex';
-        document.getElementById('loading-text').textContent = msg;
+        const errEl = document.getElementById('conn-error');
+        errEl.style.display = 'block';
+        if (msg.includes('host key mismatch')) {
+          errEl.innerHTML = escHtml(msg) + '<br><button onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
+        } else {
+          errEl.textContent = msg;
+        }
         const s = sessions[sid];
         if (s) { s.connected = false; }
         renderServers();
@@ -1060,6 +1068,19 @@ function connectToServer(sid, passphrase) {
   };
 
   initTerminal(sid);
+}
+
+async function trustAndReconnect(sid) {
+  const ses = sessions[sid];
+  const svr = ses && servers.find(s => s.id === ses.serverId);
+  if (!svr) return;
+  try {
+    await api('__BASE_PATH__/api/host-keys/' + encodeURIComponent(svr.host + ':' + svr.port), { method: 'DELETE' });
+    showToast('已信任新密钥，重新连接', 'success');
+    connectToServer(sid, '');
+  } catch (e) {
+    showToast(e.message || e, 'error');
+  }
 }
 
 function reconnectSessionWithPassphrase(sid, passphrase) {
