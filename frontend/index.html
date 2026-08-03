@@ -1002,6 +1002,7 @@ function initTerminal(sid) {
   renderTabs();
   updateStatus();
   loadFileList();
+  term.focus();
 }
 
 async function fetchServers() {
@@ -1425,6 +1426,8 @@ function saveFontSettings() {
   applyFontSettings();
   applyTheme(fontSettings.theme);
   hideFontSettings();
+  const ses = sessions[activeSessionId];
+  if (ses && ses.term) ses.term.focus();
 }
 
 function getActiveSession() { return activeSessionId ? sessions[activeSessionId] : null; }
