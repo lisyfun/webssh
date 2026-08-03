@@ -603,6 +603,7 @@ input, textarea, button { font-family: inherit; }
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideBatchImport()">取消</button>
+      <button class="btn-primary" onclick="importSSHConfig()" title="解析服务端 ~/.ssh/config 并导入服务器列表">从 ~/.ssh/config 导入</button>
       <button class="btn-primary" onclick="batchImport()">导入</button>
     </div>
   </div>
@@ -1412,6 +1413,21 @@ async function importSSHConfig() {
     await fetchServers();
   } catch (e) {
     showToast(e.message, 'error');
+  }
+}
+
+async function importSSHConfig() {
+  try {
+    const res = await api('__BASE_PATH__/api/sshconfig/import', { method: 'POST' });
+    if (res.data && res.data.imported > 0) {
+      showToast(`从 ~/.ssh/config 导入 ${res.data.imported} 个服务器`, 'success');
+      hideBatchImport();
+      await fetchServers();
+    } else {
+      showToast('没有可导入的配置项(或已全部导入)', 'error');
+    }
+  } catch (e) {
+    showToast(e.message || e, 'error');
   }
 }
 

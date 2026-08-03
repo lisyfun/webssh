@@ -193,6 +193,9 @@ func main() {
 	api.HandleFunc("/servers/batch", func(w http.ResponseWriter, r *http.Request) {
 		store.HandleBatchImport(st, decryptField, w, r)
 	}).Methods("POST")
+	api.HandleFunc("/sshconfig/import", func(w http.ResponseWriter, r *http.Request) {
+		store.HandleSSHConfigImport(st, w, r)
+	}).Methods("POST")
 	api.HandleFunc("/change-password", a.ChangePasswordHandler).Methods("POST")
 	api.HandleFunc("/host-keys", func(w http.ResponseWriter, r *http.Request) {
 		keys, err := st.ListHostKeys()
