@@ -317,26 +317,3 @@ func (s *Store) StoreHostKey(addr, keyB64 string) error {
 		addr, keyB64, now)
 	return err
 }
-
-func (s *Store) ListHostKeys() ([]HostKey, error) {
-	rows, err := s.db.Query("SELECT addr, key_b64, created_at FROM host_keys ORDER BY addr")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var keys []HostKey
-	for rows.Next() {
-		var key HostKey
-		if err := rows.Scan(&key.Addr, &key.KeyB64, &key.CreatedAt); err != nil {
-			return nil, err
-		}
-		keys = append(keys, key)
-	}
-	return keys, rows.Err()
-}
-
-func (s *Store) DeleteHostKey(addr string) error {
-	_, err := s.db.Exec("DELETE FROM host_keys WHERE addr=?", addr)
-	return err
-}

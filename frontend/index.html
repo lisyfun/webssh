@@ -238,7 +238,6 @@ input, textarea, button { font-family: inherit; }
         </div>
         <div style="display:flex;gap:2px">
           <button class="add-btn" onclick="showBatchImport()" title="批量导入"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
-          <button class="add-btn" onclick="showHostKeys()" title="主机密钥">#</button>
           <button class="add-btn" onclick="showAddServer()" title="添加服务器">+</button>
         </div>
       </div>
@@ -384,17 +383,6 @@ input, textarea, button { font-family: inherit; }
   </div>
 </div>
 
-<!-- Host Keys Modal -->
-<div class="modal-overlay" id="hostkeys-overlay" style="display:none">
-  <div class="modal" style="width:620px">
-    <h2>已信任主机密钥</h2>
-    <div id="hostkeys-list" style="max-height:360px;overflow:auto;border:1px solid var(--border-color);border-radius:4px"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="hideHostKeys()">关闭</button>
-    </div>
-  </div>
-</div>
-
 <!-- Rename Modal -->
 <div class="modal-overlay" id="rename-overlay" style="display:none">
   <div class="modal confirm-modal">
@@ -430,6 +418,7 @@ input, textarea, button { font-family: inherit; }
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideBatchImport()">取消</button>
+      <button class="btn-primary" onclick="importSSHConfig()" title="解析 ~/.ssh/config 并导入服务器列表">从 ~/.ssh/config 导入</button>
       <button class="btn-primary" onclick="batchImport()">导入</button>
     </div>
   </div>
@@ -1127,6 +1116,21 @@ async function deleteServer(id) {
   });
 }
 
+async function importSSHConfig() {
+  try {
+    const n = await App().ImportSSHConfig();
+    if (n > 0) {
+      showToast(`从 ~/.ssh/config 导入 ${n} 个服务器`, 'success');
+      hideBatchImport();
+      await fetchServers();
+    } else {
+      showToast('没有可导入的配置项(或已全部导入)', 'error');
+    }
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
 async function batchImport() {
   const text = document.getElementById('batch-import-input').value.trim();
   if (!text) { showToast('请输入服务器数据', 'error'); return; }
@@ -1186,46 +1190,6 @@ function cancelPassphrase() {
   document.getElementById('passphrase-overlay').style.display = 'none';
   if (passphraseWaiter) passphraseWaiter('');
   passphraseWaiter = null;
-}
-
-async function showHostKeys() {
-  const overlay = document.getElementById('hostkeys-overlay');
-  const list = document.getElementById('hostkeys-list');
-  overlay.style.display = 'flex';
-  list.innerHTML = '<div class="file-loading">加载中...</div>';
-  try {
-    const keys = await App().ListHostKeys();
-    if (!keys || !keys.length) {
-      list.innerHTML = '<div class="file-loading">暂无已信任主机密钥</div>';
-      return;
-    }
-    list.innerHTML = keys.map(k => `<div class="file-item" style="cursor:default">
-      <span class="name">
-        <div style="font-weight:500">${escHtml(k.addr)}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escHtml(k.fingerprint || '')}</div>
-      </span>
-      <span class="mtime">${escHtml((k.createdAt || '').split('T')[0])}</span>
-      <span class="file-actions" style="opacity:1">
-        <button class="del" onclick="deleteHostKey('${escJsStr(k.addr)}')" title="删除信任">&times;</button>
-      </span>
-    </div>`).join('');
-  } catch (e) {
-    list.innerHTML = `<div class="file-loading">加载失败: ${escHtml(e.message || e)}</div>`;
-  }
-}
-
-function hideHostKeys() { document.getElementById('hostkeys-overlay').style.display = 'none'; }
-
-function deleteHostKey(addr) {
-  showConfirm(`删除 ${addr} 的已信任主机密钥？下次连接会重新信任新密钥。`, async () => {
-    try {
-      await App().DeleteHostKey(addr);
-      showToast('已删除主机密钥', 'success');
-      showHostKeys();
-    } catch (e) {
-      showToast(e.message || e, 'error');
-    }
-  });
 }
 
 // ---- Events from Go ----

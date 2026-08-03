@@ -11,7 +11,9 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	gostatic "runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -238,6 +240,122 @@ func (a *App) BatchImport(servers []store.Server) error {
 	return nil
 }
 
+// sshConfigEntry is one Host block from ~/.ssh/config.
+type sshConfigEntry struct {
+	host, hostName, user, port, identityFile string
+}
+
+// parseSSHConfigEntries extracts Host blocks from ssh config text. Only the
+// fields relevant to server import (Host/HostName/User/Port/IdentityFile) are
+// kept; everything else is ignored.
+func parseSSHConfigEntries(data []byte) []*sshConfigEntry {
+	var entries []*sshConfigEntry
+	var cur *sshConfigEntry
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		key := strings.ToLower(fields[0])
+		if key == "host" {
+			cur = &sshConfigEntry{host: strings.Join(fields[1:], " ")}
+			entries = append(entries, cur)
+			continue
+		}
+		if cur == nil {
+			continue
+		}
+		val := strings.Join(fields[1:], " ")
+		switch key {
+		case "hostname":
+			cur.hostName = val
+		case "user":
+			cur.user = val
+		case "port":
+			cur.port = val
+		case "identityfile":
+			cur.identityFile = val
+		}
+	}
+	return entries
+}
+
+// ImportSSHConfig parses ~/.ssh/config and imports its Host entries as
+// servers. ssh config carries no passwords, so entries without a readable
+// IdentityFile are imported credential-less (fill in later; connect fails
+// loudly). IdentityFile paths are expanded and read into PrivateKey when
+// possible. Already-imported hosts (same name+host) are skipped, so the
+// import is idempotent.
+func (a *App) ImportSSHConfig() (int, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 0, err
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".ssh", "config"))
+	if err != nil {
+		return 0, fmt.Errorf("读取 ~/.ssh/config 失败: %w", err)
+	}
+	entries := parseSSHConfigEntries(data)
+
+	existing, _ := a.store.ListServers(context.Background())
+	imported := 0
+	for _, e := range entries {
+		// Skip wildcard patterns like "Host *" or "foo*.bar".
+		if e.host == "" || strings.ContainsAny(e.host, "*?") {
+			continue
+		}
+		host := e.hostName
+		if host == "" {
+			host = e.host
+		}
+		port := 22
+		if p, err := strconv.Atoi(e.port); err == nil && p > 0 {
+			port = p
+		}
+		user := e.user
+		if user == "" {
+			user = os.Getenv("USER")
+		}
+		if user == "" {
+			user = "root"
+		}
+		dup := false
+		for _, s := range existing {
+			if s.Name == e.host && s.Host == host {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			continue
+		}
+		svr := store.Server{
+			ID:       generateID(),
+			Name:     e.host,
+			Host:     host,
+			Port:     port,
+			User:     user,
+			AuthType: "password",
+		}
+		if e.identityFile != "" {
+			path := e.identityFile
+			if strings.HasPrefix(path, "~") {
+				path = filepath.Join(home, path[2:])
+			}
+			if keyData, err := os.ReadFile(path); err == nil && len(keyData) > 0 {
+				svr.AuthType = "key"
+				svr.PrivateKey = string(keyData)
+			}
+		}
+		if err := a.store.CreateServer(context.Background(), &svr); err != nil {
+			return imported, fmt.Errorf("import %s failed: %w", e.host, err)
+		}
+		imported++
+	}
+	return imported, nil
+}
+
 // ---- Terminal (SSH) ----
 
 func (a *App) ConnectServer(serverID string) (string, error) {
@@ -419,34 +537,6 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 
 	runtime.EventsEmit(a.ctx, "terminal:connected", sessionID)
 	return sessionID, nil
-}
-
-func (a *App) ListHostKeys() ([]store.HostKey, error) {
-	keys, err := a.store.ListHostKeys()
-	if err != nil {
-		return nil, err
-	}
-	for i := range keys {
-		data, err := base64.StdEncoding.DecodeString(keys[i].KeyB64)
-		if err != nil {
-			continue
-		}
-		pub, err := ssh.ParsePublicKey(data)
-		if err != nil {
-			continue
-		}
-		keys[i].Fingerprint = ssh.FingerprintSHA256(pub)
-		keys[i].KeyB64 = ""
-	}
-	return keys, nil
-}
-
-func (a *App) DeleteHostKey(addr string) error {
-	if err := a.store.DeleteHostKey(addr); err != nil {
-		return err
-	}
-	sshterm.ForgetHostKey(addr)
-	return nil
 }
 
 func (a *App) TerminalInput(sessionID string, data string) error {
