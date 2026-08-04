@@ -1118,8 +1118,8 @@ function initTerminal(sid) {
 
   loadFontSettings();
   const term = new Terminal({
-    cursorBlink: false,
-    cursorStyle: 'block',
+    cursorBlink: true,
+    cursorStyle: 'bar',
     fontSize: fontSettings.fontSize || 13,
     fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
     letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0.5,
