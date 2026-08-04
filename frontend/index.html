@@ -93,7 +93,9 @@ input, textarea, button { font-family: inherit; }
 .terminal-wrapper .loading-state .spinner { width: 16px; height: 16px; border: 2px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #terminal-container { position: absolute; inset: 0; }
-.file-panel { width: var(--file-panel-width); background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
+.file-panel { width: var(--file-panel-width); background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; position: relative; }
+.file-panel .file-panel-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 10; }
+.file-panel .file-panel-resizer:hover { background: rgba(74,140,255,0.15); }
 .file-panel.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
 .file-panel-header { padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
 .file-panel-header > span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
@@ -272,6 +274,7 @@ input, textarea, button { font-family: inherit; }
     </div>
 
     <div class="file-panel collapsed" id="file-panel">
+      <div class="file-panel-resizer" id="file-panel-resizer"></div>
       <div class="file-panel-header">
         <span>文件浏览器</span>
         <div class="actions">
@@ -1278,6 +1281,43 @@ window.runtime.EventsOn("terminal:closed", function(sessionId) {
 });
 
 // ---- File Browser ----
+// ---- File Panel Resize ----
+(function() {
+  const panel = document.getElementById('file-panel');
+  const resizer = document.getElementById('file-panel-resizer');
+  const MIN = 200, MAX = 700;
+  let startX = 0, startW = 320;
+
+  // 恢复上次拖拽的宽度
+  const saved = parseInt(localStorage.getItem('webssh-file-panel-width') || '', 10);
+  if (saved >= MIN && saved <= MAX) {
+    document.documentElement.style.setProperty('--file-panel-width', saved + 'px');
+  }
+
+  function currentWidth() {
+    return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--file-panel-width')) || 320;
+  }
+
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = currentWidth();
+    panel.style.transition = 'none'; // 拖拽时禁用 0.2s 过渡避免滞后
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  function onMove(e) {
+    const w = Math.min(MAX, Math.max(MIN, startW - (e.clientX - startX)));
+    document.documentElement.style.setProperty('--file-panel-width', w + 'px');
+  }
+  function onUp() {
+    panel.style.transition = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    localStorage.setItem('webssh-file-panel-width', currentWidth());
+  }
+})();
+
 function toggleFilePanel() {
   const panel = document.getElementById('file-panel');
   const btn = document.getElementById('toggle-files-btn');
