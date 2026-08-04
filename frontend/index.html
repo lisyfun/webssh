@@ -984,6 +984,8 @@ function initTerminal(sid) {
   term.onSelectionChange(() => {
     const sel = term.getSelection();
     if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+    // 选中复制后把焦点还给终端，避免拖选导致失焦需要手动点击
+    setTimeout(() => term.focus(), 0);
   });
 
   term.onData((data) => {
