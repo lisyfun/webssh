@@ -15,3 +15,6 @@ frontend/
 uos-offline-bundle/
 webssh-linux
 webssh-*-amd64.deb
+
+# Go build cache
+.gocache/
