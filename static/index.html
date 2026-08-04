@@ -1157,6 +1157,8 @@ function initTerminal(sid) {
     const sel = term.getSelection();
     if (!sel) return;
     copyText(sel);
+    // 复制完成后把焦点还给终端(fallbackCopy 会聚焦临时 textarea)，免去手动点击
+    setTimeout(() => term.focus(), 0);
   });
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
