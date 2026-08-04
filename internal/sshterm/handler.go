@@ -130,10 +130,17 @@ func DetectShell(client *ssh.Client) string {
 func CWDReportSnippet(shell string) string {
 	switch shell {
 	case "fish":
-		return "function __webssh_cwd --on-event fish_prompt; printf '\\033]7;file://%s\\033\\\\' \"$PWD\"; end\n"
+		// --on-variable PWD fires immediately on any cd (real-time);
+		// fish_prompt covers the initial directory after connect.
+		return "function __webssh_cwd --on-variable PWD --on-event fish_prompt; printf '\\033]7;file://%s\\033\\\\' \"$PWD\"; end\n"
 	case "zsh":
-		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; precmd_functions+=(__webssh_cwd)\n"
+		// chpwd fires immediately after cd; precmd covers prompt-time
+		// directory changes (pushd, manual chdir via other means).
+		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; chpwd_functions+=(__webssh_cwd); precmd_functions+=(__webssh_cwd)\n"
 	default:
-		return "export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'\n"
+		// bash 4.4+: PS0 reports before every command (real-time, cd then
+		// Enter updates immediately). Older bash ignores PS0 silently, so
+		// PROMPT_COMMAND stays as the compatible fallback.
+		return "export PS0='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'; export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'\n"
 	}
 }
