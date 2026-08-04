@@ -24,3 +24,6 @@ build/bin/
 rsrc_windows_*.syso
 winres/
 
+
+# Go build cache
+.gocache/
