@@ -39,8 +39,8 @@ input, textarea, button { font-family: inherit; }
 
 
 .sidebar-header { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
-.sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; }
+.sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+.sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .sidebar-header .add-btn svg { display: block; }
 .sidebar-header .add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .sidebar-header .add-btn.active { color: var(--accent); }
@@ -96,9 +96,10 @@ input, textarea, button { font-family: inherit; }
 .file-panel { width: var(--file-panel-width); background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
 .file-panel.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
 .file-panel-header { padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
-.file-panel-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.file-panel-header > span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+.file-panel-header .actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 5px; border-radius: 3px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .file-panel-header .actions { display: flex; gap: 4px; }
-.file-panel-header .actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+.file-panel-header .actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .file-panel-header .actions button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .file-panel-header .actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 .file-panel-header .actions button.active { color: var(--accent); }
@@ -234,12 +235,12 @@ input, textarea, button { font-family: inherit; }
     <div class="sidebar">
       <div class="sidebar-header">
         <div style="display:flex;align-items:center;gap:6px">
-          <button class="add-btn" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="收起/展开服务器列表" style="font-size:14px">☰</button>
+          <button class="add-btn" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="收起/展开服务器列表"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
           <span>服务器</span>
         </div>
         <div style="display:flex;gap:2px">
           <button class="add-btn" onclick="showBatchImport()" title="批量导入"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
-          <button class="add-btn" onclick="showAddServer()" title="添加服务器">+</button>
+          <button class="add-btn" onclick="showAddServer()" title="添加服务器"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
       <div class="server-search"><input type="text" id="server-search-input" placeholder="搜索名称/主机/用户..." oninput="renderServers()"></div>
@@ -275,8 +276,8 @@ input, textarea, button { font-family: inherit; }
         <span>文件浏览器</span>
         <div class="actions">
           <button onclick="toggleHiddenFiles()" id="file-hidden-btn" title="显示隐藏文件"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-          <button onclick="fileUpload()" id="file-upload-btn" disabled title="上传文件">&#x2191;</button>
-          <button onclick="fileMkdir()" id="file-mkdir-btn" disabled title="新建目录">+</button>
+          <button onclick="fileUpload()" id="file-upload-btn" disabled title="上传文件"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+          <button onclick="fileMkdir()" id="file-mkdir-btn" disabled title="新建目录"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
       <div class="file-breadcrumb" id="file-breadcrumb"></div>
