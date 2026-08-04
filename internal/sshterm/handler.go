@@ -44,11 +44,18 @@ func detectShell(client *ssh.Client) string {
 func cwdReportSnippet(shell string) string {
 	switch shell {
 	case "fish":
-		return "function __webssh_cwd --on-event fish_prompt; printf '\\033]7;file://%s\\033\\\\' \"$PWD\"; end"
+		// --on-variable PWD fires immediately on any cd (real-time);
+		// fish_prompt covers the initial directory after connect.
+		return "function __webssh_cwd --on-variable PWD --on-event fish_prompt; printf '\\033]7;file://%s\\033\\\\' \"$PWD\"; end"
 	case "zsh":
-		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; precmd_functions+=(__webssh_cwd)"
+		// chpwd fires immediately after cd; precmd covers prompt-time
+		// directory changes (pushd, manual chdir via other means).
+		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; chpwd_functions+=(__webssh_cwd); precmd_functions+=(__webssh_cwd)"
 	default:
-		return "export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'"
+		// bash 4.4+: PS0 reports before every command (real-time, cd then
+		// Enter updates immediately). Older bash ignores PS0 silently, so
+		// PROMPT_COMMAND stays as the compatible fallback.
+		return "export PS0='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'; export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'"
 	}
 }
 
@@ -252,9 +259,14 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 		cwdSnippet := cwdReportSnippet(shell)
 		cwdInjected := false
 		switch shell {
-		case "", "bash", "sh", "ksh", "dash", "zsh":
+		case "", "bash", "sh", "ksh", "dash":
+			// Env-var injection works for bash-family shells: both
+			// PROMPT_COMMAND (compat) and PS0 (real-time on bash 4.4+) are
+			// imported from the environment. zsh/fish have no env var that
+			// can install hooks, so they always use stdin injection below.
 			cwdHook := "printf '\\033]7;file://%s\\033\\\\' \"$PWD\""
 			if err := session.Setenv("PROMPT_COMMAND", cwdHook); err == nil {
+				session.Setenv("PS0", cwdHook) // failure harmless (old bash / restricted server)
 				cwdInjected = true
 			}
 		}
@@ -317,7 +329,9 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 				for _, line := range lines {
 					if strings.Contains(line, "stty -echo") ||
 						strings.Contains(line, "stty echo") ||
+						strings.Contains(line, "PS0=") ||
 						strings.Contains(line, "PROMPT_COMMAND=") ||
+						strings.Contains(line, "chpwd_functions+=") ||
 						strings.Contains(line, "__webssh_cwd") ||
 						strings.Contains(line, "precmd_functions+=") {
 						continue
