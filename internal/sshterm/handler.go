@@ -52,10 +52,13 @@ func cwdReportSnippet(shell string) string {
 		// directory changes (pushd, manual chdir via other means).
 		return "__webssh_cwd(){ printf '\\033]7;file://%s\\033\\\\' \"$PWD\" }; chpwd_functions+=(__webssh_cwd); precmd_functions+=(__webssh_cwd)"
 	default:
-		// bash 4.4+: PS0 reports before every command (real-time, cd then
-		// Enter updates immediately). Older bash ignores PS0 silently, so
-		// PROMPT_COMMAND stays as the compatible fallback.
-		return "export PS0='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'; export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'"
+		// bash 4.4+: PS0 must NOT hold a command — bash expands and *displays*
+		// PS0's value (prompt-style expansion: \033 octal, $PWD, \\) before
+		// executing it, so a printf command leaks visible text. Instead PS0
+		// holds the raw OSC 7 sequence itself, which expands to pure control
+		// text. PROMPT_COMMAND stays the compatible fallback (plain command,
+		// no prompt expansion).
+		return "export PS0='\\033]7;file://$PWD\\033\\\\'; export PROMPT_COMMAND='printf \"\\033]7;file://%s\\033\\\\\" \"$PWD\"'"
 	}
 }
 
@@ -260,13 +263,15 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 		cwdInjected := false
 		switch shell {
 		case "", "bash", "sh", "ksh", "dash":
-			// Env-var injection works for bash-family shells: both
-			// PROMPT_COMMAND (compat) and PS0 (real-time on bash 4.4+) are
-			// imported from the environment. zsh/fish have no env var that
+			// Env-var injection works for bash-family shells: PROMPT_COMMAND
+			// (compat) is imported and run as a command; PS0 (real-time on
+			// bash 4.4+) holds the raw OSC 7 sequence, which bash expands and
+			// displays as pure control text. zsh/fish have no env var that
 			// can install hooks, so they always use stdin injection below.
 			cwdHook := "printf '\\033]7;file://%s\\033\\\\' \"$PWD\""
+			ps0Hook := "\\033]7;file://$PWD\\033\\\\"
 			if err := session.Setenv("PROMPT_COMMAND", cwdHook); err == nil {
-				session.Setenv("PS0", cwdHook) // failure harmless (old bash / restricted server)
+				session.Setenv("PS0", ps0Hook) // failure harmless (old bash / restricted server)
 				cwdInjected = true
 			}
 		}
