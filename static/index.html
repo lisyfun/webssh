@@ -1118,7 +1118,7 @@ function initTerminal(sid) {
 
   loadFontSettings();
   const term = new Terminal({
-    cursorBlink: true,
+    cursorBlink: false,
     cursorStyle: 'block',
     fontSize: fontSettings.fontSize || 13,
     fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
