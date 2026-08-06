@@ -40,6 +40,7 @@ type App struct {
 	terminals map[string]*Terminal
 	mu        sync.Mutex
 	maxBodyMB int64
+	lastInput time.Time // last terminal input, used to time CWD hook injection
 }
 
 type ServerView struct {
@@ -527,9 +528,24 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 			if first {
 				first = false
 				go func() {
-					time.Sleep(200 * time.Millisecond)
-					if !cwdInjected {
-						stdin.Write([]byte(cwdSnippet))
+					if cwdInjected {
+						return
+					}
+					// Inject only while the user is idle (no input for 500ms).
+					// A full-screen program like vi eats stdin: if the hook is
+					// written mid-edit it garbles the session (feels like vi
+					// cannot be quit). Idle-gating makes the hook land after vi
+					// exits, or immediately when the shell is untouched.
+					// ponytail: fixed 30s budget, no per-session state.
+					for i := 0; i < 60; i++ {
+						a.mu.Lock()
+						idle := time.Since(a.lastInput) > 500*time.Millisecond
+						a.mu.Unlock()
+						if idle {
+							stdin.Write([]byte(cwdSnippet))
+							return
+						}
+						time.Sleep(500 * time.Millisecond)
 					}
 				}()
 			}
@@ -573,6 +589,7 @@ func (a *App) TrustHostKey(host string, port int) error {
 func (a *App) TerminalInput(sessionID string, data string) error {
 	a.mu.Lock()
 	t, ok := a.terminals[sessionID]
+	a.lastInput = time.Now()
 	a.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("session %s not found", sessionID)
