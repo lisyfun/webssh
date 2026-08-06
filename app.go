@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"webssh/internal/sshterm"
@@ -497,6 +499,7 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 	// Read stdout → emit terminal:output events
 	// Filter the CWD-reporting hook echo so users don't see it.
 	cwdEchoNeedle := strings.TrimSpace(cwdSnippet)
+	var inAlt atomic.Bool // full-screen apps (vi/less/top) switch to the alternate screen
 	go func() {
 		buf := make([]byte, 4096)
 		first := true
@@ -506,6 +509,14 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 				break
 			}
 			data := buf[:n]
+			// Track alternate-screen entry/exit so the CWD hook is never
+			// written while a full-screen program owns the terminal.
+			if bytes.Contains(data, []byte("\x1b[?1049h")) {
+				inAlt.Store(true)
+			}
+			if bytes.Contains(data, []byte("\x1b[?1049l")) {
+				inAlt.Store(false)
+			}
 			// Strip lines that contain the injected hook text.
 			if cwdEchoNeedle != "" && strings.Contains(string(data), cwdEchoNeedle) {
 				lines := strings.SplitAfter(string(data), "\n")
@@ -531,17 +542,15 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 					if cwdInjected {
 						return
 					}
-					// Inject only while the user is idle (no input for 500ms).
-					// A full-screen program like vi eats stdin: if the hook is
-					// written mid-edit it garbles the session (feels like vi
-					// cannot be quit). Idle-gating makes the hook land after vi
-					// exits, or immediately when the shell is untouched.
+					// Inject only while the user is idle AND no full-screen program
+					// owns the terminal (vi/less/top switch to the alternate
+					// screen; writing the hook there garbles the session).
 					// ponytail: fixed 30s budget, no per-session state.
 					for i := 0; i < 60; i++ {
 						a.mu.Lock()
 						idle := time.Since(a.lastInput) > 500*time.Millisecond
 						a.mu.Unlock()
-						if idle {
+						if idle && !inAlt.Load() {
 							stdin.Write([]byte(cwdSnippet))
 							return
 						}
