@@ -424,6 +424,22 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 	shell := sshterm.DetectShell(client)
 	cwdSnippet := sshterm.CWDReportSnippet(shell)
 
+	// bash-family shells: inject via SSH env request *before* the shell
+	// starts — silent, no PTY echo, and never competes with user input
+	// (stdin injection could otherwise land inside a program like vi and
+	// garble it). zsh/fish have no env var that can install hooks, so they
+	// fall back to stdin injection after the first prompt.
+	cwdInjected := false
+	switch shell {
+	case "", "bash", "sh", "ksh", "dash":
+		cwdHook := "printf '\\033]7;file://%s\\033\\\\' \"$PWD\""
+		ps0Hook := "\\033]7;file://$PWD\\033\\\\"
+		if err := session.Setenv("PROMPT_COMMAND", cwdHook); err == nil {
+			session.Setenv("PS0", ps0Hook) // failure harmless (old bash / restricted server)
+			cwdInjected = true
+		}
+	}
+
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,
 		ssh.TTY_OP_ISPEED: 14400,
@@ -512,7 +528,9 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 				first = false
 				go func() {
 					time.Sleep(200 * time.Millisecond)
-					stdin.Write([]byte(cwdSnippet))
+					if !cwdInjected {
+						stdin.Write([]byte(cwdSnippet))
+					}
 				}()
 			}
 		}
