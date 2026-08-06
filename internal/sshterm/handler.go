@@ -311,6 +311,7 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 		Manager.Create(params.SessionID, sshClient, cfg, params.Host, params.Port, params.Username)
 
 		var injectedOnce sync.Once
+		lastInput := time.Now() // idle-gate CWD hook injection so it never lands inside vi etc.
 		writePROMPT := func() {
 			if cwdInjected {
 				return
@@ -356,7 +357,19 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 				}
 				if first {
 					first = false
-					go func() { time.Sleep(200 * time.Millisecond); writePROMPT() }()
+					go func() {
+						// Inject only while the user is idle (no input for 500ms): a
+						// full-screen program like vi eats stdin, so writing the hook
+						// mid-edit garbles the session (feels like vi cannot be quit).
+						// ponytail: fixed 30s budget.
+						for i := 0; i < 60; i++ {
+							if time.Since(lastInput) > 500*time.Millisecond {
+								writePROMPT()
+								return
+							}
+							time.Sleep(500 * time.Millisecond)
+						}
+					}()
 				}
 			}
 		}()
@@ -382,6 +395,7 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			}
 
 			if msgType == websocket.BinaryMessage {
+				lastInput = time.Now()
 				stdin.Write(data)
 			} else if msgType == websocket.TextMessage {
 				var resize ResizeMsg
