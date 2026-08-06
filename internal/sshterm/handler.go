@@ -1,12 +1,14 @@
 package sshterm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -326,6 +328,7 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 		go func() {
 			buf := make([]byte, 4096)
 			first := true
+			var inAlt atomic.Bool // full-screen apps (vi/less/top) switch to the alternate screen
 			filterCwdEcho := func(data []byte) []byte {
 				if cwdInjected {
 					return data
@@ -351,19 +354,29 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 				if err != nil {
 					break
 				}
-				data := filterCwdEcho(buf[:n])
+				data := buf[:n]
+				// Track alternate-screen entry/exit so the CWD hook is never
+				// written while a full-screen program owns the terminal.
+				if bytes.Contains(data, []byte("\x1b[?1049h")) {
+					inAlt.Store(true)
+				}
+				if bytes.Contains(data, []byte("\x1b[?1049l")) {
+					inAlt.Store(false)
+				}
+				data = filterCwdEcho(buf[:n])
 				if len(data) > 0 && !writeBinary(data) {
 					break
 				}
 				if first {
 					first = false
 					go func() {
-						// Inject only while the user is idle (no input for 500ms): a
-						// full-screen program like vi eats stdin, so writing the hook
-						// mid-edit garbles the session (feels like vi cannot be quit).
+						// Inject only while the user is idle AND no full-screen
+						// program owns the terminal (vi/less/top switch to the
+						// alternate screen; writing the hook there garbles the
+						// session — feels like vi cannot be quit).
 						// ponytail: fixed 30s budget.
 						for i := 0; i < 60; i++ {
-							if time.Since(lastInput) > 500*time.Millisecond {
+							if time.Since(lastInput) > 500*time.Millisecond && !inAlt.Load() {
 								writePROMPT()
 								return
 							}
