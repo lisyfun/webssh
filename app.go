@@ -130,6 +130,48 @@ func (a *App) ServiceShutdown() error {
 	return nil
 }
 
+// bootstrapNoiseMarkers are shell-integration fragments that some remote
+// ~/.bashrc / /etc/profile.d scripts echo while the login shell starts. They
+// are only stripped during the first seconds of a connection so that later
+// commands (cat ~/.bashrc, echo $PROMPT_COMMAND) are unaffected.
+var bootstrapNoiseMarkers = []string{
+	"_COMMAND=",
+	"eval $_COMMAND",
+	"PROMPT_COMMAND=",
+	"precmd_functions+=",
+	"chpwd_functions+=",
+	"__webssh_cwd",
+	"PS0=",
+	"stty -echo",
+	"stty echo",
+}
+
+func stripBootstrapNoise(data []byte) []byte {
+	lines := strings.SplitAfter(string(data), "\n")
+	var out strings.Builder
+	for _, line := range lines {
+		drop := false
+		for _, marker := range bootstrapNoiseMarkers {
+			if strings.Contains(line, marker) {
+				drop = true
+				break
+			}
+		}
+		if drop {
+			// Clear the line instead of deleting it: some remote rc files print
+			// the fragment on the same visual line as the prompt, and dropping
+			// the newline would splice two prompts together.
+			out.WriteString("\r\x1b[2K")
+			if strings.HasSuffix(line, "\n") {
+				out.WriteString("\n")
+			}
+			continue
+		}
+		out.WriteString(line)
+	}
+	return []byte(out.String())
+}
+
 func generateID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
@@ -522,6 +564,7 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 	// Read stdout → emit terminal:output events
 	// Filter the CWD-reporting hook echo so users don't see it.
 	cwdEchoNeedle := strings.TrimSpace(cwdSnippet)
+	initFilterUntil := time.Now().Add(6 * time.Second)
 	var inAlt atomic.Bool // full-screen apps (vi/less/top) switch to the alternate screen
 	go func() {
 		buf := make([]byte, 4096)
@@ -551,6 +594,9 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 					out.WriteString(line)
 				}
 				data = []byte(out.String())
+			}
+			if time.Now().Before(initFilterUntil) {
+				data = stripBootstrapNoise(data)
 			}
 			if len(data) > 0 {
 				enc := base64.StdEncoding.EncodeToString(data)
