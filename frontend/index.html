@@ -68,7 +68,7 @@ body.platform-mac .topbar { padding-left: 80px; }
 .server-search input:focus { background:var(--bg-primary); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .server-search input::placeholder { color:var(--text-muted); }
 .server-list { flex: 1; overflow-y: auto; padding: 2px 8px 10px; }
-.server-item { padding: 7px 8px; cursor: pointer; display: flex; align-items: center; gap: 9px; border-radius: 6px; transition: background .12s ease; }
+.server-item { position: relative; padding: 7px 8px; cursor: pointer; display: flex; align-items: center; gap: 9px; border-radius: 6px; transition: background .12s ease; }
 .server-item:hover { background: var(--surface-hover); }
 .server-item.active { background: var(--surface-active); }
 .server-item .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
@@ -82,9 +82,11 @@ body.platform-mac .topbar { padding-left: 80px; }
 .server-item .server-tags { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
 .server-item .server-tags .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; }
 .server-item .server-tags .tag:hover { background: var(--accent); color: #fff; }
-.server-item .del-btn { opacity: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
-.server-item:hover .del-btn { opacity: 1; }
-.server-item .del-btn:hover { color: var(--red); }
+.server-item .server-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 1px; padding: 2px 3px 2px 12px; border-radius: 5px; background: var(--bg-tertiary); box-shadow: 0 1px 3px rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+.server-item:hover .server-actions { opacity: 1; pointer-events: auto; }
+.server-item .del-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
+.server-item .del-btn:hover { color: var(--text-primary); }
+.server-item .del-btn.danger:hover { color: var(--red); }
 .center { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 #settings-view { position: absolute; inset: 0; width: auto; display: none; overflow-y: auto; z-index: 5; background: var(--bg-primary); border: none; border-radius: 0; box-shadow: none; padding: 0; transform: none; max-height: none; }
 body.vibrancy #settings-view { background: transparent; }
@@ -923,10 +925,12 @@ function renderServers() {
         <div class="server-host">${escHtml(s.user)}@${escHtml(s.host)}:${s.port}</div>
         ${tags.length ? '<div class="server-tags">'+tags.map(t=>'<span class="tag" onclick="event.stopPropagation();filterTag(\''+escJsStr(t)+'\')">'+escHtml(t)+'</span>').join('')+'</div>' : ''}
       </div>
-      <button class="del-btn" onclick="event.stopPropagation();openNewTerminal('${s.id}')" title="新建终端"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
-      <button class="del-btn" onclick="event.stopPropagation();editServer('${s.id}')" title="编辑">&#x270E;</button>
-      <button class="del-btn" onclick="event.stopPropagation();copyServer('${s.id}')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-      <button class="del-btn" onclick="event.stopPropagation();deleteServer('${s.id}')" title="删除">&times;</button>
+      <div class="server-actions">
+        <button class="del-btn" onclick="event.stopPropagation();openNewTerminal('${s.id}')" title="新建终端"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+        <button class="del-btn" onclick="event.stopPropagation();editServer('${s.id}')" title="编辑">&#x270E;</button>
+        <button class="del-btn" onclick="event.stopPropagation();copyServer('${s.id}')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <button class="del-btn danger" onclick="event.stopPropagation();deleteServer('${s.id}')" title="删除">&times;</button>
+      </div>
     </div>`;
   }).join('');
 }
