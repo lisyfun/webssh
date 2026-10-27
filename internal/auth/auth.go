@@ -488,6 +488,7 @@ func loginPage(basePath, errMsg string, _ string) string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WebSSH Terminal</title>
+<link rel="icon" href="` + basePath + `/favicon.png">
 <style id="theme-style">
 :root {
   --bg: #0c0c0c;

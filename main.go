@@ -162,6 +162,18 @@ func main() {
 		http.Redirect(w, r, basePath+"/", http.StatusFound)
 	})
 
+	// Favicon is served before auth so the login page tab shows the app icon.
+	r.HandleFunc(basePath+"/favicon.png", func(w http.ResponseWriter, r *http.Request) {
+		data, err := staticFS.ReadFile("static/favicon.png")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Write(data)
+	})
+
 	s := r.PathPrefix(basePath).Subrouter()
 	s.Use(a.Middleware)
 	s.HandleFunc("/ws", sshterm.HandleWebSocketWithResolver(resolveServer, decryptField))
