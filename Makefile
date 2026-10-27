@@ -2,6 +2,9 @@ BINARY=webssh
 APP=WebSSH.app
 DMG=WebSSH.dmg
 RELEASE_DIR=release
+ICON_SRC=frontend/appicon.png
+ICONSET=build/darwin/iconfile.iconset
+ICNS=build/darwin/iconfile.icns
 
 # macOS-specific linker flags (detect via uname)
 UNAME_S := $(shell uname -s)
@@ -10,14 +13,13 @@ CGO_LDFLAGS = -framework UniformTypeIdentifiers
 endif
 
 build:
-	wails build -clean -ldflags "-s -w" -tags webkit2_41
-	cp build/bin/$(BINARY).app/Contents/MacOS/$(BINARY) $(BINARY)
+	CGO_ENABLED=1 CGO_LDFLAGS="$(CGO_LDFLAGS)" go build -tags production -ldflags "-s -w" -o $(BINARY) .
 
 build-windows:
-	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(BINARY).exe .
+	GOOS=windows GOARCH=amd64 go build -tags production -ldflags="-s -w" -o $(BINARY).exe .
 
 build-linux:
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -tags webkit2_41 -ldflags="-s -w" -o $(BINARY)-linux .
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -tags "production gtk3" -ldflags="-s -w" -o $(BINARY)-linux .
 
 # 统信OS 20 (Debian 10) .deb 打包（需要本机 Linux + GTK/WebKit dev libs）
 deb: build-linux
@@ -45,12 +47,12 @@ build-uos: deb
 run: build
 	./$(BINARY)
 
-package: build
+package: build icns
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp build/darwin/Info.plist $(APP)/Contents/
 	cp $(BINARY) $(APP)/Contents/MacOS/
-	cp frontend/favicon.png $(APP)/Contents/Resources/iconfile.png
+	cp $(ICNS) $(APP)/Contents/Resources/iconfile.icns
 	codesign --force --deep --sign - $(APP)
 	@echo "created $(APP)"
 
@@ -74,13 +76,13 @@ release: package
 	@echo "created release in $(RELEASE_DIR)/"
 
 # Build universal binary (arm64 + amd64) and package as .app
-universal:
+universal: icns
 	@echo "Building for arm64..."
 	CGO_ENABLED=1 CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		go build -tags "desktop,production" -o $(BINARY)-arm64 .
+		go build -tags production -o $(BINARY)-arm64 .
 	@echo "Building for amd64..."
 	CGO_ENABLED=1 GOARCH=amd64 CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		go build -tags "desktop,production" -o $(BINARY)-amd64 .
+		go build -tags production -o $(BINARY)-amd64 .
 	@echo "Creating universal binary..."
 	lipo -create -output $(BINARY) $(BINARY)-arm64 $(BINARY)-amd64
 	rm -f $(BINARY)-arm64 $(BINARY)-amd64
@@ -88,12 +90,24 @@ universal:
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp build/darwin/Info.plist $(APP)/Contents/
 	cp $(BINARY) $(APP)/Contents/MacOS/
-	cp frontend/favicon.png $(APP)/Contents/Resources/iconfile.png
+	cp $(ICNS) $(APP)/Contents/Resources/iconfile.icns
 	codesign --force --deep --sign - $(APP)
 	@echo "created universal $(APP)"
 
+icns:
+	rm -rf $(ICONSET) && mkdir -p $(ICONSET)
+	for s in 16 32 128 256 512; do \
+		sips -z $$s $$s $(ICON_SRC) --out $(ICONSET)/icon_$${s}x$${s}.png >/dev/null; \
+		sips -z $$((s*2)) $$((s*2)) $(ICON_SRC) --out $(ICONSET)/icon_$${s}x$${s}@2x.png >/dev/null; \
+	done
+	iconutil -c icns $(ICONSET) -o $(ICNS)
+	rm -rf $(ICONSET)
+
 vet:
-	go vet ./...
+	CGO_ENABLED=1 CGO_LDFLAGS="$(CGO_LDFLAGS)" go vet ./...
+
+test:
+	CGO_ENABLED=1 CGO_LDFLAGS="$(CGO_LDFLAGS)" go test ./...
 
 clean:
 	rm -f $(BINARY)
@@ -105,6 +119,7 @@ clean:
 	rm -rf winres/
 	rm -rf $(APP)
 	rm -rf $(RELEASE_DIR)
+	rm -f $(ICNS)
 	rm -rf build/bin/
 
-.PHONY: build build-windows build-linux build-uos deb run package release universal vet clean
+.PHONY: build build-windows build-linux build-uos deb run package release universal icns vet test clean

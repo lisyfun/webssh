@@ -3,24 +3,30 @@
 package main
 
 import (
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-func linuxOptions() *linux.Options {
-	return nil
-}
-
-func macOptions() *mac.Options {
-	return &mac.Options{
-		TitleBar:             mac.TitleBarDefault(),
-		Appearance:           mac.NSAppearanceNameDarkAqua,
-		WebviewIsTransparent: false,
-		WindowIsTranslucent:  false,
+func macOptions() application.MacOptions {
+	return application.MacOptions{
+		ApplicationShouldTerminateAfterLastWindowClosed: true,
 	}
 }
 
-func windowsOptions() *windows.Options {
-	return nil
+func macWindowOptions() application.MacWindow {
+	return application.MacWindow{
+		Appearance: application.NSAppearanceNameDarkAqua,
+		TitleBar:   application.MacTitleBarHidden,
+	}
+}
+
+func windowsOptions() application.WindowsOptions {
+	return application.WindowsOptions{}
+}
+
+func windowsWindowOptions() application.WindowsWindow {
+	return application.WindowsWindow{}
+}
+
+func linuxOptions() application.LinuxOptions {
+	return application.LinuxOptions{}
 }

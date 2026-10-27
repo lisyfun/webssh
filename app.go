@@ -24,7 +24,7 @@ import (
 	"webssh/internal/store"
 
 	"github.com/pkg/sftp"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -37,7 +37,7 @@ type Terminal struct {
 }
 
 type App struct {
-	ctx       context.Context
+	app       *application.App
 	store     *store.Store
 	terminals map[string]*Terminal
 	mu        sync.Mutex
@@ -79,8 +79,23 @@ func NewApp(dbPath string, maxBodyMB int64) *App {
 	}
 }
 
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func (a *App) setApplication(app *application.App) {
+	a.app = app
+}
+
+// SetWindowAppearance toggles the frosted-glass backdrop and sets its strength
+// (vibrancy) or, when vibrancy is off, the whole-window alpha.
+func (a *App) SetWindowAppearance(vibrancy bool, opacity float64) {
+	if opacity < 0.2 {
+		opacity = 0.2
+	}
+	if opacity > 1 {
+		opacity = 1
+	}
+	applyWindowAppearance(vibrancy, opacity)
+}
+
+func (a *App) ServiceStartup(_ context.Context, _ application.ServiceOptions) error {
 	if gostatic.GOOS == "linux" {
 		go func() {
 			time.Sleep(500 * time.Millisecond)
@@ -91,9 +106,11 @@ func (a *App) startup(ctx context.Context) {
 			)).Run()
 		}()
 	}
+	adjustTrafficLightsAfterStartup()
+	return nil
 }
 
-func (a *App) shutdown(ctx context.Context) {
+func (a *App) ServiceShutdown() error {
 	a.mu.Lock()
 	for id, t := range a.terminals {
 		if t.done != nil {
@@ -105,6 +122,7 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 	a.mu.Unlock()
 	a.store.Close()
+	return nil
 }
 
 func generateID() string {
@@ -489,7 +507,7 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 			case <-ticker.C:
 				if _, _, err := client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
 					a.cleanupSession(sessionID)
-					runtime.EventsEmit(a.ctx, "terminal:closed", sessionID)
+					a.app.Event.Emit("terminal:closed", sessionID)
 					return
 				}
 			}
@@ -531,7 +549,7 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 			}
 			if len(data) > 0 {
 				enc := base64.StdEncoding.EncodeToString(data)
-				runtime.EventsEmit(a.ctx, "terminal:output", map[string]string{
+				a.app.Event.Emit("terminal:output", map[string]string{
 					"sessionId": sessionID,
 					"data":      enc,
 				})
@@ -571,14 +589,14 @@ func (a *App) connect(host string, port int, username, password, privateKey, pas
 				break
 			}
 			data := base64.StdEncoding.EncodeToString(buf[:n])
-			runtime.EventsEmit(a.ctx, "terminal:output", map[string]string{
+			a.app.Event.Emit("terminal:output", map[string]string{
 				"sessionId": sessionID,
 				"data":      data,
 			})
 		}
 	}()
 
-	runtime.EventsEmit(a.ctx, "terminal:connected", sessionID)
+	a.app.Event.Emit("terminal:connected", sessionID)
 	return sessionID, nil
 }
 
@@ -619,7 +637,7 @@ func (a *App) TerminalResize(sessionID string, cols, rows int) error {
 
 func (a *App) CloseSession(sessionID string) {
 	a.cleanupSession(sessionID)
-	runtime.EventsEmit(a.ctx, "terminal:closed", sessionID)
+	a.app.Event.Emit("terminal:closed", sessionID)
 }
 
 func (a *App) ListSessions() []string {
@@ -724,7 +742,7 @@ func (a *App) SFTPStat(sessionID, filePath string) (FileStat, error) {
 }
 
 type downloadProgressWriter struct {
-	ctx      context.Context
+	app      *application.App
 	dst      io.Writer
 	total    int64
 	written  int64
@@ -737,7 +755,9 @@ func (w *downloadProgressWriter) Write(p []byte) (int, error) {
 	w.written += int64(n)
 	if time.Since(w.lastTick) > 100*time.Millisecond {
 		w.lastTick = time.Now()
-		runtime.EventsEmit(w.ctx, "download:progress", w.fileName, w.written, w.total)
+		w.app.Event.Emit("download:progress", map[string]interface{}{
+			"fileName": w.fileName, "written": w.written, "total": w.total,
+		})
 	}
 	return n, err
 }
@@ -749,13 +769,15 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 	}
 
 	fileName := path.Base(remotePath)
-	savePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		DefaultFilename: fileName,
-		Title:           "保存文件 - " + fileName,
+	dlg := a.app.Dialog.SaveFile()
+	dlg.SetOptions(&application.SaveFileDialogOptions{
+		Title:    "保存文件 - " + fileName,
+		Filename: fileName,
 	})
+	savePath, err := dlg.PromptForSingleSelection()
 	if err != nil || savePath == "" {
 		// User cancelled or dialog failed — not a real download error.
-		runtime.EventsEmit(a.ctx, "download:complete", map[string]interface{}{
+		a.app.Event.Emit("download:complete", map[string]interface{}{
 			"fileName": fileName, "success": false, "cancelled": true,
 		})
 		return err
@@ -790,19 +812,19 @@ func (a *App) SFTPDownloadDialog(sessionID, remotePath string) error {
 	defer dst.Close()
 
 	pw := &downloadProgressWriter{
-		ctx:      a.ctx,
+		app:      a.app,
 		dst:      dst,
 		total:    stat.Size(),
 		fileName: fileName,
 	}
 	_, err = io.Copy(pw, f)
 	if err != nil {
-		runtime.EventsEmit(a.ctx, "download:complete", map[string]interface{}{
+		a.app.Event.Emit("download:complete", map[string]interface{}{
 			"fileName": fileName, "success": false, "error": err.Error(),
 		})
 		return err
 	}
-	runtime.EventsEmit(a.ctx, "download:complete", map[string]interface{}{
+	a.app.Event.Emit("download:complete", map[string]interface{}{
 		"fileName": fileName, "success": true,
 	})
 	return nil

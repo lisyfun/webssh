@@ -3,21 +3,13 @@ package main
 import (
 	"embed"
 	"flag"
-	"fmt"
+	"io/fs"
 	"log"
-
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"syscall"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
-
-var lockFile string
 
 //go:embed all:frontend
 var assets embed.FS
@@ -40,66 +32,55 @@ func main() {
 	dbPath := flag.String("db", defaultDBPath(), "path to SQLite database file")
 	flag.Parse()
 
-
 	if *maxBody < 0 {
 		log.Fatal("-maxbody must be >= 0")
 	}
 
-	if runtime.GOOS == "linux" {
-		singleInstanceOrExit()
+	frontend, err := fs.Sub(assets, "frontend")
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	app := NewApp(*dbPath, *maxBody)
-	defer cleanupLock()
 
-	err := wails.Run(&options.App{
-		Title:             "WebSSH",
-		Width:             1280,
-		Height:            800,
-		MinWidth:          900,
-		MinHeight:         600,
-		DisableResize:     false,
-		StartHidden:       false,
-		Frameless:         false,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	wailsApp := application.New(application.Options{
+		Name:        "WebSSH",
+		Description: "Web SSH terminal and SFTP browser",
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(frontend),
 		},
-		BackgroundColour: &options.RGBA{R: 13, G: 17, B: 23, A: 255},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
-		Bind: []interface{}{
-			app,
+		Services: []application.Service{
+			application.NewService(app),
 		},
 		Mac:     macOptions(),
 		Windows: windowsOptions(),
 		Linux:   linuxOptions(),
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: "com.webssh.webssh",
+			OnSecondInstanceLaunch: func(_ application.SecondInstanceData) {
+				if w, ok := application.Get().Window.GetByName("main"); ok {
+					w.Show()
+					w.Focus()
+				}
+			},
+		},
+	})
+	app.setApplication(wailsApp)
+
+	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:             "main",
+		Title:            "WebSSH",
+		Width:            1280,
+		Height:           800,
+		MinWidth:         900,
+		MinHeight:        600,
+		BackgroundColour: application.NewRGB(13, 17, 23),
+		URL:              "/",
+		Mac:              macWindowOptions(),
+		Windows:          windowsWindowOptions(),
 	})
 
-	if err != nil {
+	if err := wailsApp.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
-
-func singleInstanceOrExit() {
-	lockFile = fmt.Sprintf("/tmp/webssh-%d.lock", os.Getuid())
-	data, err := os.ReadFile(lockFile)
-	if err == nil {
-		var pid int
-		if _, err := fmt.Sscanf(string(data), "%d", &pid); err == nil {
-			proc, err := os.FindProcess(pid)
-			if err == nil && proc.Signal(syscall.Signal(0)) == nil {
-				exec.Command("xdotool", "search", "--class", "WebSSH", "windowactivate").Run()
-				os.Exit(0)
-			}
-		}
-
-	}
-	os.WriteFile(lockFile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644)
-}
-
-func cleanupLock() {
-	if lockFile != "" {
-		os.Remove(lockFile)
-	}
-}
-

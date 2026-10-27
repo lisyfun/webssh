@@ -21,6 +21,9 @@
   --accent-hover: #3a7ae8;
   --green: #3fb950;
   --red: #ff7b72;
+  --border-subtle: color-mix(in srgb, var(--border-color) 55%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --surface-active: color-mix(in srgb, var(--text-primary) 8%, transparent);
   --sidebar-width: 240px;
   --file-panel-width: 320px;
 }
@@ -31,35 +34,51 @@ input, textarea, button { font-family: inherit; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
 .app { display: flex; flex-direction: column; height: 100vh; }
+/* Single top row: traffic lights (macOS), window tabs and actions — one surface, no title bar. */
+.topbar {
+  display: flex; align-items: center; gap: 6px;
+  height: 42px; flex-shrink: 0;
+  /* optical centring: glyph/SVG ink sits ~1px above the box centre */
+  padding: 2.5px 14px 0;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  user-select: none;
+  -webkit-user-select: none;
+  --wails-draggable: drag;
+}
+body.platform-mac .topbar { padding-left: 80px; }
+.app-brand { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 0 2px; }
+.app-brand-name { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.2px; }
+.titlebar-session { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .body { display: flex; flex: 1; overflow: hidden; }
-.sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
+.sidebar { width: var(--sidebar-width); background: var(--bg-primary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; }
 .sidebar.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
 .sidebar-toggle-float { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 100; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-left: none; border-radius: 0 6px 6px 0; color: var(--text-secondary); cursor: pointer; padding: 8px 4px; font-size: 12px; display: none; align-items: center; transition: background .15s; writing-mode: vertical-rl; }
 .sidebar-toggle-float:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 
-.sidebar-header { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
-.sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+.sidebar-header { padding: 12px 12px 6px; display: flex; align-items: center; justify-content: space-between; }
+.sidebar-header span { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.3px; line-height: 1; }
 .sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .sidebar-header .add-btn svg { display: block; }
-.sidebar-header .add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.sidebar-header .add-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
 .sidebar-header .add-btn.active { color: var(--accent); }
-.server-search { padding: 6px 12px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
-.server-search input { width:100%; padding:5px 8px; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; outline:none; }
-.server-search input:focus { border-color:var(--accent); }
+.server-search { padding: 4px 10px 8px; flex-shrink: 0; }
+.server-search input { width:100%; padding:6px 9px; background:var(--surface-hover); border:1px solid transparent; border-radius:6px; color:var(--text-primary); font-size:12px; outline:none; transition: background .12s ease, border-color .12s ease; }
+.server-search input:focus { background:var(--bg-primary); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .server-search input::placeholder { color:var(--text-muted); }
-.server-list { flex: 1; overflow-y: auto; padding: 4px 0; }
-.server-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent; transition: all 0.15s; }
-.server-item:hover { background: var(--bg-tertiary); }
-.server-item.active { background: var(--bg-tertiary); border-left-color: var(--accent); }
-.server-item .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.server-list { flex: 1; overflow-y: auto; padding: 2px 8px 10px; }
+.server-item { padding: 7px 8px; cursor: pointer; display: flex; align-items: center; gap: 9px; border-radius: 6px; transition: background .12s ease; }
+.server-item:hover { background: var(--surface-hover); }
+.server-item.active { background: var(--surface-active); }
+.server-item .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .server-item .status-dot.disconnected { background: var(--text-muted); }
 .server-item .status-dot.connecting { background: #d29922; animation: pulse 1s infinite; }
 .server-item .status-dot.connected { background: var(--green); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 .server-item .server-info { flex: 1; min-width: 0; }
 .server-item .server-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.server-item .server-host { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.server-item .server-host { font-size: 10.5px; color: var(--text-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .server-item .server-tags { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
 .server-item .server-tags .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; }
 .server-item .server-tags .tag:hover { background: var(--accent); color: #fff; }
@@ -67,33 +86,48 @@ input, textarea, button { font-family: inherit; }
 .server-item:hover .del-btn { opacity: 1; }
 .server-item .del-btn:hover { color: var(--red); }
 .center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.tab-bar { display: flex; align-items: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); height: 34px; flex-shrink: 0; padding: 0 8px; }
-.tab-bar .tab-bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
-.tab-bar .tab-bar-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 3px 6px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
-.tab-bar .tab-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.tab-bar .tab-bar-btn.active { color: var(--accent); }
-.tab-list { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.topbar .tab-bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.topbar .tab-bar-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; --wails-draggable: no-drag; transition: background .12s ease, color .12s ease; }
+.topbar .tab-bar-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.topbar .tab-bar-btn.active { color: var(--accent); }
+.topbar .tab-bar-btn:focus,
+.topbar .tab-bar-btn:focus-visible { outline: none; }
+.topbar .tab-bar-btn:disabled { opacity: 0.35; cursor: default; background: none; color: var(--text-secondary); }
+.tab-list { display: flex; flex: 1; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
 .tab-list::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-bottom: none; border-radius: 0; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; max-width: 160px; flex-shrink: 0; overflow: hidden; }
-.tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); box-shadow: inset 0 1.5px 0 var(--accent); }
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 9px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 12px; white-space: nowrap;
+  user-select: none; min-width: 0; max-width: 200px; flex-shrink: 0; overflow: hidden;
+  --wails-draggable: no-drag;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.tab:hover { background: var(--surface-hover); color: var(--text-primary); }
+.tab.active { background: var(--surface-active); border-color: var(--border-subtle); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
 .tab.unread .tab-name::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
-.tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
-.tab .tab-host { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 11px; margin-left: 2px; }
-.tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
-.tab-close:hover { color: var(--text-primary); }
-.tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; line-height: 1; display: inline-flex; align-items: center; flex-shrink: 0; }
+.tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; font-weight: 500; }
+.tab .tab-host { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 10.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; margin-left: 2px; }
+.tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; width: 16px; height: 16px; padding: 0; border-radius: 4px; line-height: 1; margin-left: auto; display: inline-flex; align-items: center; justify-content: center; opacity: 0.55; transition: opacity .12s ease, background .12s ease; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+.tab-close:hover { background: var(--surface-active); color: var(--text-primary); }
+.tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; line-height: 1; display: inline-flex; align-items: center; flex-shrink: 0; opacity: 0; transition: opacity .12s ease, color .12s ease; }
+.tab:hover .tab-refresh, .tab.active .tab-refresh { opacity: 1; }
 .tab-refresh:hover { color: var(--accent); }
 
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
-.terminal-wrapper .xterm { padding: 6px 0 0 14px; box-sizing: border-box; }
-.terminal-wrapper .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; gap: 8px; }
+.terminal-wrapper .xterm { padding: 8px 8px 4px 8px; box-sizing: border-box; }
+.terminal-wrapper .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; gap: 10px; }
+.terminal-wrapper .empty-state > svg { opacity: 0.22; }
 .terminal-wrapper .empty-state .conn-error { color: var(--red); font-size: 12px; max-width: 85%; text-align: center; word-break: break-all; }
 .terminal-wrapper .empty-state .conn-error button { margin-top: 10px; padding: 6px 16px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .terminal-wrapper .loading-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 13px; gap: 8px; }
 .terminal-wrapper .loading-state .spinner { width: 16px; height: 16px; border: 2px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #terminal-container { position: absolute; inset: 0; }
-.file-panel { width: var(--file-panel-width); background: var(--bg-secondary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; position: relative; }
+.file-panel { width: var(--file-panel-width); background: var(--bg-primary); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.2s, opacity 0.2s; position: relative; }
 .file-panel .file-panel-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 10; }
 .file-panel .file-panel-resizer:hover { background: rgba(74,140,255,0.15); }
 .file-panel.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
@@ -139,9 +173,9 @@ input, textarea, button { font-family: inherit; }
 .toast.show { opacity: 1; }
 .toast.error { border-color: var(--red); }
 .toast.success { border-color: var(--green); }
-.status-bar { height: 24px; background: var(--bg-secondary); border-top: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 12px; font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
-.status-bar .item { margin-right: 16px; display: flex; align-items: center; gap: 4px; }
-.status-bar .item .dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-bar { height: 34px; background: transparent; border-top: 1px solid var(--border-color); display: flex; align-items: center; padding: 0 10px; font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.status-bar .item { margin-right: 20px; display: flex; align-items: center; gap: 6px; }
+.status-bar .item .dot { width: 7px; height: 7px; border-radius: 50%; }
 .status-bar .item .dot.green { background: var(--green); }
 .status-bar .item .dot.yellow { background: #d29922; }
 .status-bar .item .dot.gray { background: var(--text-muted); }
@@ -207,7 +241,7 @@ input, textarea, button { font-family: inherit; }
 .theme-item.active .check { opacity: 1; }
 
 /* Font settings popup */
-.font-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px; width: 380px; z-index: 1500; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.font-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px; width: 440px; max-height: calc(100vh - 60px); overflow-y: auto; z-index: 1500; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
 .font-popup h2 { font-size: 15px; font-weight: 600; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
 .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .popup-header h2 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
@@ -221,6 +255,26 @@ input, textarea, button { font-family: inherit; }
 .font-popup .form-row .form-group { flex: 1; }
 .font-popup .form-group input[type="text"], .font-popup .form-group input[type="number"] { width: 100%; padding: 6px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; }
 .font-popup .form-group input:focus { border-color: var(--accent); }
+.font-popup select { width: 100%; padding: 6px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 13px; outline: none; }
+.font-popup select:focus { border-color: var(--accent); }
+.font-popup .check-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); padding: 5px 0; }
+.font-popup .switch { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 10px; background: var(--bg-hover); position: relative; cursor: pointer; border: none; transition: background .15s; flex-shrink: 0; }
+.font-popup .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.font-popup .switch:checked { background: var(--accent); }
+.font-popup .switch:checked::after { transform: translateX(14px); }
+.font-popup .slider-wrap { display: flex; align-items: center; gap: 10px; }
+.font-popup input[type="range"] { -webkit-appearance: none; width: 140px; height: 4px; background: var(--bg-hover); border-radius: 2px; outline: none; }
+.font-popup input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+.font-popup .slider-value { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+html.vibrancy, body.vibrancy { background: transparent; }
+body.vibrancy .topbar,
+body.vibrancy .sidebar,
+body.vibrancy .file-panel,
+body.vibrancy .status-bar { background: transparent; }
+body.vibrancy .app { background: var(--window-tint, transparent); }
+body.vibrancy .terminal-wrapper,
+body.vibrancy .xterm-viewport,
+body.vibrancy .xterm-screen { background-color: transparent !important; }
 .font-popup .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .font-popup .actions button { padding: 6px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; }
 .font-popup .btn-cancel { background: var(--bg-tertiary); color: var(--text-secondary); }
@@ -233,6 +287,17 @@ input, textarea, button { font-family: inherit; }
 <body>
 
 <div class="app">
+  <div class="topbar" id="tab-bar">
+    <div class="app-brand" id="app-brand">
+      <span class="app-brand-name">WebSSH</span>
+      <span class="titlebar-session" id="titlebar-session"></span>
+    </div>
+    <div class="tab-list" id="tab-list"></div>
+    <div class="tab-bar-right">
+      <button class="tab-bar-btn" onclick="showFontSettings()" title="终端设置"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
+      <button class="tab-bar-btn" id="toggle-files-btn" onclick="toggleFilePanel()" title="文件浏览器" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+    </div>
+  </div>
   <div class="body">
     <div class="sidebar">
       <div class="sidebar-header">
@@ -251,13 +316,6 @@ input, textarea, button { font-family: inherit; }
     <button class="sidebar-toggle-float" id="sidebar-toggle-float" onclick="toggleSidebar()" title="展开服务器列表">服务器列表 ▸</button>
 
     <div class="center">
-      <div class="tab-bar" id="tab-bar" style="display:none">
-        <div class="tab-list" id="tab-list"></div>
-        <div class="tab-bar-right">
-          <button class="tab-bar-btn" onclick="showFontSettings()" title="终端设置"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
-          <button class="tab-bar-btn" id="toggle-files-btn" onclick="toggleFilePanel()" title="文件浏览器"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
-        </div>
-      </div>
       <div class="terminal-wrapper" id="terminal-wrapper">
         <div class="empty-state" id="empty-state">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -469,8 +527,27 @@ input, textarea, button { font-family: inherit; }
 <script src="lib/cm-swift.min.js"></script>
 <script src="lib/cm-dart.min.js"></script>
 <script src="lib/cm-powershell.min.js"></script>
-<script src="wailsjs/runtime/runtime.js"></script>
 <script>
+// ---- Wails v3 runtime ----
+// The v3 runtime is an ES module served by the asset server at /wails/runtime.js.
+// Load it lazily so this file can stay a plain script (inline HTML handlers need
+// the functions below to remain global).
+// The WKWebView on macOS reports a Macintosh user agent; the same check keeps
+// plain-browser testing (server mode) consistent. Applied synchronously so the
+// custom title bar is laid out before the first paint.
+if (/Macintosh|Mac OS X/.test(navigator.userAgent)) {
+  document.body.classList.add('platform-mac');
+}
+
+const wailsReady = import('/wails/runtime.js').then((m) => {
+  window.wails = m;
+  return m;
+});
+
+function onWails(eventName, cb) {
+  wailsReady.then((w) => w.Events.On(eventName, cb));
+}
+
 // ---- State ----
 let servers = [];
 let editingId = null;
@@ -489,10 +566,17 @@ let sidebarOpen = true;
 let showHidden = localStorage.getItem('webssh-show-hidden') === 'true';
 var fontSettings = {};
 
-function App() { return window.go.main.App; }
+// Wails v3 binds the Go service as "main.App.<Method>" (package.type.method).
+// Every call is deferred until the runtime module has loaded.
+const appProxy = new Proxy({}, {
+  get: (_target, method) => (...args) =>
+    wailsReady.then((w) => w.Call.ByName('main.App.' + method, ...args)),
+});
+function App() { return appProxy; }
 
 
 var themeMeta = {
+  'abernathy': { name: 'Abernathy', desc: 'Ghostty 同款暗色', bg: '#111416', accent: '#1093f5', fg: '#eeeeec' },
   'github-dark': { name: 'GitHub Dark', desc: '经典 GitHub 暗色', bg: '#0d1117', accent: '#4a8cff', fg: '#e6edf3' },
   'catppuccin-mocha': { name: 'Catppuccin Mocha', desc: '热门暖紫暗色', bg: '#1e1e2e', accent: '#89b4fa', fg: '#cdd6f4' },
   'one-dark': { name: 'One Dark', desc: 'Atom 编辑器经典', bg: '#282c34', accent: '#61afef', fg: '#abb2bf' },
@@ -506,6 +590,23 @@ var themeMeta = {
 };
 
 var themes = {
+  'abernathy': {
+    css: {
+      '--bg-primary': '#111416', '--bg-secondary': '#15191c', '--bg-tertiary': '#1c2125',
+      '--bg-hover': '#242a2f', '--border': '#2a3035', '--border-color': '#2a3035',
+      '--text-primary': '#eeeeec', '--text-secondary': '#a9adae', '--text-muted': '#6f7679',
+      '--accent': '#1093f5', '--accent-hover': '#11b5f6', '--green': '#00cd00', '--red': '#ff4d4d',
+    },
+    xterm: {
+      background: '#111416', foreground: '#eeeeec', cursor: '#bbbbbb', cursorAccent: '#ffffff',
+      selectionBackground: '#eeeeec', selectionForeground: '#333333',
+      black: '#000000', red: '#cd0000', green: '#00cd00', yellow: '#cdcd00',
+      blue: '#1093f5', magenta: '#cd00cd', cyan: '#00cdcd', white: '#faebd7',
+      brightBlack: '#404040', brightRed: '#ff0000', brightGreen: '#00ff00',
+      brightYellow: '#ffff00', brightBlue: '#11b5f6', brightMagenta: '#ff00ff',
+      brightCyan: '#00ffff', brightWhite: '#ffffff',
+    },
+  },
   'github-dark': {
     css: {
       '--bg-primary': '#0d1117', '--bg-secondary': '#161b22', '--bg-tertiary': '#21262d',
@@ -760,7 +861,6 @@ function closeSession(sid) {
       switchSession(remaining[remaining.length - 1]);
     } else {
       activeSessionId = null;
-      document.getElementById('tab-bar').style.display = 'none';
       document.getElementById('empty-state').style.display = 'flex';
       renderServers();
       renderTabs();
@@ -773,11 +873,10 @@ function closeSession(sid) {
 }
 
 function renderTabs() {
-  const bar = document.getElementById('tab-bar');
   const list = document.getElementById('tab-list');
+  const brand = document.getElementById('app-brand');
   const sids = Object.keys(sessions);
-  if (sids.length === 0) { bar.style.display = 'none'; return; }
-  bar.style.display = 'flex';
+  brand.style.display = sids.length === 0 ? 'flex' : 'none';
   list.innerHTML = sids.map(sid => {
     const ses = sessions[sid];
     const svr = servers.find(s => s.id === ses.serverId);
@@ -933,19 +1032,35 @@ function initTerminal(sid) {
 
   loadFontSettings();
   const term = new Terminal({
-    cursorBlink: true,
-    cursorStyle: 'bar',
+    cursorBlink: fontSettings.cursorBlink !== false,
+    cursorStyle: fontSettings.cursorStyle || 'underline',
+    fontWeight: fontSettings.fontWeight || '400',
     fontSize: fontSettings.fontSize || 13,
-    fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
-    letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0.5,
-    lineHeight: fontSettings.lineHeight || 1.3,
-    theme: (themes[fontSettings.theme] || themes['github-dark']).xterm,
+    fontFamily: fontSettings.fontFamily || FONT_FALLBACK,
+    letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0,
+    lineHeight: fontSettings.lineHeight || 1.5,
+    scrollback: fontSettings.scrollback || 10000,
+    minimumContrastRatio: fontSettings.minimumContrastRatio || 1,
+    theme: terminalTheme(),
     allowTransparency: true,
-    drawBoldTextInBrightColors: false,
+    drawBoldTextInBrightColors: !!fontSettings.drawBoldTextInBrightColors,
   });
 
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
+
+  // Optional copy-on-select (same behaviour as Ghostty's copy-on-select).
+  term.onSelectionChange(() => {
+    if (!fontSettings.copyOnSelect) return;
+    const ses = sessions[sid];
+    const text = term.getSelection();
+    if (!ses || !text) return;
+    clearTimeout(ses._copyTimer);
+    ses._copyTimer = setTimeout(() => {
+      const clip = window.wails && window.wails.Clipboard;
+      if (clip) clip.SetText(text);
+    }, 150);
+  });
 
   if (term.parser && term.parser.registerOscHandler) {
     let cwdTimer;
@@ -1222,7 +1337,8 @@ function cancelPassphrase() {
 }
 
 // ---- Events from Go ----
-window.runtime.EventsOn("terminal:output", function(data) {
+onWails("terminal:output", function(ev) {
+  const data = ev.data;
   const entry = Object.entries(sessions).find(([, ses]) => ses.sessionId === data.sessionId);
   if (!entry) return;
   const [sid, ses] = entry;
@@ -1237,7 +1353,8 @@ window.runtime.EventsOn("terminal:output", function(data) {
   } catch (_) {}
 });
 
-window.runtime.EventsOn("download:progress", function(fileName, written, total) {
+onWails("download:progress", function(ev) {
+  const { fileName, written, total } = ev.data;
   const fillEl = document.getElementById('progress-fill');
   const pctEl = document.getElementById('progress-pct');
   const textEl = document.getElementById('progress-text');
@@ -1248,7 +1365,8 @@ window.runtime.EventsOn("download:progress", function(fileName, written, total) 
   textEl.textContent = `下载中 ${fileName}`;
 });
 
-window.runtime.EventsOn("download:complete", function(info) {
+onWails("download:complete", function(ev) {
+  const info = ev.data;
   const progressEl = document.getElementById('file-progress');
   downloadQueue--;
   if (downloadQueue <= 0) {
@@ -1264,7 +1382,8 @@ window.runtime.EventsOn("download:complete", function(info) {
   }
 });
 
-window.runtime.EventsOn("terminal:closed", function(sessionId) {
+onWails("terminal:closed", function(ev) {
+  const sessionId = ev.data;
   for (const [sid, ses] of Object.entries(sessions)) {
     if (ses.sessionId === sessionId) {
       ses.connected = false;
@@ -1319,6 +1438,7 @@ window.runtime.EventsOn("terminal:closed", function(sessionId) {
 })();
 
 function toggleFilePanel() {
+  if (!activeSessionId) return;
   const panel = document.getElementById('file-panel');
   const btn = document.getElementById('toggle-files-btn');
   filePanelOpen = !filePanelOpen;
@@ -1358,21 +1478,48 @@ function duplicateSession(sid) {
 }
 
 // ---- Terminal Font Settings ----
+const FONT_FALLBACK = "'CaskaydiaCove Nerd Font', 'CaskaydiaCove Nerd Font Mono', 'JetBrains Mono', 'SF Mono', Menlo, monospace";
+const OLD_FONT_FALLBACK = "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace";
+const FONT_DEFAULTS = {
+  fontFamily: FONT_FALLBACK, fontSize: 13, lineHeight: 1.5, letterSpacing: 0,
+  fontWeight: '400', cursorStyle: 'underline', cursorBlink: true,
+  scrollback: 10000, minimumContrastRatio: 1,
+  drawBoldTextInBrightColors: false, copyOnSelect: false,
+  vibrancy: true, windowOpacity: 1, windowWidth: 1280, windowHeight: 800,
+  theme: 'abernathy',
+};
+
 function loadFontSettings() {
   try {
     fontSettings = JSON.parse(localStorage.getItem('webssh-font') || '{}');
   } catch (_) { fontSettings = {}; }
-  const def = { fontFamily: "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace", fontSize: 13, lineHeight: 1.3, letterSpacing: 0.5, theme: 'github-dark' };
-  Object.keys(def).forEach(k => { if (fontSettings[k] == null) fontSettings[k] = def[k]; });
+  // One-time move from the old GitHub Dark defaults to the Ghostty-matched look.
+  // Explicit picks of other themes/fonts are left untouched.
+  if (!localStorage.getItem('webssh-style-v2')) {
+    if (fontSettings.theme === 'github-dark') fontSettings.theme = 'abernathy';
+    if (fontSettings.fontFamily === OLD_FONT_FALLBACK) fontSettings.fontFamily = FONT_FALLBACK;
+    if (fontSettings.lineHeight === 1.3) fontSettings.lineHeight = 1.5;
+    if (fontSettings.letterSpacing === 0.5) fontSettings.letterSpacing = 0;
+    localStorage.setItem('webssh-style-v2', '1');
+    localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+  }
+  if (!localStorage.getItem('webssh-vibrancy-v1')) {
+    if (fontSettings.vibrancy == null) fontSettings.vibrancy = true;
+    if (fontSettings.windowOpacity == null || fontSettings.windowOpacity === 1) fontSettings.windowOpacity = 0.72;
+    localStorage.setItem('webssh-vibrancy-v1', '1');
+    localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+  }
+  Object.keys(FONT_DEFAULTS).forEach(k => { if (fontSettings[k] == null) fontSettings[k] = FONT_DEFAULTS[k]; });
 }
 
 function applyTheme(name) {
   var t = themes[name];
   if (!t) return;
   Object.keys(t.css).forEach(k => document.documentElement.style.setProperty(k, t.css[k]));
+  if (fontSettings.vibrancy) setWindowTint(fontSettings.windowOpacity);
   Object.values(sessions).forEach(function(s) {
     if (s.term) {
-      s.term.options.theme = t.xterm;
+      s.term.options.theme = terminalTheme(name);
     }
   });
 }
@@ -1384,6 +1531,14 @@ function applyFontSettings() {
     s.term.options.fontSize = fontSettings.fontSize;
     s.term.options.lineHeight = fontSettings.lineHeight;
     s.term.options.letterSpacing = fontSettings.letterSpacing;
+    s.term.options.fontWeight = fontSettings.fontWeight;
+    s.term.options.cursorStyle = fontSettings.cursorStyle;
+    s.term.options.cursorBlink = fontSettings.cursorBlink !== false;
+    s.term.options.drawBoldTextInBrightColors = !!fontSettings.drawBoldTextInBrightColors;
+    s.term.options.minimumContrastRatio = fontSettings.minimumContrastRatio || 1;
+    if (fontSettings.scrollback && s.term.options.scrollback !== fontSettings.scrollback) {
+      s.term.options.scrollback = fontSettings.scrollback;
+    }
     if (s.fitAddon) s.fitAddon.fit();
   });
 }
@@ -1428,18 +1583,113 @@ function toggleThemeMenu() {
   document.getElementById('theme-trigger').classList.toggle('open', menu.classList.contains('open'));
 }
 
+function setVibrancyClass(on) {
+  document.documentElement.classList.toggle('vibrancy', on);
+  document.body.classList.toggle('vibrancy', on);
+}
+
+function currentBg() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim();
+  if (v.startsWith('#')) {
+    const n = parseInt(v.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const m = v.match(/rgba?\(([^)]+)\)/);
+  if (m) {
+    const p = m[1].split(',').map(parseFloat);
+    return [p[0] | 0, p[1] | 0, p[2] | 0];
+  }
+  return [17, 20, 22];
+}
+
+// xterm paints its own background; make it transparent while frosted glass is on
+// so the blur shows through the terminal surface too.
+function terminalTheme(name) {
+  const key = name || fontSettings.theme;
+  const base = (themes[key] || themes['abernathy']).xterm;
+  if (!fontSettings.vibrancy) return base;
+  return Object.assign({}, base, { background: 'rgba(0,0,0,0)' });
+}
+
+function refreshTermThemes() {
+  Object.values(sessions).forEach(function(s) {
+    if (s.term) s.term.options.theme = terminalTheme();
+  });
+}
+
+function setWindowTint(alpha) {
+  const c = currentBg();
+  document.documentElement.style.setProperty('--window-tint', `rgba(${c[0]},${c[1]},${c[2]},${alpha})`);
+}
+
+// Applies the saved window look (frosted glass on/off + strength).
+function applyWindowLook() {
+  const on = !!fontSettings.vibrancy;
+  setVibrancyClass(on);
+  if (on) {
+    setWindowTint(fontSettings.windowOpacity);
+  } else {
+    document.documentElement.style.removeProperty('--window-tint');
+  }
+  // With vibrancy the material stays at full strength; the slider drives the
+  // theme tint alpha instead so text keeps its contrast.
+  refreshTermThemes();
+  const material = on ? 1.0 : fontSettings.windowOpacity;
+  wailsReady.then((w) => w.Call.ByName('main.App.SetWindowAppearance', on, material)).catch(() => {});
+}
+
+// Live preview while dragging the slider / toggling the switch.
+function previewWindowLook() {
+  const on = document.getElementById('vibrancy').checked;
+  const value = parseFloat(document.getElementById('window-opacity').value);
+  setVibrancyClass(on);
+  if (on) {
+    setWindowTint(value);
+  } else {
+    document.documentElement.style.removeProperty('--window-tint');
+  }
+  refreshTermThemes();
+  wailsReady.then((w) => w.Call.ByName('main.App.SetWindowAppearance', on, on ? 1.0 : value)).catch(() => {});
+}
+
+function applyWindowSize(width, height) {
+  if (!width || !height) return;
+  wailsReady.then((w) => w.Window.SetSize(width, height)).catch(() => {});
+}
+
+// Apply saved window preferences on launch (only when the user has set them).
+function applySavedWindowPrefs() {
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem('webssh-font') || '{}'); } catch (_) {}
+  if (raw.windowOpacity != null || raw.vibrancy != null) applyWindowLook();
+  if (raw.windowWidth && raw.windowHeight) applyWindowSize(raw.windowWidth, raw.windowHeight);
+}
+
 function showFontSettings() {
   loadFontSettings();
   document.getElementById('font-family').value = fontSettings.fontFamily;
   document.getElementById('font-size').value = fontSettings.fontSize;
   document.getElementById('line-height').value = fontSettings.lineHeight;
   document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
-  renderThemePicker(fontSettings.theme || 'github-dark');
+  document.getElementById('font-weight').value = fontSettings.fontWeight;
+  document.getElementById('cursor-style').value = fontSettings.cursorStyle;
+  document.getElementById('cursor-blink').checked = fontSettings.cursorBlink !== false;
+  document.getElementById('scrollback').value = fontSettings.scrollback;
+  document.getElementById('contrast').value = fontSettings.minimumContrastRatio;
+  document.getElementById('copy-on-select').checked = !!fontSettings.copyOnSelect;
+  document.getElementById('bold-bright').checked = !!fontSettings.drawBoldTextInBrightColors;
+  document.getElementById('vibrancy').checked = fontSettings.vibrancy !== false;
+  document.getElementById('window-opacity').value = fontSettings.windowOpacity;
+  document.getElementById('opacity-value').textContent = Math.round(fontSettings.windowOpacity * 100) + '%';
+  document.getElementById('window-width').value = fontSettings.windowWidth;
+  document.getElementById('window-height').value = fontSettings.windowHeight;
+  renderThemePicker(fontSettings.theme || 'abernathy');
   document.getElementById('font-popup').style.display = 'block';
   document.getElementById('settings-overlay').style.display = 'block';
 }
 
 function hideFontSettings() {
+  if (typeof fontSettings.windowOpacity === 'number') applyWindowLook();
   document.getElementById('theme-menu').classList.remove('open');
   document.getElementById('theme-trigger').classList.remove('open');
   document.getElementById('font-popup').style.display = 'none';
@@ -1447,14 +1697,32 @@ function hideFontSettings() {
 }
 
 function saveFontSettings() {
-  fontSettings.fontFamily = document.getElementById('font-family').value.trim() || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace";
-  fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
-  fontSettings.lineHeight = parseFloat(document.getElementById('line-height').value) || 1.3;
-  fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
-  fontSettings.theme = document.querySelector('.theme-item.active') ? document.querySelector('.theme-item.active').dataset.theme : 'github-dark';
+  const num = (id, min, max, def) => {
+    const v = parseFloat(document.getElementById(id).value);
+    if (!isFinite(v)) return def;
+    return Math.min(max, Math.max(min, v));
+  };
+  fontSettings.fontFamily = document.getElementById('font-family').value.trim() || FONT_FALLBACK;
+  fontSettings.fontSize = Math.round(num('font-size', 8, 36, 13));
+  fontSettings.lineHeight = num('line-height', 0.5, 3, 1.5);
+  fontSettings.letterSpacing = num('letter-spacing', 0, 5, 0);
+  fontSettings.fontWeight = document.getElementById('font-weight').value;
+  fontSettings.cursorStyle = document.getElementById('cursor-style').value;
+  fontSettings.cursorBlink = document.getElementById('cursor-blink').checked;
+  fontSettings.scrollback = Math.round(num('scrollback', 100, 200000, 10000));
+  fontSettings.minimumContrastRatio = num('contrast', 1, 21, 1);
+  fontSettings.copyOnSelect = document.getElementById('copy-on-select').checked;
+  fontSettings.drawBoldTextInBrightColors = document.getElementById('bold-bright').checked;
+  fontSettings.vibrancy = document.getElementById('vibrancy').checked;
+  fontSettings.windowOpacity = num('window-opacity', 0.2, 1, 1);
+  fontSettings.windowWidth = Math.round(num('window-width', 900, 3840, 1280));
+  fontSettings.windowHeight = Math.round(num('window-height', 600, 2400, 800));
+  fontSettings.theme = document.querySelector('.theme-item.active') ? document.querySelector('.theme-item.active').dataset.theme : 'abernathy';
   localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
   applyFontSettings();
   applyTheme(fontSettings.theme);
+  applyWindowLook();
+  applyWindowSize(fontSettings.windowWidth, fontSettings.windowHeight);
   hideFontSettings();
   const ses = sessions[activeSessionId];
   if (ses && ses.term) ses.term.focus();
@@ -1968,6 +2236,16 @@ function updateStatus() {
     text.textContent = '未连接';
   }
   count.textContent = `${total} 个会话`;
+
+  const filesBtn = document.getElementById('toggle-files-btn');
+  if (filesBtn) filesBtn.disabled = total === 0;
+
+  const titleSession = document.getElementById('titlebar-session');
+  if (titleSession) {
+    const active = activeSessionId ? sessions[activeSessionId] : null;
+    const svr = active ? servers.find(s => s.id === active.serverId) : null;
+    titleSession.textContent = svr ? `${svr.user}@${svr.host}` : '';
+  }
 }
 
 // ---- Utils ----
@@ -1987,7 +2265,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderServers();
   loadFontSettings();
   applyTheme(fontSettings.theme);
+  applySavedWindowPrefs();
   document.getElementById('file-hidden-btn').classList.toggle('active', showHidden);
+
+  // Window opacity slider: live preview while dragging, persisted on Apply.
+  const opacity = document.getElementById('window-opacity');
+  opacity.addEventListener('input', () => {
+    document.getElementById('opacity-value').textContent = Math.round(opacity.value * 100) + '%';
+    previewWindowLook();
+  });
+  document.getElementById('vibrancy').addEventListener('change', previewWindowLook);
+
+  // Cmd+, opens terminal settings (standard macOS preference shortcut).
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      e.preventDefault();
+      showFontSettings();
+    }
+  });
 
   const fileList = document.getElementById('file-list');
   let dragCounter = 0;
@@ -2057,6 +2352,63 @@ document.addEventListener('keydown', (e) => {
         <div class="form-group">
           <label>字距</label>
           <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>字重</label>
+          <select id="font-weight">
+            <option value="300">细体 300</option>
+            <option value="400">常规 400</option>
+            <option value="500">中等 500</option>
+            <option value="600">半粗 600</option>
+            <option value="700">粗体 700</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>光标样式</label>
+          <select id="cursor-style">
+            <option value="underline">下划线</option>
+            <option value="bar">竖线</option>
+            <option value="block">方块</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">终端</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>回滚行数</label>
+          <input type="number" id="scrollback" min="100" max="200000" step="100">
+        </div>
+        <div class="form-group">
+          <label>最小对比度</label>
+          <input type="number" id="contrast" min="1" max="21" step="0.5">
+        </div>
+      </div>
+      <div class="check-row"><span>光标闪烁</span><input type="checkbox" class="switch" id="cursor-blink"></div>
+      <div class="check-row"><span>选中文本自动复制</span><input type="checkbox" class="switch" id="copy-on-select"></div>
+      <div class="check-row"><span>粗体使用亮色</span><input type="checkbox" class="switch" id="bold-bright"></div>
+    </div>
+    <div class="section">
+      <div class="section-label">窗口</div>
+      <div class="check-row"><span>磨砂效果</span><input type="checkbox" class="switch" id="vibrancy"></div>
+      <div class="check-row">
+        <span>窗口透明度</span>
+        <span class="slider-wrap">
+          <input type="range" id="window-opacity" min="0.4" max="1" step="0.02">
+          <span class="slider-value" id="opacity-value">100%</span>
+        </span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>默认宽度</label>
+          <input type="number" id="window-width" min="900" max="3840" step="10">
+        </div>
+        <div class="form-group">
+          <label>默认高度</label>
+          <input type="number" id="window-height" min="600" max="2400" step="10">
         </div>
       </div>
     </div>

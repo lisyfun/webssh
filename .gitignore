@@ -27,3 +27,6 @@ winres/
 
 # Go build cache
 .gocache/
+
+/build/darwin/iconfile.icns
+/build/darwin/iconfile.iconset/

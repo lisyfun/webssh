@@ -1,6 +1,6 @@
 # WebSSH
 
-基于 Go + xterm.js + Wails 的原生 macOS SSH 客户端，单二进制部署，无需外部依赖。
+基于 Go + xterm.js + Wails v3 的原生桌面 SSH 客户端，单二进制部署，无需外部依赖。
 
 ## 功能
 
@@ -38,8 +38,8 @@ make run
 ### 前置条件
 
 - Go 1.26+
-- [Wails v2](https://wails.io/) CLI（可选，用于 `wails generate module`）
-- macOS（当前仅支持 macOS 构建）
+- macOS 需要 Xcode Command Line Tools（CGO + WebKit）
+- 无需安装 Wails CLI：应用直接用 `go build -tags production` 构建
 
 ```bash
 git clone <repo>
@@ -56,7 +56,14 @@ make package
 
 ## 技术栈
 
-- **后端**: Go, Wails v2, golang.org/x/crypto/ssh, pkg/sftp
+- **后端**: Go, Wails v3, golang.org/x/crypto/ssh, pkg/sftp
 - **前端**: xterm.js, CodeMirror 5（本地嵌入，无 CDN 依赖）
 - **存储**: SQLite (modernc.org/sqlite，纯 Go，无 CGO)
 - **嵌入**: go:embed，所有前端资源打进二进制
+
+## 平台说明
+
+- **macOS**: `make build` / `make package`，需要 CGO 与 `-framework UniformTypeIdentifiers`；窗口使用沉浸式标题栏（交通灯内嵌，`.icns` 图标由 `make icns` 生成）。默认外观对齐 Ghostty：Abernathy 配色 + CaskaydiaCove Nerd Font（13px，行高 1.5）
+- **Windows**: `make build-windows`
+- **Linux (GTK3)**: 需要 `webkit2gtk-4.1`（不要与 v2 时代的 `webkit2gtk-4.0` 混用），构建标签为 `production gtk3`
+- **统信 UOS V20**: 其软件源基于 Debian 10，只提供 `webkit2gtk-4.0`。Wails v3 的 GTK3 后端要求 4.1，因此原有的 buster + 4.0 打包流程需改用 Debian 11+/4.1 重新验证后再发布。

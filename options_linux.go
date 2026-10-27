@@ -5,9 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 func init() {
@@ -15,16 +13,24 @@ func init() {
 	os.Setenv("GTK_THEME_VARIANT", "dark")
 }
 
-func linuxOptions() *linux.Options {
-	return &linux.Options{
+func macOptions() application.MacOptions {
+	return application.MacOptions{}
+}
+
+func macWindowOptions() application.MacWindow {
+	return application.MacWindow{}
+}
+
+func windowsOptions() application.WindowsOptions {
+	return application.WindowsOptions{}
+}
+
+func windowsWindowOptions() application.WindowsWindow {
+	return application.WindowsWindow{}
+}
+
+func linuxOptions() application.LinuxOptions {
+	return application.LinuxOptions{
 		ProgramName: "WebSSH",
 	}
-}
-
-func macOptions() *mac.Options {
-	return nil
-}
-
-func windowsOptions() *windows.Options {
-	return nil
 }
