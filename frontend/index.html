@@ -1033,6 +1033,7 @@ function setActiveSession(sid) {
   if (ses.connected) {
     empty.style.display = 'none';
     load.style.display = 'none';
+    document.getElementById('conn-error').style.display = 'none';
     document.querySelectorAll('[id^="term-"]').forEach(el => {
       el.style.display = el.id === `term-${sid}` ? 'block' : 'none';
     });
@@ -1043,6 +1044,7 @@ function setActiveSession(sid) {
   } else if (ses.connecting) {
     empty.style.display = 'none';
     load.style.display = 'flex';
+    document.getElementById('conn-error').style.display = 'none';
     document.getElementById('loading-text').textContent = '连接中...';
     document.querySelectorAll('[id^="term-"]').forEach(el => {
       el.style.display = 'none';
@@ -1053,6 +1055,7 @@ function setActiveSession(sid) {
     document.querySelectorAll('[id^="term-"]').forEach(el => {
       el.style.display = 'none';
     });
+    renderConnError(sid);
   }
   updateStatus();
   loadFileList();
@@ -1064,11 +1067,14 @@ async function connectToServer(sid) {
   const svr = servers.find(s => s.id === ses.serverId);
   if (!svr) return;
 
-  const empty = document.getElementById('empty-state');
-  const load = document.getElementById('loading-state');
-  empty.style.display = 'none';
-  load.style.display = 'flex';
-  document.getElementById('loading-text').textContent = '连接中...';
+  // Only the visible session owns the shared empty/loading view.
+  if (sid === activeSessionId) {
+    document.getElementById('empty-state').style.display = 'none';
+    const load = document.getElementById('loading-state');
+    load.style.display = 'flex';
+    document.getElementById('loading-text').textContent = '连接中...';
+    document.getElementById('conn-error').style.display = 'none';
+  }
   renderServers();
   updateStatus();
 
@@ -1077,26 +1083,44 @@ async function connectToServer(sid) {
     ses.sessionId = sessionId;
     ses.connecting = false;
     ses.connected = true;
+    ses.lastError = null;
     initTerminal(sid);
-    load.style.display = 'none';
+    if (sid === activeSessionId) {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('conn-error').style.display = 'none';
+    }
     renderServers();
     updateStatus();
   } catch (err) {
     ses.connecting = false;
     ses.connected = false;
-    load.style.display = 'none';
-    empty.style.display = 'flex';
-    const msg = String(err && (err.message || err));
-    const errEl = document.getElementById('conn-error');
-    errEl.style.display = 'block';
-    if (msg.includes('host key mismatch')) {
-      const m = msg.match(/got (SHA256:[^\s),]+)/);
-      errEl.innerHTML = escHtml(msg) + '<br><button onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
-    } else {
-      errEl.textContent = msg;
+    ses.lastError = String(err && (err.message || err));
+    if (sid === activeSessionId) {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'flex';
+      renderConnError(sid);
     }
     renderServers();
     updateStatus();
+  }
+}
+
+// Renders the connection error for the given session into the empty state.
+function renderConnError(sid) {
+  const errEl = document.getElementById('conn-error');
+  const ses = sessions[sid];
+  const msg = ses && ses.lastError;
+  if (!msg) {
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+    return;
+  }
+  errEl.style.display = 'block';
+  if (msg.includes('host key mismatch')) {
+    const m = msg.match(/got (SHA256:[^\s),]+)/);
+    errEl.innerHTML = escHtml(msg) + '<br><button onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
+  } else {
+    errEl.textContent = msg;
   }
 }
 
@@ -1158,8 +1182,9 @@ function initTerminal(sid) {
   container.style.inset = '0';
   document.getElementById('terminal-wrapper').appendChild(container);
 
+  const visible = sid === activeSessionId;
   document.querySelectorAll('[id^="term-"]').forEach(el => {
-    el.style.display = el.id === `term-${sid}` ? 'block' : 'none';
+    el.style.display = (visible && el.id === `term-${sid}`) ? 'block' : 'none';
   });
 
   loadFontSettings();
@@ -1266,8 +1291,10 @@ function initTerminal(sid) {
   renderServers();
   renderTabs();
   updateStatus();
-  loadFileList();
-  term.focus();
+  if (sid === activeSessionId) {
+    loadFileList();
+    term.focus();
+  }
 }
 
 async function fetchServers() {
@@ -1525,7 +1552,7 @@ onWails("terminal:closed", function(ev) {
       }
       renderServers();
       updateStatus();
-      if (filePanelOpen) loadFileList();
+      if (filePanelOpen && sid === activeSessionId) loadFileList();
       break;
     }
   }
