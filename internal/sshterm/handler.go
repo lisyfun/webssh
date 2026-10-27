@@ -329,20 +329,31 @@ func HandleWebSocketWithResolver(resolve ServerResolver, decrypt DecryptFunc) ht
 			buf := make([]byte, 4096)
 			first := true
 			var inAlt atomic.Bool // full-screen apps (vi/less/top) switch to the alternate screen
+			// Strip shell-integration echoes during the first seconds of the
+			// connection (some remote rc files print them on the prompt line).
+			initFilterUntil := time.Now().Add(6 * time.Second)
 			filterCwdEcho := func(data []byte) []byte {
-				if cwdInjected {
+				if time.Now().After(initFilterUntil) {
 					return data
 				}
 				lines := strings.SplitAfter(string(data), "\n")
 				var out strings.Builder
 				for _, line := range lines {
-					if strings.Contains(line, "stty -echo") ||
+					drop := strings.Contains(line, "stty -echo") ||
 						strings.Contains(line, "stty echo") ||
 						strings.Contains(line, "PS0=") ||
 						strings.Contains(line, "PROMPT_COMMAND=") ||
 						strings.Contains(line, "chpwd_functions+=") ||
 						strings.Contains(line, "__webssh_cwd") ||
-						strings.Contains(line, "precmd_functions+=") {
+						strings.Contains(line, "precmd_functions+=") ||
+						strings.Contains(line, "_COMMAND=") ||
+						strings.Contains(line, "eval $_COMMAND")
+					if drop {
+						// Clear in place and keep the newline so prompts are not spliced.
+						out.WriteString("\r\x1b[2K")
+						if strings.HasSuffix(line, "\n") {
+							out.WriteString("\n")
+						}
 						continue
 					}
 					out.WriteString(line)

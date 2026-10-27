@@ -22,6 +22,9 @@
   --accent-hover: #3a7ae8;
   --green: #3fb950;
   --red: #ff7b72;
+  --border-subtle: color-mix(in srgb, var(--border-color) 55%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --surface-active: color-mix(in srgb, var(--text-primary) 8%, transparent);
   --sidebar-width: 240px;
   --header-height: 40px;
   --file-panel-width: 320px;
@@ -38,31 +41,31 @@ input, textarea, button { font-family: inherit; }
 .app { display: flex; flex-direction: column; height: 100vh; }
 
 .header {
-  height: var(--header-height);
-  background: var(--bg-secondary);
+  height: 42px;
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 14px;
   flex-shrink: 0;
 }
 .header h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.5px; }
 .header .spacer { flex: 1; }
 .header .toggle-files { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; transition: background .15s, color .15s; }
-.header .toggle-files:hover { background: var(--bg-hover); color: var(--text-primary); }
+.header .toggle-files:hover { background: var(--surface-hover); color: var(--text-primary); }
 .header .toggle-files.active { color: var(--accent); }
 .header .sep { width: 1px; height: 20px; background: var(--border-color); margin: 0 6px; flex-shrink: 0; }
 .header .user-group { display: flex; align-items: center; gap: 2px; }
 
 .header .toggle-sidebar { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: inline-flex; align-items: center; transition: background .15s, color .15s; margin-right: 4px; }
-.header .toggle-sidebar:hover { background: var(--bg-hover); color: var(--text-primary); }
+.header .toggle-sidebar:hover { background: var(--surface-hover); color: var(--text-primary); }
 .header .toggle-sidebar.active { color: var(--accent); }
 .body { display: flex; flex: 1; overflow: hidden; }
 
 /* Left Sidebar - Server List */
 .sidebar {
   width: var(--sidebar-width);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -72,71 +75,91 @@ input, textarea, button { font-family: inherit; }
 }
 .sidebar.collapsed { width: 0; border: none; opacity: 0; overflow: hidden; }
 .sidebar-header {
-  padding: 10px 12px;
+  padding: 12px 12px 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
 }
-.sidebar-header span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+.sidebar-header span { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.3px; line-height: 1; }
 .sidebar-header .add-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 3px; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .sidebar-header .add-btn svg { display: block; }
-.sidebar-header .add-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.server-search { padding: 6px 12px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
-.server-search input { width:100%; padding:5px 8px; background:var(--bg-primary); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; outline:none; }
-.server-search input:focus { border-color:var(--accent); }
+.sidebar-header .add-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.server-search { padding: 4px 10px 8px; flex-shrink: 0; }
+.server-search input { width:100%; padding:6px 9px; background:var(--surface-hover); border:1px solid transparent; border-radius:6px; color:var(--text-primary); font-size:12px; outline:none; transition: background .12s ease, border-color .12s ease; }
+.server-search input:focus { background:var(--bg-primary); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .server-search input::placeholder { color:var(--text-muted); }
-.server-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.server-list { flex: 1; overflow-y: auto; padding: 2px 8px 10px; }
 .server-item {
-  padding: 8px 12px;
+  position: relative;
+  padding: 7px 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-left: 3px solid transparent;
-  transition: all 0.15s;
+  gap: 9px;
+  border-radius: 6px;
+  transition: background 0.12s ease;
 }
-.server-item:hover { background: var(--bg-tertiary); }
-.server-item.active { background: var(--bg-tertiary); border-left-color: var(--accent); }
-.server-item .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.server-item:hover { background: var(--surface-hover); }
+.server-item.active { background: var(--surface-active); }
+.server-item .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .server-item .status-dot.disconnected { background: var(--text-muted); }
 .server-item .status-dot.connecting { background: #d29922; animation: pulse 1s infinite; }
 .server-item .status-dot.connected { background: var(--green); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 .server-item .server-info { flex: 1; min-width: 0; }
 .server-item .server-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.server-item .server-host { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.server-item .server-host { font-size: 10.5px; color: var(--text-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .server-item .server-tags { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
 .server-item .server-tags .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; }
 .server-item .server-tags .tag:hover { background: var(--accent); color: #fff; }
-.server-item .del-btn { opacity: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
-.server-item:hover .del-btn { opacity: 1; }
-.server-item .del-btn:hover { color: var(--red); }
+.server-item .server-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 1px; padding: 2px 3px 2px 12px; border-radius: 5px; background: var(--bg-tertiary); box-shadow: 0 1px 3px rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+.server-item:hover .server-actions { opacity: 1; pointer-events: auto; }
+.server-item .del-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
+.server-item .del-btn:hover { color: var(--text-primary); }
+.server-item .del-btn.danger:hover { color: var(--red); }
 
 /* Center - Terminal */
-.center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.tab-bar { display: flex; align-items: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border); height: 34px; flex-shrink: 0; padding: 0 8px; }
+.center { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+.tab-bar { display: flex; align-items: center; background: var(--bg-primary); border-bottom: 1px solid var(--border-color); height: 38px; flex-shrink: 0; padding: 0 14px; }
 .tab-list { display: flex; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tab-list::-webkit-scrollbar { display: none; }
-.tab { display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg-primary); border: 1px solid var(--border); border-bottom: none; cursor: pointer; font-size: 12px; white-space: nowrap; user-select: none; min-width: 0; max-width: 160px; flex-shrink: 0; overflow: hidden; }
-.tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
-.tab .tab-host { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 11px; margin-left: 2px; }
-.tab.active { background: var(--bg-secondary); border-bottom-color: var(--bg-secondary); box-shadow: inset 0 1.5px 0 var(--accent); }
-.tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; margin-left: auto; }
-.tab-close:hover { color: var(--text-primary); }
-.tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; line-height: 1; display: flex; align-items: center; flex-shrink: 0; }
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 9px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 12px; white-space: nowrap;
+  user-select: none; min-width: 0; max-width: 200px; flex-shrink: 0; overflow: hidden;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.tab:hover { background: var(--surface-hover); color: var(--text-primary); }
+.tab.active { background: var(--surface-active); border-color: var(--border-subtle); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; font-weight: 500; }
+.tab .tab-host { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 10.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; margin-left: 2px; }
+.tab-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; width: 16px; height: 16px; padding: 0; border-radius: 4px; line-height: 1; margin-left: auto; display: inline-flex; align-items: center; justify-content: center; opacity: 0.55; transition: opacity .12s ease, background .12s ease; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+.tab-close:hover { background: var(--surface-active); color: var(--text-primary); }
+.tab-refresh { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; line-height: 1; display: flex; align-items: center; flex-shrink: 0; opacity: 0; transition: opacity .12s ease, color .12s ease; }
+.tab:hover .tab-refresh, .tab.active .tab-refresh { opacity: 1; }
 .tab-refresh:hover { color: var(--accent); }
 .tab-refresh svg { width: 10px; height: 16px; }
 .terminal-wrapper { flex: 1; position: relative; overflow: hidden; }
-.terminal-wrapper .xterm { padding-left: 12px; box-sizing: border-box; }
+.terminal-wrapper .xterm { padding: 8px 8px 4px 8px; box-sizing: border-box; }
 .terminal-wrapper .empty-state {
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  color: var(--text-muted); font-size: 14px; gap: 8px;
+  color: var(--text-muted); font-size: 13px; gap: 10px;
 }
-.terminal-wrapper .empty-state .conn-error { color: var(--red); font-size: 12px; max-width: 85%; text-align: center; word-break: break-all; }
-.terminal-wrapper .empty-state .conn-error button { margin-top: 10px; padding: 6px 16px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+.terminal-wrapper .empty-state > svg { opacity: 0.22; }
+.terminal-wrapper .empty-state .conn-error { color: var(--text-muted); font-size: 12px; max-width: 86%; text-align: center; margin-top: 4px; }
+.terminal-wrapper .empty-state.has-error > svg,
+.terminal-wrapper .empty-state.has-error > div:not(.conn-error) { display: none; }
+.conn-error-title { font-size: 14px; font-weight: 600; color: var(--red); margin-bottom: 6px; }
+.conn-error-detail { font-size: 12px; color: var(--text-secondary); font-family: ui-monospace, "SF Mono", Menlo, monospace; margin-bottom: 4px; }
+.conn-error-hint { font-size: 11.5px; color: var(--text-muted); line-height: 1.6; max-width: 430px; margin: 0 auto; }
+.conn-error .retry-btn { margin-top: 14px; padding: 5px 16px; background: var(--accent); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+.conn-error .retry-btn:hover { opacity: .85; }
 .terminal-wrapper .loading-state {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -149,7 +172,7 @@ input, textarea, button { font-family: inherit; }
 /* Right - File Browser */
 .file-panel {
   width: var(--file-panel-width);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -228,18 +251,18 @@ input, textarea, button { font-family: inherit; }
 
 /* Status Bar */
 .status-bar {
-  height: 24px;
-  background: var(--bg-secondary);
+  height: 34px;
+  background: transparent;
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 10px;
   font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
-.status-bar .item { margin-right: 16px; display: flex; align-items: center; gap: 4px; }
-.status-bar .item .dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-bar .item { margin-right: 20px; display: flex; align-items: center; gap: 6px; }
+.status-bar .item .dot { width: 7px; height: 7px; border-radius: 50%; }
 .status-bar .item .dot.green { background: var(--green); }
 .status-bar .item .dot.yellow { background: #d29922; }
 .status-bar .item .dot.gray { background: var(--text-muted); }
@@ -322,6 +345,10 @@ input, textarea, button { font-family: inherit; }
   background: var(--bg-secondary); border: 1px solid var(--border-color);
   border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.4);
 }
+#settings-view { position: absolute; inset: 0; width: auto; display: none; overflow-y: auto; z-index: 5; background: var(--bg-primary); border: none; border-radius: 0; box-shadow: none; padding: 0; transform: none; max-height: none; top: 0; left: 0; }
+.settings-inner { max-width: 760px; margin: 0 auto; padding: 28px 40px 48px; }
+.settings-inner .popup-header { padding: 0 0 8px; }
+.settings-inner .popup-body { padding: 12px 0 0; }
 .font-popup .popup-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 20px 0;
@@ -348,6 +375,15 @@ input, textarea, button { font-family: inherit; }
 .font-popup .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; }
 .font-popup .form-group input { width: 100%; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color .15s, box-shadow .15s; }
 .font-popup .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,140,255,0.12); }
+.font-popup .form-group select { width: 100%; height: 30px; padding: 0 10px; box-sizing: border-box; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; outline: none; }
+.font-popup .form-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,140,255,0.12); }
+.font-popup .form-group input[type="text"], .font-popup .form-group input[type="number"] { height: 30px; box-sizing: border-box; line-height: 28px; }
+.font-popup .size-btn { height: 30px; padding: 0 10px; box-sizing: border-box; }
+.font-popup .check-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); padding: 5px 0; }
+.font-popup .switch { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 10px; background: var(--bg-hover); position: relative; cursor: pointer; border: none; transition: background .15s; flex-shrink: 0; }
+.font-popup .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.font-popup .switch:checked { background: var(--accent); }
+.font-popup .switch:checked::after { transform: translateX(14px); }
 .font-popup .form-row { display: flex; gap: 10px; }
 .font-popup .form-row .form-group { flex: 1; }
 .font-popup .form-row .form-group.half { flex: 0 0 70px; }
@@ -444,6 +480,92 @@ input, textarea, button { font-family: inherit; }
           <span id="loading-text">连接中...</span>
         </div>
         <div id="terminal-container"></div>
+      </div>
+      <div id="settings-view" class="font-popup" style="display:none">
+        <div class="settings-inner">
+<div class="popup-header">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> 终端设置</h2>
+    <button class="close-btn" onclick="hideFontSettings()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="popup-body">
+    <div class="section">
+      <div class="section-label">字体</div>
+      <div class="form-group">
+        <label>字体系列</label>
+        <select id="font-family"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>大小</label>
+          <div class="size-group">
+            <button class="size-btn" onclick="adjFontSize(-1)">−</button>
+            <input type="number" id="font-size" min="8" max="36" step="1">
+            <button class="size-btn" onclick="adjFontSize(1)">+</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>行高</label>
+          <input type="number" id="line-height" min="0.5" max="3" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>字距</label>
+          <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>字重</label>
+          <select id="font-weight">
+            <option value="300">细体 300</option>
+            <option value="400">常规 400</option>
+            <option value="500">中等 500</option>
+            <option value="600">半粗 600</option>
+            <option value="700">粗体 700</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>光标样式</label>
+          <select id="cursor-style">
+            <option value="underline">下划线</option>
+            <option value="bar">竖线</option>
+            <option value="block">方块</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">终端</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>回滚行数</label>
+          <input type="number" id="scrollback" min="100" max="200000" step="100">
+        </div>
+        <div class="form-group">
+          <label>最小对比度</label>
+          <input type="number" id="contrast" min="1" max="21" step="0.5">
+        </div>
+      </div>
+      <div class="check-row"><span>光标闪烁</span><input type="checkbox" class="switch" id="cursor-blink"></div>
+      <div class="check-row"><span>选中文本自动复制</span><input type="checkbox" class="switch" id="copy-on-select"></div>
+      <div class="check-row"><span>粗体使用亮色</span><input type="checkbox" class="switch" id="bold-bright"></div>
+    </div>
+    <div class="section">
+      <div class="section-label">主题</div>
+      <div class="theme-dropdown">
+        <div class="theme-trigger" id="theme-trigger" onclick="toggleThemeMenu()">
+          <div class="theme-swatch" id="theme-swatch"></div>
+          <span class="theme-name" id="theme-name">GitHub Dark</span>
+          <span class="arrow">▾</span>
+        </div>
+        <div class="theme-menu" id="theme-menu"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
+      <button class="btn-apply" onclick="saveFontSettings()">应用</button>
+    </div>
+  </div>
+        </div>
       </div>
     </div>
 
@@ -655,57 +777,6 @@ input, textarea, button { font-family: inherit; }
 <input type="file" id="file-input" style="display:none" multiple onchange="fileUploadDo(this)">
 <div class="toast" id="toast"></div>
 
-<!-- Settings Overlay -->
-<div class="settings-overlay" id="settings-overlay" style="display:none" onclick="hideFontSettings()"></div>
-
-<!-- Terminal Settings Popup -->
-<div id="font-popup" class="font-popup" style="display:none">
-  <div class="popup-header">
-    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> 终端设置</h2>
-    <button class="close-btn" onclick="hideFontSettings()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-  </div>
-  <div class="popup-body">
-    <div class="section">
-      <div class="section-label">字体</div>
-      <div class="form-group">
-        <label>字体系列</label>
-        <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>大小</label>
-          <div class="size-group">
-            <button class="size-btn" onclick="adjFontSize(-1)">−</button>
-            <input type="number" id="font-size" min="8" max="36" step="1">
-            <button class="size-btn" onclick="adjFontSize(1)">+</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>行高</label>
-          <input type="number" id="line-height" min="0.5" max="3" step="0.1">
-        </div>
-        <div class="form-group">
-          <label>字距</label>
-          <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-label">主题</div>
-      <div class="theme-dropdown">
-        <div class="theme-trigger" id="theme-trigger" onclick="toggleThemeMenu()">
-          <div class="theme-swatch" id="theme-swatch"></div>
-          <span class="theme-name" id="theme-name">GitHub Dark</span>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="theme-menu" id="theme-menu"></div>
-      </div>
-    </div>
-    <div class="actions">
-      <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
-      <button class="btn-apply" onclick="saveFontSettings()">应用</button>
-    </div>
-  </div>
 <script src="lib/xterm.min.js"></script>
 <script src="lib/xterm-addon-fit.min.js"></script>
 <script src="lib/codemirror.min.js"></script>
@@ -732,6 +803,7 @@ let servers = [];
 let editingId = null;
 let sessions = {};          // sid -> { serverId, ws, term, fitAddon, connected, fsPath, info }
 let activeSessionId = null;
+let settingsOpen = false;
 let filePanelOpen = false;
 let sidebarOpen = true;
 let sessionKey = null;
@@ -819,10 +891,12 @@ function renderServers() {
         <div class="server-host">${escHtml(s.user)}@${escHtml(s.host)}:${s.port}</div>
         ${tags.length ? '<div class="server-tags">'+tags.map(t=>'<span class="tag" onclick="event.stopPropagation();filterTag(\''+escJsStr(t)+'\')">'+escHtml(t)+'</span>').join('')+'</div>' : ''}
       </div>
-      <button class="del-btn" onclick="event.stopPropagation();openNewTerminal('${s.id}')" title="新建终端"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
-      <button class="del-btn" onclick="event.stopPropagation();editServer('${s.id}')" title="编辑">&#x270E;</button>
-      <button class="del-btn" onclick="event.stopPropagation();copyServer('${s.id}')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-      <button class="del-btn" onclick="event.stopPropagation();deleteServer('${s.id}')" title="删除">&times;</button>
+      <div class="server-actions">
+        <button class="del-btn" onclick="event.stopPropagation();openNewTerminal('${s.id}')" title="新建终端"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+        <button class="del-btn" onclick="event.stopPropagation();editServer('${s.id}')" title="编辑">&#x270E;</button>
+        <button class="del-btn" onclick="event.stopPropagation();copyServer('${s.id}')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <button class="del-btn danger" onclick="event.stopPropagation();deleteServer('${s.id}')" title="删除">&times;</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -856,6 +930,11 @@ function duplicateSession(sid) {
 
 function switchSession(sid) {
   if (!sessions[sid]) return;
+  if (settingsOpen) {
+    settingsOpen = false;
+    document.getElementById('settings-view').style.display = 'none';
+    document.getElementById('terminal-wrapper').style.display = '';
+  }
   activeSessionId = sid;
   renderServers();
   renderTabs();
@@ -916,14 +995,14 @@ function renderTabs() {
   const bar = document.getElementById('tab-bar');
   const list = document.getElementById('tab-list');
   const sids = Object.keys(sessions);
-  if (sids.length === 0) { bar.style.display = 'none'; return; }
+  if (sids.length === 0 && !settingsOpen) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
-  list.innerHTML = sids.map(sid => {
+  let html = sids.map(sid => {
     const ses = sessions[sid];
     const svr = servers.find(s => s.id === ses.serverId);
     const name = svr ? (svr.name || svr.host) : '?';
     const host = svr ? `${svr.user}@${svr.host}:${svr.port}` : '?';
-    const active = sid === activeSessionId ? ' active' : '';
+    const active = (!settingsOpen && sid === activeSessionId) ? ' active' : '';
     return `<div class="tab${active}" onclick="switchSession('${sid}')" ondblclick="duplicateSession('${sid}')">
       <span class="tab-name">${escHtml(name)}</span>
       <span class="tab-host">${escHtml(host)}</span>
@@ -931,6 +1010,13 @@ function renderTabs() {
       <button class="tab-close" onclick="event.stopPropagation();closeSession('${sid}')">&times;</button>
     </div>`;
   }).join('');
+  if (settingsOpen) {
+    html += `<div class="tab active" onclick="showSettingsView()">
+      <span class="tab-name">设置</span>
+      <button class="tab-close" onclick="event.stopPropagation();hideFontSettings()">&times;</button>
+    </div>`;
+  }
+  list.innerHTML = html;
 }
 
 function setActiveSession(sid) {
@@ -941,6 +1027,7 @@ function setActiveSession(sid) {
   if (ses.connected) {
     empty.style.display = 'none';
     load.style.display = 'none';
+    document.getElementById('conn-error').style.display = 'none';
     document.querySelectorAll('[id^="term-"]').forEach(el => {
       el.style.display = el.id === `term-${sid}` ? 'block' : 'none';
     });
@@ -962,6 +1049,7 @@ function setActiveSession(sid) {
     document.querySelectorAll('[id^="term-"]').forEach(el => {
       el.style.display = 'none';
     });
+    renderConnError(sid);
   }
   updateStatus();
   loadFileList();
@@ -977,9 +1065,12 @@ function connectToServer(sid, passphrase) {
 
   const empty = document.getElementById('empty-state');
   const load = document.getElementById('loading-state');
-  empty.style.display = 'none';
-  load.style.display = 'flex';
-  document.getElementById('loading-text').textContent = '连接中...';
+  if (sid === activeSessionId) {
+    empty.style.display = 'none';
+    load.style.display = 'flex';
+    document.getElementById('loading-text').textContent = '连接中...';
+    document.getElementById('conn-error').style.display = 'none';
+  }
 
   renderServers();
   updateStatus();
@@ -1028,17 +1119,13 @@ function connectToServer(sid, passphrase) {
     } else {
       const msg = evt.data;
       if (typeof msg === 'string' && (msg.startsWith('SSH connection failed') || msg.startsWith('SSH session failed'))) {
-        load.style.display = 'none';
-        empty.style.display = 'flex';
-        const errEl = document.getElementById('conn-error');
-        errEl.style.display = 'block';
-        if (msg.includes('host key mismatch')) {
-          errEl.innerHTML = escHtml(msg) + '<br><button onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
-        } else {
-          errEl.textContent = msg;
-        }
         const s = sessions[sid];
-        if (s) { s.connected = false; }
+        if (s) { s.connected = false; s.lastError = msg; }
+        if (sid === activeSessionId) {
+          document.getElementById('loading-state').style.display = 'none';
+          empty.style.display = 'flex';
+          renderConnError(sid);
+        }
         renderServers();
         updateStatus();
         if (msg.includes('私钥已加密') || msg.toLowerCase().includes('passphrase')) {
@@ -1122,19 +1209,35 @@ function initTerminal(sid) {
 
   loadFontSettings();
   const term = new Terminal({
-    cursorBlink: true,
-    cursorStyle: 'bar',
+    cursorBlink: fontSettings.cursorBlink !== false,
+    cursorStyle: fontSettings.cursorStyle || 'underline',
+    fontWeight: fontSettings.fontWeight || '400',
     fontSize: fontSettings.fontSize || 13,
-    fontFamily: fontSettings.fontFamily || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace",
-    letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0.5,
-    lineHeight: fontSettings.lineHeight || 1.3,
-    theme: (themes[fontSettings.theme] || themes['github-dark']).xterm,
+    fontFamily: cssFontFamily(),
+    letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0,
+    lineHeight: fontSettings.lineHeight || 1.5,
+    scrollback: fontSettings.scrollback || 10000,
+    minimumContrastRatio: fontSettings.minimumContrastRatio || 1,
+    theme: terminalTheme(),
     allowTransparency: true,
-    drawBoldTextInBrightColors: false,
+    drawBoldTextInBrightColors: !!fontSettings.drawBoldTextInBrightColors,
   });
 
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
+
+  // Optional copy-on-select
+  term.onSelectionChange(() => {
+    if (!fontSettings.copyOnSelect) return;
+    const text = term.getSelection();
+    if (!text) return;
+    const ses = sessions[sid];
+    if (!ses) return;
+    clearTimeout(ses._copyTimer);
+    ses._copyTimer = setTimeout(() => {
+      if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+    }, 150);
+  });
 
   // OSC 7 — CWD tracking (industry standard, used by VS Code/iTerm2)
   if (term.parser && term.parser.registerOscHandler) {
@@ -1533,6 +1636,7 @@ function changePassword() {
 
 // ---- Terminal Font Settings ----
 var themeMeta = {
+  'abernathy': { name: 'Abernathy', desc: 'Ghostty 同款暗色', bg: '#111416', accent: '#1093f5', fg: '#eeeeec' },
   'github-dark': { name: 'GitHub Dark', desc: '经典 GitHub 暗色', bg: '#0d1117', accent: '#4a8cff', fg: '#e6edf3' },
   'catppuccin-mocha': { name: 'Catppuccin Mocha', desc: '热门暖紫暗色', bg: '#1e1e2e', accent: '#89b4fa', fg: '#cdd6f4' },
   'one-dark': { name: 'One Dark', desc: 'Atom 编辑器经典', bg: '#282c34', accent: '#61afef', fg: '#abb2bf' },
@@ -1547,6 +1651,23 @@ var themeMeta = {
 };
 
 var themes = {
+  'abernathy': {
+    css: {
+      '--bg-primary': '#111416', '--bg-secondary': '#15191c', '--bg-tertiary': '#1c2125',
+      '--bg-hover': '#242a2f', '--border': '#2a3035', '--border-color': '#2a3035',
+      '--text-primary': '#eeeeec', '--text-secondary': '#a9adae', '--text-muted': '#6f7679',
+      '--accent': '#1093f5', '--accent-hover': '#11b5f6', '--green': '#00cd00', '--red': '#ff4d4d',
+    },
+    xterm: {
+      background: '#111416', foreground: '#eeeeec', cursor: '#bbbbbb', cursorAccent: '#ffffff',
+      selectionBackground: '#eeeeec', selectionForeground: '#333333',
+      black: '#000000', red: '#cd0000', green: '#00cd00', yellow: '#cdcd00',
+      blue: '#1093f5', magenta: '#cd00cd', cyan: '#00cdcd', white: '#faebd7',
+      brightBlack: '#404040', brightRed: '#ff0000', brightGreen: '#00ff00',
+      brightYellow: '#ffff00', brightBlue: '#11b5f6', brightMagenta: '#ff00ff',
+      brightCyan: '#00ffff', brightWhite: '#ffffff',
+    },
+  },
   'github-dark': {
     css: {
       '--bg-primary': '#0d1117', '--bg-secondary': '#161b22', '--bg-tertiary': '#21262d',
@@ -1738,12 +1859,83 @@ var themes = {
 
 var fontSettings = {};
 
+const FONT_FALLBACK = "'CaskaydiaCove Nerd Font', 'JetBrains Mono', 'SF Mono', Menlo, monospace";
+const OLD_FONT_FALLBACK = "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace";
+const FONT_DEFAULTS = {
+  fontFamily: FONT_FALLBACK, fontSize: 13, lineHeight: 1.5, letterSpacing: 0,
+  fontWeight: '400', cursorStyle: 'underline', cursorBlink: true,
+  scrollback: 10000, minimumContrastRatio: 1,
+  drawBoldTextInBrightColors: false, copyOnSelect: false,
+  theme: 'abernathy',
+};
+
+// The browser cannot enumerate system fonts; probe a curated list instead.
+const FONT_CANDIDATES = [
+  'CaskaydiaCove Nerd Font', 'CaskaydiaCove Nerd Font Mono', 'JetBrains Mono',
+  'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'Cascadia Code', 'Fira Code',
+  'Source Code Pro', 'IBM Plex Mono', 'Hack', 'Ubuntu Mono', 'DejaVu Sans Mono',
+  'Courier New', 'monospace',
+];
+
+function primaryFontFamily(v) {
+  if (!v) return '';
+  return v.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+}
+
+function cssFontFamily() {
+  const f = fontSettings.fontFamily;
+  if (!f) return FONT_FALLBACK;
+  if (f.includes(',')) return f;
+  return `'${f.replace(/'/g, '')}', monospace`;
+}
+
+function terminalTheme(name) {
+  const key = name || fontSettings.theme;
+  return (themes[key] || themes['abernathy']).xterm;
+}
+
+function refreshTermThemes() {
+  Object.values(sessions).forEach(function(s) {
+    if (s.term) s.term.options.theme = terminalTheme();
+  });
+}
+
+function populateFontSelect() {
+  const sel = document.getElementById('font-family');
+  const current = primaryFontFamily(fontSettings.fontFamily);
+  sel.innerHTML = '';
+  const seen = new Set();
+  const add = (family) => {
+    if (!family || seen.has(family)) return;
+    seen.add(family);
+    const o = document.createElement('option');
+    o.value = family;
+    o.textContent = family;
+    sel.appendChild(o);
+  };
+  FONT_CANDIDATES.forEach((f) => {
+    let ok = true;
+    try { ok = document.fonts.check(`13px "${f}"`); } catch (_) {}
+    if (ok) add(f);
+  });
+  add(current);
+  add('monospace');
+  if (current) sel.value = current;
+}
+
 function loadFontSettings() {
   try {
     fontSettings = JSON.parse(localStorage.getItem('webssh-font') || '{}');
   } catch (_) { fontSettings = {}; }
-  const def = { fontFamily: "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace", fontSize: 13, lineHeight: 1.3, letterSpacing: 0.5, theme: 'github-dark' };
-  Object.keys(def).forEach(k => { if (fontSettings[k] == null) fontSettings[k] = def[k]; });
+  if (!localStorage.getItem('webssh-style-v2')) {
+    if (fontSettings.theme === 'github-dark') fontSettings.theme = 'abernathy';
+    if (fontSettings.fontFamily === OLD_FONT_FALLBACK) fontSettings.fontFamily = FONT_FALLBACK;
+    if (fontSettings.lineHeight === 1.3) fontSettings.lineHeight = 1.5;
+    if (fontSettings.letterSpacing === 0.5) fontSettings.letterSpacing = 0;
+    localStorage.setItem('webssh-style-v2', '1');
+    localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
+  }
+  Object.keys(FONT_DEFAULTS).forEach(k => { if (fontSettings[k] == null) fontSettings[k] = FONT_DEFAULTS[k]; });
 }
 
 function applyTheme(name) {
@@ -1754,7 +1946,7 @@ function applyTheme(name) {
   // Apply to all xterm terminals
   Object.values(sessions).forEach(s => {
     if (s.term) {
-      s.term.options.theme = t.xterm;
+      s.term.options.theme = terminalTheme(name);
     }
   });
 }
@@ -1762,10 +1954,18 @@ function applyTheme(name) {
 function applyFontSettings() {
   Object.values(sessions).forEach(s => {
     if (s.term) {
-      s.term.options.fontFamily = fontSettings.fontFamily;
+      s.term.options.fontFamily = cssFontFamily();
       s.term.options.fontSize = fontSettings.fontSize;
       s.term.options.lineHeight = fontSettings.lineHeight;
       s.term.options.letterSpacing = fontSettings.letterSpacing;
+      s.term.options.fontWeight = fontSettings.fontWeight;
+      s.term.options.cursorStyle = fontSettings.cursorStyle;
+      s.term.options.cursorBlink = fontSettings.cursorBlink !== false;
+      s.term.options.drawBoldTextInBrightColors = !!fontSettings.drawBoldTextInBrightColors;
+      s.term.options.minimumContrastRatio = fontSettings.minimumContrastRatio || 1;
+      if (fontSettings.scrollback && s.term.options.scrollback !== fontSettings.scrollback) {
+        s.term.options.scrollback = fontSettings.scrollback;
+      }
     }
   });
 }
@@ -1809,23 +2009,45 @@ function toggleThemeMenu() {
   document.getElementById('theme-trigger').classList.toggle('open', menu.classList.contains('open'));
 }
 
+function showSettingsView() {
+  settingsOpen = true;
+  document.getElementById('terminal-wrapper').style.display = 'none';
+  document.getElementById('settings-view').style.display = 'block';
+  renderTabs();
+  updateStatus();
+}
+
 function showFontSettings() {
   loadFontSettings();
-  document.getElementById('font-family').value = fontSettings.fontFamily;
+  populateFontSelect();
   document.getElementById('font-size').value = fontSettings.fontSize;
   document.getElementById('line-height').value = fontSettings.lineHeight;
   document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
-  renderThemePicker(fontSettings.theme || 'github-dark');
-  document.getElementById('font-popup').style.display = 'block';
-  document.getElementById('settings-overlay').style.display = 'block';
+  document.getElementById('font-weight').value = fontSettings.fontWeight;
+  document.getElementById('cursor-style').value = fontSettings.cursorStyle;
+  document.getElementById('cursor-blink').checked = fontSettings.cursorBlink !== false;
+  document.getElementById('scrollback').value = fontSettings.scrollback;
+  document.getElementById('contrast').value = fontSettings.minimumContrastRatio;
+  document.getElementById('copy-on-select').checked = !!fontSettings.copyOnSelect;
+  document.getElementById('bold-bright').checked = !!fontSettings.drawBoldTextInBrightColors;
+  renderThemePicker(fontSettings.theme || 'abernathy');
+  showSettingsView();
 }
-
 
 function hideFontSettings() {
   document.getElementById('theme-menu').classList.remove('open');
   document.getElementById('theme-trigger').classList.remove('open');
-  document.getElementById('font-popup').style.display = 'none';
-  document.getElementById('settings-overlay').style.display = 'none';
+  settingsOpen = false;
+  document.getElementById('settings-view').style.display = 'none';
+  document.getElementById('terminal-wrapper').style.display = '';
+  renderTabs();
+  if (activeSessionId && sessions[activeSessionId]) {
+    setActiveSession(activeSessionId);
+  } else {
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('loading-state').style.display = 'none';
+  }
+  updateStatus();
 }
 function adjFontSize(delta) {
   const inp = document.getElementById('font-size');
@@ -1836,16 +2058,80 @@ function adjFontSize(delta) {
 }
 
 function saveFontSettings() {
-  fontSettings.fontFamily = document.getElementById('font-family').value.trim() || "'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace";
-  fontSettings.fontSize = parseInt(document.getElementById('font-size').value) || 13;
-  fontSettings.lineHeight = parseFloat(document.getElementById('line-height').value) || 1.3;
-  fontSettings.letterSpacing = parseFloat(document.getElementById('letter-spacing').value) || 0.5;
-  fontSettings.theme = document.querySelector('.theme-item.active') ? document.querySelector('.theme-item.active').dataset.theme : 'github-dark';
+  const num = (id, min, max, def) => {
+    const v = parseFloat(document.getElementById(id).value);
+    if (!isFinite(v)) return def;
+    return Math.min(max, Math.max(min, v));
+  };
+  fontSettings.fontFamily = document.getElementById('font-family').value || primaryFontFamily(FONT_FALLBACK);
+  fontSettings.fontSize = Math.round(num('font-size', 8, 36, 13));
+  fontSettings.lineHeight = num('line-height', 0.5, 3, 1.5);
+  fontSettings.letterSpacing = num('letter-spacing', 0, 5, 0);
+  fontSettings.fontWeight = document.getElementById('font-weight').value;
+  fontSettings.cursorStyle = document.getElementById('cursor-style').value;
+  fontSettings.cursorBlink = document.getElementById('cursor-blink').checked;
+  fontSettings.scrollback = Math.round(num('scrollback', 100, 200000, 10000));
+  fontSettings.minimumContrastRatio = num('contrast', 1, 21, 1);
+  fontSettings.copyOnSelect = document.getElementById('copy-on-select').checked;
+  fontSettings.drawBoldTextInBrightColors = document.getElementById('bold-bright').checked;
+  fontSettings.theme = document.querySelector('.theme-item.active') ? document.querySelector('.theme-item.active').dataset.theme : 'abernathy';
   localStorage.setItem('webssh-font', JSON.stringify(fontSettings));
   applyFontSettings();
   applyTheme(fontSettings.theme);
-  hideFontSettings();
+  refreshTermThemes();
   showToast('终端显示设置已应用', 'success');
+}
+
+// Raw SSH errors turned into a short, friendly card.
+function describeConnectError(msg, svr) {
+  const lower = msg.toLowerCase();
+  const target = svr ? `${svr.user}@${svr.host}:${svr.port}` : '';
+  if (lower.includes('i/o timeout') || lower.includes('timed out') || lower.includes('timeout')) {
+    return { title: '连接超时', detail: target, hint: '目标主机没有响应，请检查地址与端口是否正确，或服务器防火墙是否放行。' };
+  }
+  if (lower.includes('connection refused')) {
+    return { title: '连接被拒绝', detail: target, hint: '端口已关闭或被防火墙拦截，请确认 SSH 服务正在运行。' };
+  }
+  if (lower.includes('no route to host') || lower.includes('network is unreachable')) {
+    return { title: '网络不可达', detail: target, hint: '当前网络无法访问该地址，请检查网络与路由。' };
+  }
+  if (lower.includes('no such host') || lower.includes('name or service not known') || lower.includes('lookup')) {
+    return { title: '主机名解析失败', detail: target, hint: '无法解析该主机名，请检查拼写或 DNS 设置。' };
+  }
+  if (lower.includes('permission denied') || lower.includes('unable to authenticate') || lower.includes('no supported methods')) {
+    return { title: '认证失败', detail: target, hint: '请检查用户名、密码或私钥是否正确。' };
+  }
+  if (lower.includes('connection reset') || lower.includes('unexpected eof') || lower.includes('broken pipe')) {
+    return { title: '连接被断开', detail: target, hint: '服务器提前关闭了连接，请稍后重试。' };
+  }
+  return { title: '连接失败', detail: target, hint: msg.replace(/^SSH (connection|session) failed:\s*/i, '') };
+}
+
+function renderConnError(sid) {
+  const errEl = document.getElementById('conn-error');
+  const empty = document.getElementById('empty-state');
+  const ses = sessions[sid];
+  const msg = ses && ses.lastError;
+  if (!msg) {
+    errEl.style.display = 'none';
+    errEl.innerHTML = '';
+    empty.classList.remove('has-error');
+    return;
+  }
+  errEl.style.display = 'block';
+  empty.classList.add('has-error');
+  const svr = ses ? servers.find(s => s.id === ses.serverId) : null;
+  if (msg.includes('host key mismatch')) {
+    errEl.innerHTML = '<div class="conn-error-title">主机密钥已变更</div>' +
+      '<div class="conn-error-detail">' + escHtml(svr ? svr.host : '') + '</div>' +
+      '<div class="conn-error-hint">这不是预期的服务器密钥。确认可信后再信任新密钥。</div>' +
+      '<button class="retry-btn" onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
+    return;
+  }
+  const info = describeConnectError(msg, svr);
+  errEl.innerHTML = '<div class="conn-error-title">' + escHtml(info.title) + '</div>' +
+    (info.detail ? '<div class="conn-error-detail">' + escHtml(info.detail) + '</div>' : '') +
+    '<div class="conn-error-hint">' + escHtml(info.hint) + '</div>';
 }
 
 function showConfirm(msg, onOk) {
@@ -2675,12 +2961,13 @@ function updateStatus() {
   const text = document.getElementById('status-text');
   const count = document.getElementById('session-count');
   const connected = Object.values(sessions).filter(s => s.connected).length;
+  const connecting = Object.values(sessions).filter(s => s.connecting || (s.ws && s.ws.readyState <= 1)).length;
   const total = Object.keys(sessions).length;
 
   if (connected > 0) {
     dot.className = 'dot green';
     text.textContent = `已连接 ${connected} 个`;
-  } else if (total > 0) {
+  } else if (connecting > 0) {
     dot.className = 'dot yellow';
     text.textContent = '连接中...';
   } else {
@@ -2730,9 +3017,6 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('click', (e) => {
-  const fp = document.getElementById('font-popup');
-  if (fp.style.display !== 'none' && !fp.contains(e.target) && !e.target.closest('[onclick*="showFontSettings"]'))
-    hideFontSettings();
   const cp = document.getElementById('change-pwd-popup');
   if (cp.style.display !== 'none' && !cp.contains(e.target) && !e.target.closest('[onclick*="showChangePwd"]'))
     hideChangePwd();
