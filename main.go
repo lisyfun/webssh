@@ -320,7 +320,8 @@ func main() {
 	}
 }
 func generateSecret() string {
-	b := make([]byte, 16)
+	// 6 bytes -> 12 hex chars: short enough to share, still ~2.8e14 possibilities.
+	b := make([]byte, 6)
 	if _, err := crand.Read(b); err != nil {
 		log.Fatal("failed to generate random path:", err)
 	}
