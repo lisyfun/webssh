@@ -130,7 +130,14 @@ body.vibrancy #settings-view select { background: color-mix(in srgb, var(--bg-pr
 .terminal-wrapper .xterm { padding: 8px 8px 4px 8px; box-sizing: border-box; }
 .terminal-wrapper .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; gap: 10px; }
 .terminal-wrapper .empty-state > svg { opacity: 0.22; }
-.terminal-wrapper .empty-state .conn-error { color: var(--red); font-size: 12px; max-width: 85%; text-align: center; word-break: break-all; }
+.terminal-wrapper .empty-state .conn-error { color: var(--text-muted); font-size: 12px; max-width: 86%; text-align: center; margin-top: 4px; }
+.terminal-wrapper .empty-state.has-error > svg,
+.terminal-wrapper .empty-state.has-error > div:not(.conn-error) { display: none; }
+.conn-error-title { font-size: 14px; font-weight: 600; color: var(--red); margin-bottom: 6px; }
+.conn-error-detail { font-size: 12px; color: var(--text-secondary); font-family: ui-monospace, "SF Mono", Menlo, monospace; margin-bottom: 4px; }
+.conn-error-hint { font-size: 11.5px; color: var(--text-muted); line-height: 1.6; max-width: 430px; margin: 0 auto; }
+.conn-error .retry-btn { margin-top: 14px; padding: 5px 16px; background: var(--accent); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+.conn-error .retry-btn:hover { opacity: .85; }
 .terminal-wrapper .empty-state .conn-error button { margin-top: 10px; padding: 6px 16px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .terminal-wrapper .loading-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 13px; gap: 8px; }
 .terminal-wrapper .loading-state .spinner { width: 16px; height: 16px; border: 2px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -1105,23 +1112,57 @@ async function connectToServer(sid) {
   }
 }
 
+// Turns raw SSH/network errors into a short, friendly card.
+function describeConnectError(msg, svr) {
+  const lower = msg.toLowerCase();
+  const target = svr ? `${svr.user}@${svr.host}:${svr.port}` : '';
+  if (lower.includes('i/o timeout') || lower.includes('timed out') || lower.includes('timeout')) {
+    return { title: '连接超时', detail: target, hint: '目标主机没有响应，请检查地址与端口是否正确，或服务器防火墙是否放行。' };
+  }
+  if (lower.includes('connection refused')) {
+    return { title: '连接被拒绝', detail: target, hint: '端口已关闭或被防火墙拦截，请确认 SSH 服务正在运行。' };
+  }
+  if (lower.includes('no route to host') || lower.includes('network is unreachable')) {
+    return { title: '网络不可达', detail: target, hint: '当前网络无法访问该地址，请检查网络与路由。' };
+  }
+  if (lower.includes('no such host') || lower.includes('name or service not known') || lower.includes('lookup')) {
+    return { title: '主机名解析失败', detail: target, hint: '无法解析该主机名，请检查拼写或 DNS 设置。' };
+  }
+  if (lower.includes('permission denied') || lower.includes('unable to authenticate') || lower.includes('no supported methods')) {
+    return { title: '认证失败', detail: target, hint: '请检查用户名、密码或私钥是否正确。' };
+  }
+  if (lower.includes('connection reset') || lower.includes('unexpected eof') || lower.includes('broken pipe')) {
+    return { title: '连接被断开', detail: target, hint: '服务器提前关闭了连接，请稍后重试。' };
+  }
+  return { title: '连接失败', detail: target, hint: msg.replace(/^SSH dial failed:\s*/i, '') };
+}
+
 // Renders the connection error for the given session into the empty state.
 function renderConnError(sid) {
   const errEl = document.getElementById('conn-error');
+  const empty = document.getElementById('empty-state');
   const ses = sessions[sid];
   const msg = ses && ses.lastError;
   if (!msg) {
     errEl.style.display = 'none';
-    errEl.textContent = '';
+    errEl.innerHTML = '';
+    empty.classList.remove('has-error');
     return;
   }
   errEl.style.display = 'block';
+  empty.classList.add('has-error');
+  const svr = ses ? servers.find(s => s.id === ses.serverId) : null;
   if (msg.includes('host key mismatch')) {
-    const m = msg.match(/got (SHA256:[^\s),]+)/);
-    errEl.innerHTML = escHtml(msg) + '<br><button onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
-  } else {
-    errEl.textContent = msg;
+    errEl.innerHTML = '<div class="conn-error-title">主机密钥已变更</div>' +
+      '<div class="conn-error-detail">' + escHtml(svr ? svr.host : '') + '</div>' +
+      '<div class="conn-error-hint">这不是预期的服务器密钥。确认可信后再信任新密钥。</div>' +
+      '<button class="retry-btn" onclick="trustAndReconnect(\'' + escJsStr(sid) + '\')">信任新密钥并重连</button>';
+    return;
   }
+  const info = describeConnectError(msg, svr);
+  errEl.innerHTML = '<div class="conn-error-title">' + escHtml(info.title) + '</div>' +
+    (info.detail ? '<div class="conn-error-detail">' + escHtml(info.detail) + '</div>' : '') +
+    '<div class="conn-error-hint">' + escHtml(info.hint) + '</div>';
 }
 
 async function trustAndReconnect(sid) {
@@ -2455,12 +2496,13 @@ function updateStatus() {
   const text = document.getElementById('status-text');
   const count = document.getElementById('session-count');
   const connected = Object.values(sessions).filter(s => s.connected).length;
+  const connecting = Object.values(sessions).filter(s => s.connecting).length;
   const total = Object.keys(sessions).length;
 
   if (connected > 0) {
     dot.className = 'dot green';
     text.textContent = `已连接 ${connected} 个`;
-  } else if (total > 0) {
+  } else if (connecting > 0) {
     dot.className = 'dot yellow';
     text.textContent = '连接中...';
   } else {
