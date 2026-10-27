@@ -87,7 +87,10 @@ body.platform-mac .topbar { padding-left: 80px; }
 .server-item .del-btn:hover { color: var(--red); }
 .center { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 #settings-view { position: absolute; inset: 0; width: auto; display: none; overflow-y: auto; z-index: 5; background: var(--bg-primary); border: none; border-radius: 0; box-shadow: none; padding: 0; transform: none; max-height: none; }
-body.vibrancy #settings-view { background: var(--window-tint, transparent); }
+body.vibrancy #settings-view { background: transparent; }
+body.vibrancy #settings-view .form-group input[type="text"],
+body.vibrancy #settings-view .form-group input[type="number"],
+body.vibrancy #settings-view select { background: color-mix(in srgb, var(--bg-primary) 72%, transparent); }
 .settings-inner { max-width: 760px; margin: 0 auto; padding: 28px 40px 48px; }
 .settings-inner .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .topbar .tab-bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
@@ -344,7 +347,7 @@ body.vibrancy .xterm-screen { background-color: transparent !important; }
       <div class="section-label">字体</div>
       <div class="form-group">
         <label>字体系列</label>
-        <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
+        <select id="font-family"></select>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1155,7 +1158,7 @@ function initTerminal(sid) {
     cursorStyle: fontSettings.cursorStyle || 'underline',
     fontWeight: fontSettings.fontWeight || '400',
     fontSize: fontSettings.fontSize || 13,
-    fontFamily: fontSettings.fontFamily || FONT_FALLBACK,
+    fontFamily: cssFontFamily(),
     letterSpacing: fontSettings.letterSpacing != null ? fontSettings.letterSpacing : 0,
     lineHeight: fontSettings.lineHeight || 1.5,
     scrollback: fontSettings.scrollback || 10000,
@@ -1646,7 +1649,7 @@ function applyTheme(name) {
 function applyFontSettings() {
   Object.values(sessions).forEach(function(s) {
     if (!s.term) return;
-    s.term.options.fontFamily = fontSettings.fontFamily;
+    s.term.options.fontFamily = cssFontFamily();
     s.term.options.fontSize = fontSettings.fontSize;
     s.term.options.lineHeight = fontSettings.lineHeight;
     s.term.options.letterSpacing = fontSettings.letterSpacing;
@@ -1700,6 +1703,65 @@ function toggleThemeMenu() {
   var menu = document.getElementById('theme-menu');
   menu.classList.toggle('open');
   document.getElementById('theme-trigger').classList.toggle('open', menu.classList.contains('open'));
+}
+
+function primaryFontFamily(v) {
+  if (!v) return '';
+  return v.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+}
+
+// xterm accepts a CSS font stack; stored values are usually a single family.
+function cssFontFamily() {
+  const f = fontSettings.fontFamily;
+  if (!f) return FONT_FALLBACK;
+  if (f.includes(',')) return f;
+  return `'${f.replace(/'/g, '')}', monospace`;
+}
+
+let localFontsCache = null;
+
+async function loadLocalFonts() {
+  if (localFontsCache) return localFontsCache;
+  try {
+    localFontsCache = (await App().ListFonts()) || [];
+  } catch (_) {
+    localFontsCache = [];
+  }
+  return localFontsCache;
+}
+
+async function populateFontSelect() {
+  const sel = document.getElementById('font-family');
+  const fonts = await loadLocalFonts();
+  const current = primaryFontFamily(fontSettings.fontFamily);
+  sel.innerHTML = '';
+  const addGroup = (label, list) => {
+    if (!list.length) return;
+    const og = document.createElement('optgroup');
+    og.label = label;
+    for (const f of list) {
+      const o = document.createElement('option');
+      o.value = f.family;
+      o.textContent = f.family;
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
+  };
+  addGroup('等宽字体', fonts.filter((f) => f.monospace));
+  addGroup('其他字体', fonts.filter((f) => !f.monospace));
+  if (!fonts.length) {
+    const o = document.createElement('option');
+    o.value = current;
+    o.textContent = current;
+    sel.appendChild(o);
+  }
+  if (current && !Array.from(sel.options).some((o) => o.value === current)) {
+    const o = document.createElement('option');
+    o.value = current;
+    o.textContent = current + '（当前）';
+    sel.insertBefore(o, sel.firstChild);
+  }
+  if (current) sel.value = current;
 }
 
 function setVibrancyClass(on) {
@@ -1787,7 +1849,7 @@ function applySavedWindowPrefs() {
 
 function showFontSettings() {
   loadFontSettings();
-  document.getElementById('font-family').value = fontSettings.fontFamily;
+  populateFontSelect();
   document.getElementById('font-size').value = fontSettings.fontSize;
   document.getElementById('line-height').value = fontSettings.lineHeight;
   document.getElementById('letter-spacing').value = fontSettings.letterSpacing;
@@ -1838,7 +1900,7 @@ function saveFontSettings() {
     if (!isFinite(v)) return def;
     return Math.min(max, Math.max(min, v));
   };
-  fontSettings.fontFamily = document.getElementById('font-family').value.trim() || FONT_FALLBACK;
+  fontSettings.fontFamily = document.getElementById('font-family').value || primaryFontFamily(FONT_FALLBACK);
   fontSettings.fontSize = Math.round(num('font-size', 8, 36, 13));
   fontSettings.lineHeight = num('line-height', 0.5, 3, 1.5);
   fontSettings.letterSpacing = num('letter-spacing', 0, 5, 0);

@@ -83,6 +83,11 @@ func (a *App) setApplication(app *application.App) {
 	a.app = app
 }
 
+// ListFonts returns installed font families (monospace first).
+func (a *App) ListFonts() []LocalFont {
+	return listLocalFonts()
+}
+
 // SetWindowAppearance toggles the frosted-glass backdrop and sets its strength
 // (vibrancy) or, when vibrancy is off, the whole-window alpha.
 func (a *App) SetWindowAppearance(vibrancy bool, opacity float64) {
