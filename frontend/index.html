@@ -85,7 +85,11 @@ body.platform-mac .topbar { padding-left: 80px; }
 .server-item .del-btn { opacity: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; font-size: 12px; display: inline-flex; align-items: center; }
 .server-item:hover .del-btn { opacity: 1; }
 .server-item .del-btn:hover { color: var(--red); }
-.center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.center { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+#settings-view { position: absolute; inset: 0; width: auto; display: none; overflow-y: auto; z-index: 5; background: var(--bg-primary); border: none; border-radius: 0; box-shadow: none; padding: 0; transform: none; max-height: none; }
+body.vibrancy #settings-view { background: var(--window-tint, transparent); }
+.settings-inner { max-width: 760px; margin: 0 auto; padding: 28px 40px 48px; }
+.settings-inner .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .topbar .tab-bar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
 .topbar .tab-bar-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; --wails-draggable: no-drag; transition: background .12s ease, color .12s ease; }
 .topbar .tab-bar-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
@@ -281,7 +285,6 @@ body.vibrancy .xterm-screen { background-color: transparent !important; }
 .font-popup .btn-cancel:hover { background: var(--bg-hover); }
 .font-popup .btn-apply { background: var(--accent); color: #fff; }
 .font-popup .btn-apply:hover { opacity: .85; }
-.settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1400; }
 </style>
 </head>
 <body>
@@ -328,6 +331,109 @@ body.vibrancy .xterm-screen { background-color: transparent !important; }
           <span id="loading-text">连接中...</span>
         </div>
         <div id="terminal-container"></div>
+      </div>
+<!-- Terminal Settings (rendered as a tab in the centre pane) -->
+      <div id="settings-view" class="font-popup" style="display:none">
+        <div class="settings-inner">
+<div class="popup-header">
+    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> 终端设置</h2>
+    <button class="close-btn" onclick="hideFontSettings()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="popup-body">
+    <div class="section">
+      <div class="section-label">字体</div>
+      <div class="form-group">
+        <label>字体系列</label>
+        <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>大小</label>
+          <input type="number" id="font-size" min="8" max="36" step="1">
+        </div>
+        <div class="form-group">
+          <label>行高</label>
+          <input type="number" id="line-height" min="0.5" max="3" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>字距</label>
+          <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>字重</label>
+          <select id="font-weight">
+            <option value="300">细体 300</option>
+            <option value="400">常规 400</option>
+            <option value="500">中等 500</option>
+            <option value="600">半粗 600</option>
+            <option value="700">粗体 700</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>光标样式</label>
+          <select id="cursor-style">
+            <option value="underline">下划线</option>
+            <option value="bar">竖线</option>
+            <option value="block">方块</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">终端</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>回滚行数</label>
+          <input type="number" id="scrollback" min="100" max="200000" step="100">
+        </div>
+        <div class="form-group">
+          <label>最小对比度</label>
+          <input type="number" id="contrast" min="1" max="21" step="0.5">
+        </div>
+      </div>
+      <div class="check-row"><span>光标闪烁</span><input type="checkbox" class="switch" id="cursor-blink"></div>
+      <div class="check-row"><span>选中文本自动复制</span><input type="checkbox" class="switch" id="copy-on-select"></div>
+      <div class="check-row"><span>粗体使用亮色</span><input type="checkbox" class="switch" id="bold-bright"></div>
+    </div>
+    <div class="section">
+      <div class="section-label">窗口</div>
+      <div class="check-row"><span>磨砂效果</span><input type="checkbox" class="switch" id="vibrancy"></div>
+      <div class="check-row">
+        <span>窗口透明度</span>
+        <span class="slider-wrap">
+          <input type="range" id="window-opacity" min="0.4" max="1" step="0.02">
+          <span class="slider-value" id="opacity-value">100%</span>
+        </span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>默认宽度</label>
+          <input type="number" id="window-width" min="900" max="3840" step="10">
+        </div>
+        <div class="form-group">
+          <label>默认高度</label>
+          <input type="number" id="window-height" min="600" max="2400" step="10">
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">主题</div>
+      <div class="theme-dropdown">
+        <div class="theme-trigger" id="theme-trigger" onclick="toggleThemeMenu()">
+          <div class="theme-swatch" id="theme-swatch"></div>
+          <span class="theme-name" id="theme-name">GitHub Dark</span>
+          <span class="arrow">▾</span>
+        </div>
+        <div class="theme-menu" id="theme-menu"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
+      <button class="btn-apply" onclick="saveFontSettings()">应用</button>
+    </div>
+          </div>
       </div>
     </div>
 
@@ -553,6 +659,7 @@ let servers = [];
 let editingId = null;
 let sessions = {};
 let activeSessionId = null;
+let settingsOpen = false;
 let filePanelOpen = false;
 let maxUploadMB = 0;
 let _uploadQ = { items: [], active: false, totalBytes: 0, sentBytes: 0, done: 0 };
@@ -838,6 +945,11 @@ function openNewTerminal(serverId) {
 
 function switchSession(sid) {
   if (!sessions[sid]) return;
+  if (settingsOpen) {
+    settingsOpen = false;
+    document.getElementById('settings-view').style.display = 'none';
+    document.getElementById('terminal-wrapper').style.display = '';
+  }
   sessions[sid].unread = false;
   activeSessionId = sid;
   renderServers();
@@ -876,14 +988,14 @@ function renderTabs() {
   const list = document.getElementById('tab-list');
   const brand = document.getElementById('app-brand');
   const sids = Object.keys(sessions);
-  brand.style.display = sids.length === 0 ? 'flex' : 'none';
-  list.innerHTML = sids.map(sid => {
+  brand.style.display = (sids.length === 0 && !settingsOpen) ? 'flex' : 'none';
+  let html = sids.map(sid => {
     const ses = sessions[sid];
     const svr = servers.find(s => s.id === ses.serverId);
     const name = svr ? (svr.name || svr.host) : '?';
     const host = svr ? `${svr.user}@${svr.host}:${svr.port}` : '?';
-    const active = sid === activeSessionId ? ' active' : '';
-    const unread = ses.unread && sid !== activeSessionId ? ' unread' : '';
+    const active = (!settingsOpen && sid === activeSessionId) ? ' active' : '';
+    const unread = (!settingsOpen && ses.unread && sid !== activeSessionId) ? ' unread' : '';
     return `<div class="tab${active}${unread}" onclick="switchSession('${sid}')" ondblclick="duplicateSession('${sid}')">
       <span class="tab-name">${escHtml(name)}</span>
       <span class="tab-host">${escHtml(host)}</span>
@@ -891,6 +1003,13 @@ function renderTabs() {
       <button class="tab-close" onclick="event.stopPropagation();closeSession('${sid}')">&times;</button>
     </div>`;
   }).join('');
+  if (settingsOpen) {
+    html += `<div class="tab active" onclick="showSettingsView()">
+      <span class="tab-name">设置</span>
+      <button class="tab-close" onclick="event.stopPropagation();hideFontSettings()">&times;</button>
+    </div>`;
+  }
+  list.innerHTML = html;
 }
 
 function setActiveSession(sid) {
@@ -1685,16 +1804,32 @@ function showFontSettings() {
   document.getElementById('window-width').value = fontSettings.windowWidth;
   document.getElementById('window-height').value = fontSettings.windowHeight;
   renderThemePicker(fontSettings.theme || 'abernathy');
-  document.getElementById('font-popup').style.display = 'block';
-  document.getElementById('settings-overlay').style.display = 'block';
+  showSettingsView();
+}
+
+function showSettingsView() {
+  settingsOpen = true;
+  document.getElementById('terminal-wrapper').style.display = 'none';
+  document.getElementById('settings-view').style.display = 'block';
+  renderTabs();
+  updateStatus();
 }
 
 function hideFontSettings() {
   if (typeof fontSettings.windowOpacity === 'number') applyWindowLook();
   document.getElementById('theme-menu').classList.remove('open');
   document.getElementById('theme-trigger').classList.remove('open');
-  document.getElementById('font-popup').style.display = 'none';
-  document.getElementById('settings-overlay').style.display = 'none';
+  settingsOpen = false;
+  document.getElementById('settings-view').style.display = 'none';
+  document.getElementById('terminal-wrapper').style.display = '';
+  renderTabs();
+  if (activeSessionId && sessions[activeSessionId]) {
+    setActiveSession(activeSessionId);
+  } else {
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('loading-state').style.display = 'none';
+  }
+  updateStatus();
 }
 
 function saveFontSettings() {
@@ -1724,9 +1859,6 @@ function saveFontSettings() {
   applyTheme(fontSettings.theme);
   applyWindowLook();
   applyWindowSize(fontSettings.windowWidth, fontSettings.windowHeight);
-  hideFontSettings();
-  const ses = sessions[activeSessionId];
-  if (ses && ses.term) ses.term.focus();
 }
 
 function getActiveSession() { return activeSessionId ? sessions[activeSessionId] : null; }
@@ -2309,7 +2441,7 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('click', (e) => {
-  const fp = document.getElementById('font-popup');
+  const fp = document.getElementById('settings-view');
   if (fp.style.display !== 'none' && !fp.contains(e.target) && !e.target.closest('[onclick*="showFontSettings"]'))
     hideFontSettings();
   // 关闭主题下拉菜单
@@ -2323,114 +2455,12 @@ document.addEventListener('click', (e) => {
 // Keyboard shortcut
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (settingsOpen) { hideFontSettings(); return; }
     document.getElementById('modal-overlay').style.display = 'none';
   }
 });
 </script>
 <!-- Settings Overlay -->
-<div class="settings-overlay" id="settings-overlay" style="display:none" onclick="hideFontSettings()"></div>
-
-<!-- Terminal Settings Popup -->
-<div id="font-popup" class="font-popup" style="display:none">
-  <div class="popup-header">
-    <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> 终端设置</h2>
-    <button class="close-btn" onclick="hideFontSettings()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-  </div>
-  <div class="popup-body">
-    <div class="section">
-      <div class="section-label">字体</div>
-      <div class="form-group">
-        <label>字体系列</label>
-        <input type="text" id="font-family" placeholder="例如 'Consolas', 'Menlo', monospace">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>大小</label>
-          <input type="number" id="font-size" min="8" max="36" step="1">
-        </div>
-        <div class="form-group">
-          <label>行高</label>
-          <input type="number" id="line-height" min="0.5" max="3" step="0.1">
-        </div>
-        <div class="form-group">
-          <label>字距</label>
-          <input type="number" id="letter-spacing" min="0" max="5" step="0.1">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>字重</label>
-          <select id="font-weight">
-            <option value="300">细体 300</option>
-            <option value="400">常规 400</option>
-            <option value="500">中等 500</option>
-            <option value="600">半粗 600</option>
-            <option value="700">粗体 700</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>光标样式</label>
-          <select id="cursor-style">
-            <option value="underline">下划线</option>
-            <option value="bar">竖线</option>
-            <option value="block">方块</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-label">终端</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>回滚行数</label>
-          <input type="number" id="scrollback" min="100" max="200000" step="100">
-        </div>
-        <div class="form-group">
-          <label>最小对比度</label>
-          <input type="number" id="contrast" min="1" max="21" step="0.5">
-        </div>
-      </div>
-      <div class="check-row"><span>光标闪烁</span><input type="checkbox" class="switch" id="cursor-blink"></div>
-      <div class="check-row"><span>选中文本自动复制</span><input type="checkbox" class="switch" id="copy-on-select"></div>
-      <div class="check-row"><span>粗体使用亮色</span><input type="checkbox" class="switch" id="bold-bright"></div>
-    </div>
-    <div class="section">
-      <div class="section-label">窗口</div>
-      <div class="check-row"><span>磨砂效果</span><input type="checkbox" class="switch" id="vibrancy"></div>
-      <div class="check-row">
-        <span>窗口透明度</span>
-        <span class="slider-wrap">
-          <input type="range" id="window-opacity" min="0.4" max="1" step="0.02">
-          <span class="slider-value" id="opacity-value">100%</span>
-        </span>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>默认宽度</label>
-          <input type="number" id="window-width" min="900" max="3840" step="10">
-        </div>
-        <div class="form-group">
-          <label>默认高度</label>
-          <input type="number" id="window-height" min="600" max="2400" step="10">
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-label">主题</div>
-      <div class="theme-dropdown">
-        <div class="theme-trigger" id="theme-trigger" onclick="toggleThemeMenu()">
-          <div class="theme-swatch" id="theme-swatch"></div>
-          <span class="theme-name" id="theme-name">GitHub Dark</span>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="theme-menu" id="theme-menu"></div>
-      </div>
-    </div>
-    <div class="actions">
-      <button class="btn-cancel" onclick="hideFontSettings()">取消</button>
-      <button class="btn-apply" onclick="saveFontSettings()">应用</button>
-    </div>
-  </div>
 
 </body>
 </html>
