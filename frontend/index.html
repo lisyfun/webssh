@@ -1654,7 +1654,8 @@ function previewWindowLook() {
 
 function applyWindowSize(width, height) {
   if (!width || !height) return;
-  wailsReady.then((w) => w.Window.SetSize(width, height)).catch(() => {});
+  // Re-centre after resizing: the native window keeps its top-left corner.
+  wailsReady.then((w) => w.Window.SetSize(width, height).then(() => w.Window.Center())).catch(() => {});
 }
 
 // Apply saved window preferences on launch (only when the user has set them).
@@ -2266,6 +2267,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadFontSettings();
   applyTheme(fontSettings.theme);
   applySavedWindowPrefs();
+  // Always open centred on the active screen.
+  wailsReady.then((w) => w.Window.Center()).catch(() => {});
   document.getElementById('file-hidden-btn').classList.toggle('active', showHidden);
 
   // Window opacity slider: live preview while dragging, persisted on Apply.
