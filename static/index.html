@@ -717,7 +717,7 @@ input, textarea, button { font-family: inherit; }
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideSSHConfigImport()">取消</button>
-      <button class="btn-primary" onclick="importSSHConfig()" id="sshconfig-import-btn" disabled>导入</button>
+      <button class="btn-primary" onclick="importParsedSSHConfig()" id="sshconfig-import-btn" disabled>导入</button>
     </div>
   </div>
 </div>
@@ -733,7 +733,7 @@ input, textarea, button { font-family: inherit; }
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="hideBatchImport()">取消</button>
-      <button class="btn-primary" onclick="importSSHConfig()" title="解析服务端 ~/.ssh/config 并导入服务器列表">从 ~/.ssh/config 导入</button>
+      <button class="btn-primary" onclick="importSSHConfigFromServer()" title="解析服务端 ~/.ssh/config 并导入服务器列表">从 ~/.ssh/config 导入</button>
       <button class="btn-primary" onclick="batchImport()">导入</button>
     </div>
   </div>
@@ -859,8 +859,15 @@ async function api(url, opts) {
   opts = opts || {};
   opts.headers = { ...apiHeaders(), ...(opts.headers || {}) };
   const r = await fetch(url, opts);
-  const j = await r.json();
-  if (!j.success) throw new Error(j.error || 'request failed');
+  const text = await r.text();
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch (_) {
+    const snippet = (text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    throw new Error(`HTTP ${r.status}: ${snippet || 'empty response'}`);
+  }
+  if (!j || !j.success) throw new Error((j && j.error) || `HTTP ${r.status}`);
   return j;
 }
 
@@ -1523,7 +1530,7 @@ function renderSSHConfigPreview() {
   document.getElementById('sshconfig-import-btn').disabled = sshConfigParsed.length === 0;
 }
 
-async function importSSHConfig() {
+async function importParsedSSHConfig() {
   if (!sshConfigParsed.length) { showToast('没有可导入的主机', 'error'); return; }
   const list = sshConfigParsed.map(h => ({
     id: uuid(),
@@ -1553,7 +1560,7 @@ async function importSSHConfig() {
   }
 }
 
-async function importSSHConfig() {
+async function importSSHConfigFromServer() {
   try {
     const res = await api('__BASE_PATH__/api/sshconfig/import', { method: 'POST' });
     if (res.data && res.data.imported > 0) {
